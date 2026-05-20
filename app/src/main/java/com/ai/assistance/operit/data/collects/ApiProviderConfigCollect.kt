@@ -241,6 +241,21 @@ object ApiProviderConfigs {
             )
         ),
         ProviderApiConfig(
+            providerType = ApiProviderType.BEDROCK,
+            defaultModelName = "openai.gpt-oss-120b",
+            defaultApiEndpoint = "https://bedrock-mantle.us-east-1.api.aws/v1/chat/completions",
+            endpointOptions = listOf(
+                ProviderEndpointOption(
+                    endpoint = "https://bedrock-mantle.us-east-1.api.aws/v1/chat/completions",
+                    label = "Mantle OpenAI-compatible (us-east-1)"
+                ),
+                ProviderEndpointOption(
+                    endpoint = "https://bedrock-runtime.us-east-1.amazonaws.com/v1/chat/completions",
+                    label = "Runtime OpenAI-compatible (us-east-1)"
+                )
+            )
+        ),
+        ProviderApiConfig(
             providerType = ApiProviderType.OTHER,
             defaultModelName = "",
             defaultApiEndpoint = ""

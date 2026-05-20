@@ -104,6 +104,7 @@ object ModelListFetcher {
                     ApiProviderType.LMSTUDIO -> "${extractBaseUrl(apiEndpoint)}/v1/models"
                     ApiProviderType.OLLAMA -> "${extractBaseUrl(apiEndpoint)}/v1/models"
                     ApiProviderType.PPINFRA -> "${extractBaseUrl(apiEndpoint)}/v1/models"
+                    ApiProviderType.BEDROCK -> "${extractBaseUrl(apiEndpoint)}/v1/models"
                     // 其他API提供商可能需要特殊处理
                     else -> "${extractBaseUrl(apiEndpoint)}/v1/models" // 默认尝试OpenAI兼容格式
                 }
@@ -335,7 +336,8 @@ object ModelListFetcher {
                                     ApiProviderType.ZHIPU,
                                     ApiProviderType.LMSTUDIO,
                                     ApiProviderType.OLLAMA,
-                                    ApiProviderType.PPINFRA -> parseOpenAIModelResponse(context, responseBody)
+                                    ApiProviderType.PPINFRA,
+                                    ApiProviderType.BEDROCK -> parseOpenAIModelResponse(context, responseBody)
                                     ApiProviderType.ANTHROPIC,
                                     ApiProviderType.ANTHROPIC_GENERIC -> parseAnthropicModelResponse(context, responseBody)
                                     ApiProviderType.GOOGLE,

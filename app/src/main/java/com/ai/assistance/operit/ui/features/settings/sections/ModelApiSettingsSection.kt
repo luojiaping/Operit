@@ -284,7 +284,8 @@ fun ModelApiSettingsSection(
                 selectedApiProvider == ApiProviderType.ANTHROPIC_GENERIC ||
                 selectedApiProvider == ApiProviderType.MISTRAL ||
                 selectedApiProvider == ApiProviderType.NVIDIA ||
-                selectedApiProvider == ApiProviderType.NOUS_PORTAL
+                selectedApiProvider == ApiProviderType.NOUS_PORTAL ||
+                selectedApiProvider == ApiProviderType.BEDROCK
         ) {
             val inChina = LocationUtils.isDeviceInMainlandChina(context)
             showRegionWarning = inChina
@@ -1066,6 +1067,7 @@ private fun getBuiltInProviderDisplayName(provider: ApiProviderType, context: an
         ApiProviderType.LLAMA_CPP -> context.getString(R.string.provider_llama_cpp)
         ApiProviderType.PPINFRA -> context.getString(R.string.provider_ppinfra)
         ApiProviderType.NOVITA -> context.getString(R.string.provider_novita)
+        ApiProviderType.BEDROCK -> context.getString(R.string.provider_bedrock)
         ApiProviderType.OTHER -> context.getString(R.string.provider_other)
     }
 }
@@ -1722,6 +1724,7 @@ private fun getProviderColor(providerTypeId: String): androidx.compose.ui.graphi
         ApiProviderType.LLAMA_CPP -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.9f)
         ApiProviderType.PPINFRA -> MaterialTheme.colorScheme.primaryContainer
         ApiProviderType.NOVITA -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.75f)
+        ApiProviderType.BEDROCK -> MaterialTheme.colorScheme.primary.copy(alpha = 0.68f)
         ApiProviderType.OTHER -> MaterialTheme.colorScheme.surfaceVariant
     }
 }
