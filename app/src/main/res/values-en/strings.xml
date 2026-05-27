@@ -3939,7 +3939,6 @@
     <string name="sub_model_select_parameter">Select parameter to add</string>
     <string name="sub_model_remove_parameter">Remove</string>
     <string name="sub_model_no_more_params">No more parameters to add</string>
-    <string name="enabled">Enabled</string>
     <string name="disabled">Disabled</string>
   
     <!-- Custom Parameters Dialog -->
