@@ -3857,7 +3857,6 @@
     <string name="sub_model_select_parameter">选择要添加的参数</string>
     <string name="sub_model_remove_parameter">移除</string>
     <string name="sub_model_no_more_params">没有更多可添加的参数</string>
-    <string name="disabled">未启用</string>
     <string name="sub_model_override_saved">已保存 %s 的自定义参数</string>
     <string name="sub_model_override_save_failed">保存失败: %s</string>
     <string name="sub_model_override_reset">已重置 %s 的自定义参数</string>
