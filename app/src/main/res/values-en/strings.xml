@@ -3897,7 +3897,6 @@
     <string name="sub_model_inherit">Inherit</string>
     <string name="sub_model_reset">Reset to Default</string>
     <string name="sub_model_parameter_settings">%s Parameter Settings</string>
-    <string name="save">Save</string>
   
     <!-- Custom Parameters Dialog -->
     <string name="add_custom_parameter">Add</string>

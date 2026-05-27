@@ -24,7 +24,6 @@ import androidx.compose.ui.unit.dp
 import com.ai.assistance.operit.R
 import com.ai.assistance.operit.data.model.ModelConfigData
 import com.ai.assistance.operit.data.model.ModelOverrideConfig
-import com.ai.assistance.operit.data.model.ModelParameter
 import com.ai.assistance.operit.data.model.getModelList
 import com.ai.assistance.operit.data.preferences.ModelConfigManager
 import kotlinx.coroutines.launch
