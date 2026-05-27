@@ -3940,6 +3940,9 @@
     <string name="sub_model_remove_parameter">Remove</string>
     <string name="sub_model_no_more_params">No more parameters to add</string>
     <string name="disabled">Disabled</string>
+    <string name="sub_model_override_saved">Saved custom parameters for %s</string>
+    <string name="sub_model_override_save_failed">Save failed: %s</string>
+    <string name="sub_model_override_reset">Reset custom parameters for %s</string>
   
     <!-- Custom Parameters Dialog -->
     <string name="add_custom_parameter">Add</string>

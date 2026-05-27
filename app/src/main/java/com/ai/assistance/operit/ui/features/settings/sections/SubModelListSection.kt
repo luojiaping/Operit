@@ -2,7 +2,6 @@ package com.ai.assistance.operit.ui.features.settings.sections
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -16,9 +15,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Settings
@@ -28,7 +25,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -38,6 +34,8 @@ import com.ai.assistance.operit.data.model.ModelConfigDefaults
 import com.ai.assistance.operit.data.model.ModelOverrideConfig
 import com.ai.assistance.operit.data.model.getModelList
 import com.ai.assistance.operit.data.preferences.ModelConfigManager
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
@@ -103,7 +101,9 @@ fun SubModelListSection(
                         {
                             scope.launch {
                                 configManager.deleteModelOverride(config.id, modelName)
-                                showNotification("已重置 $modelName 的自定义参数")
+                                showNotification(
+                                    stringResource(R.string.sub_model_override_reset, modelName)
+                                )
                             }
                         }
                     } else null
@@ -192,7 +192,7 @@ private fun SubModelItem(
                         modifier = Modifier.size(24.dp)
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Delete,
+                            imageVector = Icons.Default.Close,
                             contentDescription = stringResource(R.string.sub_model_reset),
                             tint = MaterialTheme.colorScheme.error,
                             modifier = Modifier.size(16.dp)
@@ -217,6 +217,16 @@ private data class AddableParameter(
     val id: String,
     val nameResId: Int,
     val descriptionResId: Int
+)
+
+/** 可选参数的完整定义列表 */
+private val addableParameters = listOf(
+    AddableParameter("top_p", R.string.top_p_name, R.string.top_p_description),
+    AddableParameter("top_k", R.string.top_k_name, R.string.top_k_description),
+    AddableParameter("max_tokens", R.string.max_tokens_name, R.string.max_tokens_description),
+    AddableParameter("presence_penalty", R.string.presence_penalty_name, R.string.presence_penalty_description),
+    AddableParameter("frequency_penalty", R.string.frequency_penalty_name, R.string.frequency_penalty_description),
+    AddableParameter("repetition_penalty", R.string.repetition_penalty_name, R.string.repetition_penalty_description)
 )
 
 /**
@@ -303,19 +313,14 @@ private fun SubModelParameterPanel(
     // 下拉菜单状态
     var showAddMenu by remember { mutableStateOf(false) }
 
-    // 可添加的参数列表
-    val addableParameters = listOf(
-        AddableParameter("top_p", R.string.top_p_name, R.string.top_p_description),
-        AddableParameter("top_k", R.string.top_k_name, R.string.top_k_description),
-        AddableParameter("max_tokens", R.string.max_tokens_name, R.string.max_tokens_description),
-        AddableParameter("presence_penalty", R.string.presence_penalty_name, R.string.presence_penalty_description),
-        AddableParameter("frequency_penalty", R.string.frequency_penalty_name, R.string.frequency_penalty_description),
-        AddableParameter("repetition_penalty", R.string.repetition_penalty_name, R.string.repetition_penalty_description)
-    )
+    // 防抖：延迟保存，避免快速切换时频繁写入
+    var saveJob by remember { mutableStateOf<Job?>(null) }
 
     // 保存函数
     fun saveOverride() {
-        scope.launch {
+        saveJob?.cancel()
+        saveJob = scope.launch {
+            delay(300) // 300ms 防抖
             try {
                 val override = ModelOverrideConfig(
                     temperatureEnabled = temperatureEnabled,
@@ -337,9 +342,71 @@ private fun SubModelParameterPanel(
                     customHeaders = existingOverride?.customHeaders
                 )
                 configManager.updateModelOverride(config.id, modelName, override)
-                showNotification("已保存 $modelName 的自定义参数")
+                showNotification(stringResource(R.string.sub_model_override_saved, modelName))
             } catch (e: Exception) {
-                showNotification("保存失败: ${e.message}")
+                showNotification(stringResource(R.string.sub_model_override_save_failed, e.message ?: ""))
+            }
+        }
+    }
+
+    // 构建已添加参数的运行时状态映射，用于数据驱动渲染
+    data class OptionalParamState(
+        val id: String,
+        val nameResId: Int,
+        val descriptionResId: Int,
+        val enabled: Boolean,
+        val onEnabledChange: (Boolean) -> Unit,
+        val value: String,
+        val onValueChange: (String) -> Unit,
+        val onValueSave: () -> Unit,
+        val onRemove: () -> Unit
+    )
+
+    val optionalParamStates = remember(
+        addedParameters.toList(),
+        topPEnabled, topP, topKEnabled, topK,
+        maxTokensEnabled, maxTokens, presencePenaltyEnabled, presencePenalty,
+        frequencyPenaltyEnabled, frequencyPenalty, repetitionPenaltyEnabled, repetitionPenalty
+    ) {
+        addableParameters.filter { it.id in addedParameters }.map { param ->
+            when (param.id) {
+                "top_p" -> OptionalParamState(
+                    param.id, param.nameResId, param.descriptionResId,
+                    topPEnabled, { topPEnabled = it; saveOverride() },
+                    topP, { topP = it }, { saveOverride() },
+                    { addedParameters.remove("top_p"); topPEnabled = false; saveOverride() }
+                )
+                "top_k" -> OptionalParamState(
+                    param.id, param.nameResId, param.descriptionResId,
+                    topKEnabled, { topKEnabled = it; saveOverride() },
+                    topK, { topK = it }, { saveOverride() },
+                    { addedParameters.remove("top_k"); topKEnabled = false; saveOverride() }
+                )
+                "max_tokens" -> OptionalParamState(
+                    param.id, param.nameResId, param.descriptionResId,
+                    maxTokensEnabled, { maxTokensEnabled = it; saveOverride() },
+                    maxTokens, { maxTokens = it }, { saveOverride() },
+                    { addedParameters.remove("max_tokens"); maxTokensEnabled = false; saveOverride() }
+                )
+                "presence_penalty" -> OptionalParamState(
+                    param.id, param.nameResId, param.descriptionResId,
+                    presencePenaltyEnabled, { presencePenaltyEnabled = it; saveOverride() },
+                    presencePenalty, { presencePenalty = it }, { saveOverride() },
+                    { addedParameters.remove("presence_penalty"); presencePenaltyEnabled = false; saveOverride() }
+                )
+                "frequency_penalty" -> OptionalParamState(
+                    param.id, param.nameResId, param.descriptionResId,
+                    frequencyPenaltyEnabled, { frequencyPenaltyEnabled = it; saveOverride() },
+                    frequencyPenalty, { frequencyPenalty = it }, { saveOverride() },
+                    { addedParameters.remove("frequency_penalty"); frequencyPenaltyEnabled = false; saveOverride() }
+                )
+                "repetition_penalty" -> OptionalParamState(
+                    param.id, param.nameResId, param.descriptionResId,
+                    repetitionPenaltyEnabled, { repetitionPenaltyEnabled = it; saveOverride() },
+                    repetitionPenalty, { repetitionPenalty = it }, { saveOverride() },
+                    { addedParameters.remove("repetition_penalty"); repetitionPenaltyEnabled = false; saveOverride() }
+                )
+                else -> throw IllegalArgumentException("Unknown parameter: ${param.id}")
             }
         }
     }
@@ -350,7 +417,7 @@ private fun SubModelParameterPanel(
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Divider(modifier = Modifier.padding(vertical = 4.dp))
+        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
 
         Text(
             text = stringResource(R.string.sub_model_parameter_settings, modelName),
@@ -358,7 +425,7 @@ private fun SubModelParameterPanel(
             fontWeight = FontWeight.Medium
         )
 
-        // Temperature（默认显示）
+        // Temperature（默认显示，不可移除）
         SubModelParameterRow(
             name = stringResource(R.string.temperature_name),
             enabled = temperatureEnabled,
@@ -367,10 +434,10 @@ private fun SubModelParameterPanel(
             onValueChange = { temperature = it },
             onValueSave = { saveOverride() },
             description = stringResource(R.string.temperature_description),
-            onRemove = null // Temperature不可移除
+            onRemove = null
         )
 
-        // Max Context Length（默认显示）
+        // Max Context Length（默认显示，不可移除）
         SubModelParameterRow(
             name = stringResource(R.string.sub_model_max_context_length),
             enabled = maxContextLengthEnabled,
@@ -379,109 +446,20 @@ private fun SubModelParameterPanel(
             onValueChange = { maxContextLength = it },
             onValueSave = { saveOverride() },
             description = stringResource(R.string.sub_model_max_context_length_desc),
-            onRemove = null // 最大上下文长度不可移除
+            onRemove = null
         )
 
-        // 已添加的可选参数
-        if ("top_p" in addedParameters) {
+        // 已添加的可选参数（数据驱动渲染）
+        optionalParamStates.forEach { state ->
             SubModelParameterRow(
-                name = stringResource(R.string.top_p_name),
-                enabled = topPEnabled,
-                onEnabledChange = { topPEnabled = it; saveOverride() },
-                value = topP,
-                onValueChange = { topP = it },
-                onValueSave = { saveOverride() },
-                description = stringResource(R.string.top_p_description),
-                onRemove = {
-                    addedParameters.remove("top_p")
-                    topPEnabled = false
-                    saveOverride()
-                }
-            )
-        }
-
-        if ("top_k" in addedParameters) {
-            SubModelParameterRow(
-                name = stringResource(R.string.top_k_name),
-                enabled = topKEnabled,
-                onEnabledChange = { topKEnabled = it; saveOverride() },
-                value = topK,
-                onValueChange = { topK = it },
-                onValueSave = { saveOverride() },
-                description = stringResource(R.string.top_k_description),
-                onRemove = {
-                    addedParameters.remove("top_k")
-                    topKEnabled = false
-                    saveOverride()
-                }
-            )
-        }
-
-        if ("max_tokens" in addedParameters) {
-            SubModelParameterRow(
-                name = stringResource(R.string.max_tokens_name),
-                enabled = maxTokensEnabled,
-                onEnabledChange = { maxTokensEnabled = it; saveOverride() },
-                value = maxTokens,
-                onValueChange = { maxTokens = it },
-                onValueSave = { saveOverride() },
-                description = stringResource(R.string.max_tokens_description),
-                onRemove = {
-                    addedParameters.remove("max_tokens")
-                    maxTokensEnabled = false
-                    saveOverride()
-                }
-            )
-        }
-
-        if ("presence_penalty" in addedParameters) {
-            SubModelParameterRow(
-                name = stringResource(R.string.presence_penalty_name),
-                enabled = presencePenaltyEnabled,
-                onEnabledChange = { presencePenaltyEnabled = it; saveOverride() },
-                value = presencePenalty,
-                onValueChange = { presencePenalty = it },
-                onValueSave = { saveOverride() },
-                description = stringResource(R.string.presence_penalty_description),
-                onRemove = {
-                    addedParameters.remove("presence_penalty")
-                    presencePenaltyEnabled = false
-                    saveOverride()
-                }
-            )
-        }
-
-        if ("frequency_penalty" in addedParameters) {
-            SubModelParameterRow(
-                name = stringResource(R.string.frequency_penalty_name),
-                enabled = frequencyPenaltyEnabled,
-                onEnabledChange = { frequencyPenaltyEnabled = it; saveOverride() },
-                value = frequencyPenalty,
-                onValueChange = { frequencyPenalty = it },
-                onValueSave = { saveOverride() },
-                description = stringResource(R.string.frequency_penalty_description),
-                onRemove = {
-                    addedParameters.remove("frequency_penalty")
-                    frequencyPenaltyEnabled = false
-                    saveOverride()
-                }
-            )
-        }
-
-        if ("repetition_penalty" in addedParameters) {
-            SubModelParameterRow(
-                name = stringResource(R.string.repetition_penalty_name),
-                enabled = repetitionPenaltyEnabled,
-                onEnabledChange = { repetitionPenaltyEnabled = it; saveOverride() },
-                value = repetitionPenalty,
-                onValueChange = { repetitionPenalty = it },
-                onValueSave = { saveOverride() },
-                description = stringResource(R.string.repetition_penalty_description),
-                onRemove = {
-                    addedParameters.remove("repetition_penalty")
-                    repetitionPenaltyEnabled = false
-                    saveOverride()
-                }
+                name = stringResource(state.nameResId),
+                enabled = state.enabled,
+                onEnabledChange = state.onEnabledChange,
+                value = state.value,
+                onValueChange = state.onValueChange,
+                onValueSave = state.onValueSave,
+                description = stringResource(state.descriptionResId),
+                onRemove = state.onRemove
             )
         }
 
@@ -573,13 +551,13 @@ private fun SubModelParameterRow(
 ) {
     // 动画效果
     val backgroundColor by animateColorAsState(
-        targetValue = if (enabled) 
+        targetValue = if (enabled)
             MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-        else 
+        else
             MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
         label = "backgroundColor"
     )
-    
+
     val buttonScale by animateFloatAsState(
         targetValue = if (enabled) 1.1f else 1.0f,
         label = "buttonScale"
@@ -612,7 +590,7 @@ private fun SubModelParameterRow(
                         )
                     }
                 }
-                
+
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -632,12 +610,12 @@ private fun SubModelParameterRow(
                         Icon(
                             imageVector = if (enabled) Icons.Default.Check else Icons.Default.Close,
                             contentDescription = if (enabled) stringResource(R.string.enabled) else stringResource(R.string.disabled),
-                            tint = if (enabled) MaterialTheme.colorScheme.onPrimary 
+                            tint = if (enabled) MaterialTheme.colorScheme.onPrimary
                                    else MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(20.dp)
                         )
                     }
-                    
+
                     // 移除按钮
                     if (onRemove != null) {
                         IconButton(
