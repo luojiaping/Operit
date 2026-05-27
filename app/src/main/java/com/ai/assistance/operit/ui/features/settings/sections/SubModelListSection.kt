@@ -389,7 +389,7 @@ private fun SubModelParameterPanel(
 }
 
 /**
- * 子模型参数行
+ * 子模型参数行 - 参考 ModelParametersSection 的 ParameterItem 布局
  */
 @Composable
 private fun SubModelParameterRow(
@@ -401,51 +401,66 @@ private fun SubModelParameterRow(
     onValueSave: () -> Unit,
     description: String
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 2.dp),
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
     ) {
-        // 启用开关
-        Switch(
-            checked = enabled,
-            onCheckedChange = onEnabledChange,
-            modifier = Modifier.size(32.dp)
-        )
-
-        Spacer(modifier = Modifier.width(8.dp))
-
-        // 参数名称
-        Text(
-            text = name,
-            style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier.width(80.dp)
-        )
-
-        // 参数值输入
-        OutlinedTextField(
-            value = value,
-            onValueChange = onValueChange,
-            enabled = enabled,
-            modifier = Modifier
-                .weight(1f)
-                .height(40.dp),
-            textStyle = MaterialTheme.typography.bodySmall,
-            singleLine = true,
-            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal
-            ),
-            trailingIcon = {
-                IconButton(
-                    onClick = onValueSave,
-                    modifier = Modifier.size(24.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.CheckCircle,
-                        contentDescription = stringResource(R.string.save),
-                        modifier = Modifier.size(16.dp)
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = name,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Medium
                     )
+                    if (description.isNotEmpty()) {
+                        Text(
+                            text = description,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                Switch(
+                    checked = enabled,
+                    onCheckedChange = onEnabledChange
+                )
+            }
+
+            AnimatedVisibility(visible = enabled) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedTextField(
+                        value = value,
+                        onValueChange = onValueChange,
+                        label = { Text(stringResource(R.string.value)) },
+                        modifier = Modifier.weight(1f),
+                        singleLine = true,
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                            keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal
+                        )
+                    )
+                    IconButton(onClick = onValueSave) {
+                        Icon(
+                            imageVector = Icons.Default.CheckCircle,
+                            contentDescription = stringResource(R.string.save),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
                 }
             }
-        )
+        }
     }
 }
