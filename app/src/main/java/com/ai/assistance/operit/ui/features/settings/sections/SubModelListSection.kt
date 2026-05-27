@@ -101,9 +101,7 @@ fun SubModelListSection(
                         {
                             scope.launch {
                                 configManager.deleteModelOverride(config.id, modelName)
-                                showNotification(
-                                    stringResource(R.string.sub_model_override_reset, modelName)
-                                )
+                                showNotification("已重置 $modelName 的自定义参数")
                             }
                         }
                     } else null
@@ -342,9 +340,9 @@ private fun SubModelParameterPanel(
                     customHeaders = existingOverride?.customHeaders
                 )
                 configManager.updateModelOverride(config.id, modelName, override)
-                showNotification(stringResource(R.string.sub_model_override_saved, modelName))
+                showNotification("已保存 $modelName 的自定义参数")
             } catch (e: Exception) {
-                showNotification(stringResource(R.string.sub_model_override_save_failed, e.message ?: ""))
+                showNotification("保存失败: \${e.message}")
             }
         }
     }
