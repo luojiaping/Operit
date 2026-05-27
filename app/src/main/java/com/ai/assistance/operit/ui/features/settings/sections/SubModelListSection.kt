@@ -1,20 +1,15 @@
 package com.ai.assistance.operit.ui.features.settings.sections
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
@@ -23,8 +18,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -534,7 +527,7 @@ private fun SubModelParameterPanel(
 }
 
 /**
- * 子模型参数行 - 改进的开关按钮样式
+ * 子模型参数行 - 重新设计的布局
  */
 @Composable
 private fun SubModelParameterRow(
@@ -547,90 +540,61 @@ private fun SubModelParameterRow(
     description: String,
     onRemove: (() -> Unit)?
 ) {
-    // 动画效果
-    val backgroundColor by animateColorAsState(
-        targetValue = if (enabled)
-            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-        else
-            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-        label = "backgroundColor"
-    )
-
-    val buttonScale by animateFloatAsState(
-        targetValue = if (enabled) 1.1f else 1.0f,
-        label = "buttonScale"
-    )
-
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 2.dp),
-        shape = RoundedCornerShape(8.dp),
-        color = backgroundColor
+            .padding(vertical = 4.dp),
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
+            // 第一行：标题 + 移除按钮 + 开关
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = name,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Medium
-                    )
-                    if (description.isNotEmpty()) {
-                        Text(
-                            text = description,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    // 改进的开关按钮
+                // 标题
+                Text(
+                    text = name,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.weight(1f)
+                )
+                
+                // 移除按钮（可选）
+                if (onRemove != null) {
                     IconButton(
-                        onClick = { onEnabledChange(!enabled) },
-                        modifier = Modifier
-                            .size(36.dp)
-                            .scale(buttonScale)
-                            .clip(CircleShape)
-                            .background(
-                                if (enabled) MaterialTheme.colorScheme.primary
-                                else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
-                            )
+                        onClick = onRemove,
+                        modifier = Modifier.size(24.dp)
                     ) {
                         Icon(
-                            imageVector = if (enabled) Icons.Default.Check else Icons.Default.Close,
-                            contentDescription = if (enabled) stringResource(R.string.enabled) else stringResource(R.string.disabled),
-                            tint = if (enabled) MaterialTheme.colorScheme.onPrimary
-                                   else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(20.dp)
+                            imageVector = Icons.Default.Close,
+                            contentDescription = stringResource(R.string.sub_model_remove_parameter),
+                            tint = MaterialTheme.colorScheme.error.copy(alpha = 0.6f),
+                            modifier = Modifier.size(16.dp)
                         )
                     }
-
-                    // 移除按钮
-                    if (onRemove != null) {
-                        IconButton(
-                            onClick = onRemove,
-                            modifier = Modifier.size(24.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = stringResource(R.string.sub_model_remove_parameter),
-                                tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
-                    }
+                    Spacer(modifier = Modifier.width(4.dp))
                 }
+                
+                // 开关按钮
+                Switch(
+                    checked = enabled,
+                    onCheckedChange = onEnabledChange
+                )
             }
-
+            
+            // 第二行：描述文字
+            if (description.isNotEmpty()) {
+                Text(
+                    text = description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
+            }
+            
+            // 第三行：输入框和保存按钮（仅在启用时显示）
             AnimatedVisibility(visible = enabled) {
                 Row(
                     modifier = Modifier
@@ -642,25 +606,18 @@ private fun SubModelParameterRow(
                     OutlinedTextField(
                         value = value,
                         onValueChange = onValueChange,
-                        label = { Text(stringResource(R.string.value)) },
                         modifier = Modifier.weight(1f),
                         singleLine = true,
+                        textStyle = MaterialTheme.typography.bodyMedium,
                         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                             keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal
                         )
                     )
-                    IconButton(
+                    Button(
                         onClick = onValueSave,
-                        modifier = Modifier
-                            .size(40.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primaryContainer)
+                        modifier = Modifier.height(48.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Check,
-                            contentDescription = stringResource(R.string.save),
-                            tint = MaterialTheme.colorScheme.primary
-                        )
+                        Text(stringResource(R.string.save))
                     }
                 }
             }
