@@ -294,6 +294,7 @@ internal class ToolPkgJsAiProviderService(
             "enableDirectAudioProcessing" to config.enableDirectAudioProcessing,
             "enableDirectVideoProcessing" to config.enableDirectVideoProcessing,
             "enableGoogleSearch" to config.enableGoogleSearch,
+            "enableClaude1hPromptCache" to config.enableClaude1hPromptCache,
             "enableToolCall" to config.enableToolCall,
             "requestLimitPerMinute" to config.requestLimitPerMinute,
             "maxConcurrentRequests" to config.maxConcurrentRequests,

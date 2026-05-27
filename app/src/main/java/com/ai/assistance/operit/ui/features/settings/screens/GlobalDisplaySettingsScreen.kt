@@ -45,14 +45,6 @@ fun GlobalDisplaySettingsScreen(
     val scope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
 
-    // 收集显示设置状态
-    val showModelProvider by displayPreferencesManager.showModelProvider.collectAsState(initial = false)
-    val showModelName by displayPreferencesManager.showModelName.collectAsState(initial = false)
-    val showRoleName by displayPreferencesManager.showRoleName.collectAsState(initial = false)
-    val showUserName by displayPreferencesManager.showUserName.collectAsState(initial = false)
-    val showMessageTokenStats by displayPreferencesManager.showMessageTokenStats.collectAsState(initial = false)
-    val showMessageTimingStats by displayPreferencesManager.showMessageTimingStats.collectAsState(initial = false)
-    val showMessageTimestamp by displayPreferencesManager.showMessageTimestamp.collectAsState(initial = false)
     val toolCollapseMode by displayPreferencesManager.toolCollapseMode.collectAsState(initial = ToolCollapseMode.ALL)
     val showFpsCounter by displayPreferencesManager.showFpsCounter.collectAsState(initial = false)
     val enableReplyNotification by displayPreferencesManager.enableReplyNotification.collectAsState(initial = true)
@@ -64,7 +56,6 @@ fun GlobalDisplaySettingsScreen(
     val enableExperimentalVirtualDisplay by displayPreferencesManager.enableExperimentalVirtualDisplay.collectAsState(initial = true)
     val hideRuntimeTaskView by displayPreferencesManager.hideRuntimeTaskView.collectAsState(initial = false)
     val globalUserName by displayPreferencesManager.globalUserName.collectAsState(initial = null)
-    val globalUserAvatarUri by displayPreferencesManager.globalUserAvatarUri.collectAsState(initial = null)
     val screenshotFormat by displayPreferencesManager.screenshotFormat.collectAsState(initial = "JPG")
     val screenshotQuality by displayPreferencesManager.screenshotQuality.collectAsState(initial = 75)
     val screenshotScalePercent by displayPreferencesManager.screenshotScalePercent.collectAsState(initial = 75)
@@ -124,7 +115,6 @@ fun GlobalDisplaySettingsScreen(
         )
     }
 
-    // 同步全局用户名状态
     LaunchedEffect(globalUserName) {
         userNameInput = globalUserName ?: ""
     }
@@ -183,94 +173,9 @@ fun GlobalDisplaySettingsScreen(
                 .padding(horizontal = 16.dp, vertical = 8.dp)
                 .verticalScroll(scrollState)
         ) {
-            // ======= 消息显示设置 =======
             SectionTitle(
                 text = stringResource(R.string.message_display_settings),
                 icon = Icons.Default.Message
-            )
-
-            DisplayToggleItem(
-                title = stringResource(R.string.show_model_provider),
-                subtitle = stringResource(R.string.show_model_provider_description),
-                checked = showModelProvider,
-                onCheckedChange = {
-                    scope.launch {
-                        displayPreferencesManager.saveDisplaySettings(showModelProvider = it)
-                    }
-                },
-                backgroundColor = componentBackgroundColor
-            )
-
-            DisplayToggleItem(
-                title = stringResource(R.string.show_model_name),
-                subtitle = stringResource(R.string.show_model_name_description),
-                checked = showModelName,
-                onCheckedChange = {
-                    scope.launch {
-                        displayPreferencesManager.saveDisplaySettings(showModelName = it)
-                    }
-                },
-                backgroundColor = componentBackgroundColor
-            )
-
-            DisplayToggleItem(
-                title = stringResource(R.string.show_role_name),
-                subtitle = stringResource(R.string.show_role_name_description),
-                checked = showRoleName,
-                onCheckedChange = {
-                    scope.launch {
-                        displayPreferencesManager.saveDisplaySettings(showRoleName = it)
-                    }
-                },
-                backgroundColor = componentBackgroundColor
-            )
-
-            DisplayToggleItem(
-                title = stringResource(R.string.show_user_name),
-                subtitle = stringResource(R.string.show_user_name_description),
-                checked = showUserName,
-                onCheckedChange = {
-                    scope.launch {
-                        displayPreferencesManager.saveDisplaySettings(showUserName = it)
-                    }
-                },
-                backgroundColor = componentBackgroundColor
-            )
-
-            DisplayToggleItem(
-                title = stringResource(R.string.show_message_token_stats),
-                subtitle = stringResource(R.string.show_message_token_stats_description),
-                checked = showMessageTokenStats,
-                onCheckedChange = {
-                    scope.launch {
-                        displayPreferencesManager.saveDisplaySettings(showMessageTokenStats = it)
-                    }
-                },
-                backgroundColor = componentBackgroundColor
-            )
-
-            DisplayToggleItem(
-                title = stringResource(R.string.show_message_timing_stats),
-                subtitle = stringResource(R.string.show_message_timing_stats_description),
-                checked = showMessageTimingStats,
-                onCheckedChange = {
-                    scope.launch {
-                        displayPreferencesManager.saveDisplaySettings(showMessageTimingStats = it)
-                    }
-                },
-                backgroundColor = componentBackgroundColor
-            )
-
-            DisplayToggleItem(
-                title = stringResource(R.string.show_message_timestamp),
-                subtitle = stringResource(R.string.show_message_timestamp_description),
-                checked = showMessageTimestamp,
-                onCheckedChange = {
-                    scope.launch {
-                        displayPreferencesManager.saveDisplaySettings(showMessageTimestamp = it)
-                    }
-                },
-                backgroundColor = componentBackgroundColor
             )
 
             Column(
@@ -325,29 +230,33 @@ fun GlobalDisplaySettingsScreen(
                 }
             }
 
-            // 用户名字输入框
-            if (showUserName) {
-                OutlinedTextField(
-                    value = userNameInput,
-                    onValueChange = { userNameInput = it },
-                    label = { Text(stringResource(R.string.global_user_name)) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 8.dp),
-                    singleLine = true,
-                    trailingIcon = {
-                        if (userNameInput != globalUserName) {
-                            IconButton(onClick = {
+            OutlinedTextField(
+                value = userNameInput,
+                onValueChange = { userNameInput = it },
+                label = { Text(stringResource(R.string.global_user_name)) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
+                singleLine = true,
+                trailingIcon = {
+                    if (userNameInput != globalUserName) {
+                        IconButton(
+                            onClick = {
                                 scope.launch {
-                                    displayPreferencesManager.saveDisplaySettings(globalUserName = userNameInput)
+                                    displayPreferencesManager.saveDisplaySettings(
+                                        globalUserName = userNameInput,
+                                    )
                                 }
-                            }) {
-                                Icon(Icons.Default.Save, contentDescription = stringResource(R.string.save))
-                            }
+                            },
+                        ) {
+                            Icon(
+                                Icons.Default.Save,
+                                contentDescription = stringResource(R.string.save),
+                            )
                         }
                     }
-                )
-            }
+                },
+            )
 
             Spacer(modifier = Modifier.height(16.dp))
 

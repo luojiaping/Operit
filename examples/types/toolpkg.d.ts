@@ -515,6 +515,7 @@ export namespace ToolPkg {
         enableDirectAudioProcessing: boolean;
         enableDirectVideoProcessing: boolean;
         enableGoogleSearch: boolean;
+        enableClaude1hPromptCache: boolean;
         enableToolCall: boolean;
         requestLimitPerMinute: number;
         maxConcurrentRequests: number;

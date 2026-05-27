@@ -12,7 +12,8 @@ object MaterialIconNameResolver {
         if (normalizedName.isEmpty()) {
             return null
         }
-        return iconCache.getOrPut(normalizedName) {
+        iconCache[normalizedName]?.let { return it }
+        return runCatching {
             val pascalCaseName =
                 normalizedName
                     .split(Regex("[^A-Za-z0-9]+"))
@@ -30,8 +31,9 @@ object MaterialIconNameResolver {
                 Class.forName("androidx.compose.material.icons.filled.${pascalCaseName}Kt")
             val getterMethod =
                 iconKtClass.getMethod("get$pascalCaseName", Icons.Default::class.java)
-            getterMethod.invoke(null, Icons.Default) as ImageVector
-        }
+            (getterMethod.invoke(null, Icons.Default) as ImageVector)
+                .also { iconCache[normalizedName] = it }
+        }.getOrNull()
     }
 
     fun resolveOrDefault(iconName: String?, fallback: ImageVector): ImageVector {

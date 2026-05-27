@@ -81,6 +81,11 @@ private data class InlineCodeMarkerSpan(
     val cornerRadiusPx: Float,
 )
 
+internal data class InlineCodeTextRange(
+    val start: Int,
+    val end: Int,
+)
+
 private fun createInlineCodeStyleSpan(): InlineCodeStyleSpan {
     return InlineCodeStyleSpan(textScale = 0.9f)
 }
@@ -104,6 +109,74 @@ private fun createInlineCodePaint(basePaint: Paint, marker: InlineCodeMarkerSpan
         typeface = getMarkdownCodeTypeface()
         textSize = basePaint.textSize * marker.textScale
         isAntiAlias = true
+    }
+}
+
+internal fun inlineCodeRangeAt(text: CharSequence, offset: Int): InlineCodeTextRange? {
+    val spanned = text as? Spanned ?: return null
+    if (spanned.isEmpty()) return null
+
+    val point = offset.coerceIn(0, spanned.length)
+    val probe = if (point == spanned.length) (point - 1).coerceAtLeast(0) else point
+    val markers = spanned.getSpans(0, spanned.length, InlineCodeMarkerSpan::class.java)
+    markers.forEach { marker ->
+        val spanStart = spanned.getSpanStart(marker)
+        val spanEnd = spanned.getSpanEnd(marker)
+        if (
+            spanStart >= 0 &&
+                spanEnd > spanStart &&
+                ((probe >= spanStart && probe < spanEnd) || point == spanEnd)
+        ) {
+            return InlineCodeTextRange(spanStart, spanEnd)
+        }
+    }
+    return null
+}
+
+internal fun selectedTextWithInlineCodeMarkers(
+    text: CharSequence,
+    start: Int,
+    end: Int,
+): CharSequence {
+    val safeStart = start.coerceIn(0, text.length)
+    val safeEnd = end.coerceIn(0, text.length)
+    if (safeStart >= safeEnd) return ""
+
+    val spanned = text as? Spanned ?: return text.subSequence(safeStart, safeEnd)
+    val markers =
+        spanned
+            .getSpans(safeStart, safeEnd, InlineCodeMarkerSpan::class.java)
+            .mapNotNull { marker ->
+                val spanStart = spanned.getSpanStart(marker)
+                val spanEnd = spanned.getSpanEnd(marker)
+                val selectedStart = maxOf(safeStart, spanStart)
+                val selectedEnd = minOf(safeEnd, spanEnd)
+                if (spanStart >= 0 && selectedStart < selectedEnd) {
+                    InlineCodeTextRange(selectedStart, selectedEnd)
+                } else {
+                    null
+                }
+            }
+            .sortedBy { it.start }
+
+    if (markers.isEmpty()) {
+        return text.subSequence(safeStart, safeEnd)
+    }
+
+    return buildString {
+        var cursor = safeStart
+        markers.forEach { range ->
+            if (cursor < range.start) {
+                append(text.subSequence(cursor, range.start))
+            }
+            append('`')
+            append(text.subSequence(range.start, range.end))
+            append('`')
+            cursor = range.end
+        }
+        if (cursor < safeEnd) {
+            append(text.subSequence(cursor, safeEnd))
+        }
     }
 }
 

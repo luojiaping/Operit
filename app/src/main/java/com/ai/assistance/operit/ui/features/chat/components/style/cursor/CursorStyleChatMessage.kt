@@ -45,7 +45,7 @@ fun CursorStyleChatMessage(
                     enableLiquidGlass = userMessageLiquidGlassEnabled,
                     enableWaterGlass = userMessageWaterGlassEnabled,
                     textColor = userTextColor,
-                    enableDialogs = enableDialogs
+                    enableDialogs = enableDialogs,
             )
         }
         "ai" -> {

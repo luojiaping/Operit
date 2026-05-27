@@ -746,6 +746,155 @@ data class AppUsageTimeResultData(
     }
 }
 
+/** Bluetooth adapter state. */
+@Serializable
+data class BluetoothStateData(
+        val supported: Boolean,
+        val enabled: Boolean,
+        val state: String
+) : ToolResultData() {
+    override fun toString(): String {
+        if (!supported) {
+            return "Bluetooth is not supported on this device"
+        }
+        return "Bluetooth state: $state"
+    }
+}
+
+/** Bluetooth bonded device list. */
+@Serializable
+data class BluetoothBondedDevicesData(
+        val devices: List<BluetoothDeviceData>
+) : ToolResultData() {
+    override fun toString(): String {
+        if (devices.isEmpty()) {
+            return "No bonded Bluetooth devices"
+        }
+        return "Bonded Bluetooth devices:\n" +
+                devices.joinToString("\n") { device ->
+                    "- ${device.name ?: "Unnamed"} (${device.address}) ${device.type}"
+                }
+    }
+}
+
+@Serializable
+data class BluetoothDeviceData(
+        val name: String?,
+        val address: String,
+        val type: String,
+        val bondState: String
+)
+
+/** Bluetooth scan result. */
+@Serializable
+data class BluetoothScanResultData(
+        val devices: List<BluetoothScannedDeviceData>,
+        val durationMs: Long,
+        val includesBle: Boolean
+) : ToolResultData() {
+    override fun toString(): String {
+        if (devices.isEmpty()) {
+            return "No Bluetooth devices found"
+        }
+        return "Bluetooth devices:\n" +
+                devices.joinToString("\n") { device ->
+                    "- ${device.name ?: "Unnamed"} (${device.address}) ${device.source}"
+                }
+    }
+}
+
+@Serializable
+data class BluetoothScannedDeviceData(
+        val name: String?,
+        val address: String,
+        val type: String,
+        val bondState: String,
+        val source: String,
+        val rssi: Int? = null
+)
+
+/** Bluetooth connection/session result. */
+@Serializable
+data class BluetoothSessionData(
+        val sessionId: String,
+        val address: String,
+        val mode: String
+) : ToolResultData() {
+    override fun toString(): String = "Bluetooth $mode session $sessionId connected to $address"
+}
+
+/** Bluetooth write result. */
+@Serializable
+data class BluetoothTransferData(
+        val sessionId: String,
+        val bytesWritten: Int
+) : ToolResultData() {
+    override fun toString(): String = "Wrote $bytesWritten bytes to Bluetooth session $sessionId"
+}
+
+/** Bluetooth read result. */
+@Serializable
+data class BluetoothReadData(
+        val sessionId: String,
+        val bytesRead: Int,
+        val text: String? = null,
+        val dataBase64: String? = null
+) : ToolResultData() {
+    override fun toString(): String {
+        return text ?: "Read $bytesRead bytes from Bluetooth session $sessionId"
+    }
+}
+
+@Serializable
+data class BluetoothBleServicesData(
+        val sessionId: String,
+        val services: List<BluetoothBleServiceData>
+) : ToolResultData() {
+    override fun toString(): String {
+        if (services.isEmpty()) {
+            return "No BLE services discovered for session $sessionId"
+        }
+        return "BLE services for $sessionId:\n" +
+                services.joinToString("\n") { service ->
+                    "- ${service.uuid}: ${service.characteristics.joinToString(", ") { it.uuid }}"
+                }
+    }
+}
+
+@Serializable
+data class BluetoothBleServiceData(
+        val uuid: String,
+        val characteristics: List<BluetoothBleCharacteristicData>
+)
+
+@Serializable
+data class BluetoothBleCharacteristicData(
+        val uuid: String,
+        val properties: List<String>
+)
+
+@Serializable
+data class BluetoothBleNotificationData(
+        val sessionId: String,
+        val notifications: List<BluetoothBleNotificationEntry>
+) : ToolResultData() {
+    override fun toString(): String {
+        if (notifications.isEmpty()) {
+            return "No BLE notifications for session $sessionId"
+        }
+        return notifications.joinToString("\n") { it.text ?: it.dataBase64.orEmpty() }
+    }
+}
+
+@Serializable
+data class BluetoothBleNotificationEntry(
+        val characteristicUuid: String,
+        val bytesRead: Int,
+        val text: String? = null,
+        val dataBase64: String? = null,
+        val timestamp: Long = System.currentTimeMillis()
+)
+
 /** Represents UI node structure for hierarchical display */
 @Serializable
 data class SimplifiedUINode(
@@ -2267,6 +2416,7 @@ data class ModelConfigResultItem(
     val enableDirectAudioProcessing: Boolean,
     val enableDirectVideoProcessing: Boolean,
     val enableGoogleSearch: Boolean,
+    val enableClaude1hPromptCache: Boolean,
     val enableToolCall: Boolean,
     val requestLimitPerMinute: Int,
     val maxConcurrentRequests: Int,

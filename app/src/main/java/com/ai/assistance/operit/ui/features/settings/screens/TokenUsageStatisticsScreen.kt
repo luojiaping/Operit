@@ -54,7 +54,7 @@ fun TokenUsageStatisticsScreen(
     var totalChats by remember { mutableStateOf(0) }
     var totalMessages by remember { mutableStateOf(0) }
 
-    val providerModelTokenUsage = remember { mutableStateMapOf<String, Triple<Int, Int, Int>>() }
+    val providerModelTokenUsage = remember { mutableStateMapOf<String, Triple<Long, Long, Long>>() }
     val providerModelRequestCounts = remember { mutableStateMapOf<String, Int>() }
     val modelPricing = remember { mutableStateMapOf<String, Triple<Double, Double, Double>>() }
     val modelBillingMode = remember { mutableStateMapOf<String, BillingMode>() }
@@ -161,7 +161,7 @@ fun TokenUsageStatisticsScreen(
                             defaults.outputPricePerMillion,
                             defaults.cachedInputPricePerMillion
                         )
-                        val nonCachedInput = (tokens.first - tokens.third).coerceAtLeast(0)
+                        val nonCachedInput = (tokens.first - tokens.third).coerceAtLeast(0L)
                         (nonCachedInput / 1_000_000.0 * pricing.first) +
                                 (tokens.second / 1_000_000.0 * pricing.second) +
                                 (tokens.third / 1_000_000.0 * pricing.third)
@@ -647,9 +647,9 @@ private fun ExchangeRateSettingsCard(
 @Composable
 private fun TokenUsageModelCard(
     modelName: String,
-    inputTokens: Int,
-    cachedInputTokens: Int,
-    outputTokens: Int,
+    inputTokens: Long,
+    cachedInputTokens: Long,
+    outputTokens: Long,
     requestCount: Int,
     cost: Double,
     inputPrice: Double,
@@ -750,7 +750,7 @@ private fun TokenUsageModelCard(
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Medium
                     )
-                    if (cachedInputTokens > 0) {
+                    if (cachedInputTokens > 0L) {
                         Text(
                             text = stringResource(R.string.settings_cached_tokens, cachedInputTokens),
                             style = MaterialTheme.typography.bodySmall,

@@ -27,7 +27,7 @@ import {
  */
 export namespace SoftwareSettings {
     interface SpeechServicesUpdateOptions {
-        tts_service_type?: 'SIMPLE_TTS' | 'HTTP_TTS' | 'OPENAI_WS_TTS' | 'SILICONFLOW_TTS' | 'MINIMAX_TTS' | 'OPENAI_TTS' | 'VITS_TTS';
+        tts_service_type?: 'SIMPLE_TTS' | 'HTTP_TTS' | 'OPENAI_WS_TTS' | 'SILICONFLOW_TTS' | 'MINIMAX_TTS' | 'MIMO_TTS' | 'DOUBAO_TTS' | 'OPENAI_TTS' | 'VITS_TTS';
         tts_url_template?: string;
         tts_api_key?: string;
         tts_headers?: string | Record<string, string>;
@@ -146,6 +146,7 @@ export namespace SoftwareSettings {
         enable_direct_audio_processing?: boolean;
         enable_direct_video_processing?: boolean;
         enable_google_search?: boolean;
+        enable_claude_1h_prompt_cache?: boolean;
         enable_tool_call?: boolean;
         mnn_forward_type?: number;
         mnn_thread_count?: number;

@@ -1559,6 +1559,7 @@
 
     <!-- Context Menu -->
     <string name="copy_message">复制消息</string>
+    <string name="copy_full_message">全部复制</string>
     <string name="chat_hidden_user_message_placeholder">自动触发用户消息（内容已隐藏）</string>
     <string name="chat_hidden_user_message_badge">自动触发</string>
     <string name="info">信息</string>
@@ -1581,7 +1582,7 @@
     <string name="stop_reading">停止朗读</string>
     <string name="edit_and_resend">编辑并重发</string>
     <string name="rollback_to_here">回滚到此处</string>
-    <string name="select_copy">选择并复制</string>
+    <string name="select_copy">选择复制</string>
     <string name="insert_summary">插入总结</string>
     <string name="create_branch">创建分支</string>
     <string name="branch">分支</string>
@@ -2569,6 +2570,8 @@
     <string name="speech_services_tts_type_http">HTTP API (远程)</string>
     <string name="speech_services_tts_type_siliconflow">硅基流动 TTS</string>
     <string name="speech_services_tts_type_minimax">MiniMax TTS</string>
+    <string name="speech_services_tts_type_mimo">MiMo TTS</string>
+    <string name="speech_services_tts_type_doubao">豆包 TTS</string>
     <string name="speech_services_tts_type_openai_ws">OpenAI Realtime (WebSocket)</string>
     <string name="speech_services_tts_type_openai">OpenAI 语音 (HTTP)</string>
     <string name="speech_services_tts_type_vits">VITS/Piper TTS (本地)</string>
@@ -2653,6 +2656,36 @@
     <string name="speech_services_minimax_voice_id">voice_id</string>
     <string name="speech_services_minimax_voice_id_placeholder">例如：male-qn-qingse</string>
     <string name="speech_services_minimax_voice_id_hint">留空时默认使用 male-qn-qingse；会按 MiniMax 的 voice_setting.voice_id 发送。</string>
+
+    <string name="speech_services_mimo_config">MiMo TTS 配置</string>
+    <string name="speech_services_mimo_url">URL</string>
+    <string name="speech_services_mimo_url_placeholder">例如：https://api.xiaomimimo.com/v1/chat/completions</string>
+    <string name="speech_services_mimo_url_hint">留空时使用 MiMo Chat Completions 语音合成接口；内部会解析 choices[0].message.audio.data 并做 Base64 解码。</string>
+    <string name="speech_services_mimo_api_key">API 密钥</string>
+    <string name="speech_services_mimo_api_key_placeholder">请输入您的 MiMo API Key</string>
+    <string name="speech_services_mimo_model_name">model</string>
+    <string name="speech_services_mimo_model_name_placeholder">例如：mimo-v2.5-tts</string>
+    <string name="speech_services_mimo_model_name_hint">留空时默认使用 mimo-v2.5-tts；预置音色请使用 mimo-v2.5-tts。</string>
+    <string name="speech_services_mimo_voice_select">选择预置音色</string>
+    <string name="speech_services_mimo_voice_select_icon">选择音色</string>
+    <string name="speech_services_mimo_voice_custom">自定义音色</string>
+    <string name="speech_services_mimo_voice_id">voice</string>
+    <string name="speech_services_mimo_voice_id_placeholder">例如：mimo_default、冰糖、Mia、Chloe</string>
+    <string name="speech_services_mimo_voice_id_hint">预置音色包含 mimo_default、冰糖、茉莉、苏打、白桦、Mia、Chloe、Milo、Dean。</string>
+    <string name="speech_services_doubao_config">豆包 TTS 配置</string>
+    <string name="speech_services_doubao_url">URL</string>
+    <string name="speech_services_doubao_url_placeholder">https://openspeech.bytedance.com/api/v1/tts</string>
+    <string name="speech_services_doubao_url_hint">豆包语音合成 HTTP 接口地址。</string>
+    <string name="speech_services_doubao_appid">App ID</string>
+    <string name="speech_services_doubao_appid_placeholder">请输入豆包语音 App ID</string>
+    <string name="speech_services_doubao_token">Token</string>
+    <string name="speech_services_doubao_token_placeholder">请输入豆包语音 Token</string>
+    <string name="speech_services_doubao_voice_select">选择音色</string>
+    <string name="speech_services_doubao_voice_select_icon">选择音色</string>
+    <string name="speech_services_doubao_voice_custom">自定义音色</string>
+    <string name="speech_services_doubao_voice_id">voice_type</string>
+    <string name="speech_services_doubao_voice_id_placeholder">例如：BV700_V2_streaming</string>
+    <string name="speech_services_doubao_voice_id_hint">填写豆包语音控制台提供的 voice_type。</string>
 
     <string name="speech_services_openai_ws_config">OpenAI Realtime 配置</string>
     <string name="speech_services_openai_ws_url">Realtime WebSocket URL</string>
@@ -3034,7 +3067,6 @@
     <string name="chat_regenerating_single">正在重新生成该条回答...</string>
     <string name="chat_regenerate_single_failed">单条重新生成失败: %1$s</string>
     <string name="chat_regenerate_busy">当前已有消息在处理中，请稍后再试</string>
-    <string name="chat_regenerate_single_tool_unsupported">包含工具调用的回答暂不支持单条重新生成</string>
     <string name="chat_delete_single_variant">删除单次消息</string>
     <string name="chat_delete_single_variant_unavailable">当前消息没有可删除的单次候选</string>
     <string name="chat_delete_single_variant_failed">删除单次消息失败: %1$s</string>
@@ -3503,6 +3535,8 @@
     <string name="unlocked">未锁定</string>
     <string name="lock_chat">锁定聊天</string>
     <string name="unlock_chat">取消锁定</string>
+    <string name="pin_chat">置顶聊天</string>
+    <string name="unpin_chat">取消置顶</string>
     <string name="select_date">选择日期</string>
     <string name="input_field_placeholder">请输入%s信息</string>
     <string name="not_set_field">未设置%s</string>
@@ -3713,6 +3747,8 @@
     <string name="enable_direct_video_processing_desc">启用后，视频将直接发送给AI处理，而不是通过工具抽帧/分析</string>
     <string name="enable_google_search">启用 Google Search</string>
     <string name="enable_google_search_desc">启用后，Gemini 将使用 Google 搜索来增强回答（可能产生额外费用）</string>
+    <string name="enable_claude_1h_prompt_cache">启用 Claude 1 小时提示缓存</string>
+    <string name="enable_claude_1h_prompt_cache_desc">启用后，Claude 和 Claude 兼容供应商的提示缓存 TTL 将使用 1 小时</string>
     <string name="enable_tool_call">模型支持ToolCall</string>
     <string name="enable_tool_call_desc">关闭时，会使用软件内工具调用机制，也可以完成工具调用。开启后，将会使用API的专用接口进行原生工具调用（需要模型支持）</string>
     <string name="enable_deepseek_reasoning">启用 DeepSeek 推理模式</string>
@@ -3980,6 +4016,11 @@
     <string name="waifu_mode_description">启用后，AI的回复将按标点分割逐句发送，营造更自然的对话体验。</string>
     <string name="enable_waifu_mode">启用Waifu模式</string>
     <string name="waifu_mode_toggle_desc">AI回复将按标点分割发送</string>
+    <string name="waifu_merge_send">合并发送</string>
+    <string name="waifu_merge_send_desc">连续发送多条短消息时，停顿后合成一条消息交给AI处理</string>
+    <string name="waifu_merge_send_delay">合并发送间隔</string>
+    <string name="waifu_merge_send_delay_desc">用户最后一次发送后等待多久再提交给AI</string>
+    <string name="waifu_merge_send_delay_format">当前：%dms</string>
     <string name="typing_speed_settings">打字速度设置</string>
     <string name="typing_speed_desc">控制每字符的延迟时间，模拟真人打字节奏</string>
     <string name="current_speed_format">当前速度：每秒 %.1f 字符</string>
@@ -4003,7 +4044,7 @@
     <string name="appearance_prompt_placeholder">例如：long hair, purple eyes, sweater vest...</string>
     <string name="appearance_prompt_tip">提示：使用英文关键词描述外貌特征，多个关键词用逗号分隔</string>
     <string name="feature_explanation">功能说明</string>
-    <string name="waifu_mode_explanation">• 普通模式：AI回复一次性全部发送\n• Waifu模式：AI回复按句子分割，每句独立气泡\n• 智能延迟：根据句子长度计算延迟时间\n• 自动清理：移除状态标签，只显示纯文本\n• 可选功能：移除句末标点、编辑 Waifu 提示词、启用表情包\n• 适用场景：模拟更自然的对话节奏\n• 注意：此模式对工具调用的适配可能不佳</string>
+    <string name="waifu_mode_explanation">• 普通模式：AI回复一次性全部发送\n• Waifu模式：AI回复按句子分割，每句独立气泡\n• 智能延迟：根据句子长度计算延迟时间\n• 合并发送：用户连续发送短消息时，停顿后合成一条消息交给AI\n• 自动清理：移除状态标签，只显示纯文本\n• 可选功能：合并发送、移除句末标点、编辑 Waifu 提示词、启用表情包\n• 适用场景：模拟更自然的对话节奏\n• 注意：此模式对工具调用的适配可能不佳</string>
     <string name="settings_saved_message">设置已保存</string>
 
     <string name="settings_section_account">账号</string>
@@ -7108,6 +7149,7 @@
     <string name="minimax_tts_error_audio_url_missing">MiniMax TTS 响应中缺少 data.audio 下载地址</string>
     <string name="minimax_tts_error_audio_download_failed">下载 MiniMax TTS 音频失败</string>
     <string name="minimax_tts_error_audio_download_empty">MiniMax TTS 音频下载结果为空</string>
+    <string name="mimo_tts_error_api_key_not_set">MiMo API Key 未设置，请在设置中填写。</string>
     <string name="openai_realtime_tts_error_url_not_set">OpenAI Realtime WebSocket URL 未设置，请填写完整接口地址（例如 wss://api.openai.com/v1/realtime）。</string>
     <string name="openai_realtime_tts_error_url_invalid_scheme">OpenAI Realtime WebSocket URL 必须以 ws:// 或 wss:// 开头。</string>
     <string name="openai_realtime_tts_error_api_key_not_set">OpenAI Realtime API Key 未设置，请在设置中填写。</string>

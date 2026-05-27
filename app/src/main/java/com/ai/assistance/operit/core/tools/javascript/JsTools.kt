@@ -638,6 +638,167 @@ fun getJsToolsDefinition(): String {
                 // 获取设备位置
                 getLocation: (highAccuracy = false, timeout = 10) => 
                     toolCall("get_device_location", { high_accuracy: !!highAccuracy, timeout: parseInt(timeout) }),
+                bluetooth: {
+                    requestPermission: () => toolCall("request_bluetooth_permission", {}),
+                    getState: () => toolCall("get_bluetooth_state", {}),
+                    requestEnable: () => toolCall("request_enable_bluetooth", {}),
+                    listBondedDevices: () => toolCall("list_bluetooth_bonded_devices", {}),
+                    scan: (options = {}) => {
+                        const params = {};
+                        if (options && typeof options === "object") {
+                            if (options.durationMs !== undefined && options.durationMs !== null) {
+                                params.duration_ms = String(options.durationMs);
+                            }
+                            if (options.includeBle !== undefined) {
+                                params.include_ble = !!options.includeBle;
+                            }
+                        }
+                        return toolCall("scan_bluetooth_devices", params);
+                    },
+                    connect: (options) => {
+                        const params = { address: options.address };
+                        if (options.uuid !== undefined && options.uuid !== null) {
+                            params.uuid = String(options.uuid);
+                        }
+                        return toolCall("bluetooth_connect", params);
+                    },
+                    listen: (options = {}) => {
+                        const params = {};
+                        if (options && typeof options === "object") {
+                            if (options.name !== undefined && options.name !== null) {
+                                params.name = String(options.name);
+                            }
+                            if (options.uuid !== undefined && options.uuid !== null) {
+                                params.uuid = String(options.uuid);
+                            }
+                        }
+                        return toolCall("bluetooth_listen", params);
+                    },
+                    accept: (listenerSessionId, timeoutMs) => {
+                        const params = { listener_session_id: listenerSessionId };
+                        if (timeoutMs !== undefined && timeoutMs !== null) {
+                            params.timeout_ms = String(timeoutMs);
+                        }
+                        return toolCall("bluetooth_accept", params);
+                    },
+                    send: (sessionId, options) => {
+                        const params = { session_id: sessionId };
+                        if (options.text !== undefined && options.text !== null) {
+                            params.text = String(options.text);
+                        }
+                        if (options.dataBase64 !== undefined && options.dataBase64 !== null) {
+                            params.data_base64 = String(options.dataBase64);
+                        }
+                        return toolCall("bluetooth_send", params);
+                    },
+                    read: (sessionId, options = {}) => {
+                        const params = { session_id: sessionId };
+                        if (options && typeof options === "object") {
+                            if (options.maxBytes !== undefined && options.maxBytes !== null) {
+                                params.max_bytes = String(options.maxBytes);
+                            }
+                            if (options.timeoutMs !== undefined && options.timeoutMs !== null) {
+                                params.timeout_ms = String(options.timeoutMs);
+                            }
+                        }
+                        return toolCall("bluetooth_read", params);
+                    },
+                    sendAndRead: (sessionId, options) => {
+                        const params = { session_id: sessionId };
+                        if (options.text !== undefined && options.text !== null) {
+                            params.text = String(options.text);
+                        }
+                        if (options.dataBase64 !== undefined && options.dataBase64 !== null) {
+                            params.data_base64 = String(options.dataBase64);
+                        }
+                        if (options.maxBytes !== undefined && options.maxBytes !== null) {
+                            params.max_bytes = String(options.maxBytes);
+                        }
+                        if (options.timeoutMs !== undefined && options.timeoutMs !== null) {
+                            params.timeout_ms = String(options.timeoutMs);
+                        }
+                        return toolCall("bluetooth_send_and_read", params);
+                    },
+                    close: (sessionId) => toolCall("bluetooth_close", { session_id: sessionId }),
+                    ble: {
+                        connect: (options) => {
+                            const params = { address: options.address };
+                            if (options.autoConnect !== undefined) {
+                                params.auto_connect = !!options.autoConnect;
+                            }
+                            return toolCall("bluetooth_ble_connect", params);
+                        },
+                        discoverServices: (sessionId, timeoutMs) => {
+                            const params = { session_id: sessionId };
+                            if (timeoutMs !== undefined && timeoutMs !== null) {
+                                params.timeout_ms = String(timeoutMs);
+                            }
+                            return toolCall("bluetooth_ble_discover_services", params);
+                        },
+                        readCharacteristic: (sessionId, options) => {
+                            const params = {
+                                session_id: sessionId,
+                                service_uuid: options.serviceUuid,
+                                characteristic_uuid: options.characteristicUuid
+                            };
+                            if (options.timeoutMs !== undefined && options.timeoutMs !== null) {
+                                params.timeout_ms = String(options.timeoutMs);
+                            }
+                            return toolCall("bluetooth_ble_read_characteristic", params);
+                        },
+                        writeCharacteristic: (sessionId, options) => {
+                            const params = {
+                                session_id: sessionId,
+                                service_uuid: options.serviceUuid,
+                                characteristic_uuid: options.characteristicUuid
+                            };
+                            if (options.text !== undefined && options.text !== null) {
+                                params.text = String(options.text);
+                            }
+                            if (options.dataBase64 !== undefined && options.dataBase64 !== null) {
+                                params.data_base64 = String(options.dataBase64);
+                            }
+                            return toolCall("bluetooth_ble_write_characteristic", params);
+                        },
+                        writeAndReadCharacteristic: (sessionId, options) => {
+                            const params = {
+                                session_id: sessionId,
+                                write_service_uuid: options.writeServiceUuid,
+                                write_characteristic_uuid: options.writeCharacteristicUuid,
+                                read_service_uuid: options.readServiceUuid,
+                                read_characteristic_uuid: options.readCharacteristicUuid
+                            };
+                            if (options.text !== undefined && options.text !== null) {
+                                params.text = String(options.text);
+                            }
+                            if (options.dataBase64 !== undefined && options.dataBase64 !== null) {
+                                params.data_base64 = String(options.dataBase64);
+                            }
+                            if (options.timeoutMs !== undefined && options.timeoutMs !== null) {
+                                params.timeout_ms = String(options.timeoutMs);
+                            }
+                            return toolCall("bluetooth_ble_write_and_read_characteristic", params);
+                        },
+                        subscribe: (sessionId, options) => {
+                            const params = {
+                                session_id: sessionId,
+                                service_uuid: options.serviceUuid,
+                                characteristic_uuid: options.characteristicUuid
+                            };
+                            if (options.enable !== undefined) {
+                                params.enable = !!options.enable;
+                            }
+                            return toolCall("bluetooth_ble_subscribe_characteristic", params);
+                        },
+                        readNotifications: (sessionId, limit) => {
+                            const params = { session_id: sessionId };
+                            if (limit !== undefined && limit !== null) {
+                                params.limit = String(limit);
+                            }
+                            return toolCall("bluetooth_ble_read_notifications", params);
+                        }
+                    }
+                },
                 shell: (command) => toolCall("execute_shell", { command }),
                 // 执行终端命令 - 一次性收集输出
                 terminal: {

@@ -3279,6 +3279,8 @@ Agora é possível usar o modo AutoGLM na interface de diálogo.</string>
     <string name="enable_direct_video_processing_desc">Quando ativado, o vídeo será enviado diretamente para processamento de IA em vez de extração/análise de quadros pela ferramenta</string>
     <string name="enable_google_search">Ativar Pesquisa Google</string>
     <string name="enable_google_search_desc">Quando ativado, o Gemini usará a Pesquisa Google para aprimorar as respostas (podem ser aplicadas taxas adicionais)</string>
+    <string name="enable_claude_1h_prompt_cache">Ativar cache de prompt Claude de 1 hora</string>
+    <string name="enable_claude_1h_prompt_cache_desc">Quando ativado, Claude e provedores compatíveis com Claude usarão TTL de cache de prompt de 1 hora</string>
     <string name="enable_tool_call">Modelo suporta ToolCall</string>
     <string name="enable_tool_call_desc">Quando fechado, o mecanismo de chamada de ferramenta dentro do software será usado e a chamada de ferramenta também poderá ser concluída. Uma vez habilitada, a interface dedicada da API será usada para fazer chamadas de ferramentas nativas (é necessário suporte ao modelo)</string>
     <string name="enable_deepseek_reasoning">Habilitar modo de inferência DeepSeek</string>
@@ -6538,7 +6540,6 @@ Agora é possível usar o modo AutoGLM na interface de diálogo.</string>
     <string name="chat_regenerating_single">Regenerando esta resposta...</string>
     <string name="chat_regenerate_single_failed">Falha ao regenerar individualmente: %1$s</string>
     <string name="chat_regenerate_busy">Já há uma mensagem sendo processada. Tente novamente mais tarde.</string>
-    <string name="chat_regenerate_single_tool_unsupported">Respostas que incluem chamadas de ferramenta não suportam regeneração individual no momento</string>
     <string name="chat_switch_variant_failed">Falha ao alternar resposta: %1$s</string>
     <string name="chat_message_variant_counter">%1$d/%2$d</string>
     <string name="chat_previous_variant">Resposta anterior</string>

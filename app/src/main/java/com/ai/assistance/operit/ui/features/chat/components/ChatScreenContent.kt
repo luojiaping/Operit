@@ -272,8 +272,8 @@ fun ChatScreenContent(
                         onShowLatestDisplayWindow = {
                             actualViewModel.showLatestMessagesForCurrentChat()
                         },
-                        loadMessageLocatorEntries = { chatId ->
-                            actualViewModel.loadChatMessageLocatorPreviews(chatId)
+                        loadMessageLocatorEntries = { chatId, query ->
+                            actualViewModel.loadChatMessageLocatorPreviews(chatId, query)
                         },
                         onRevealMessageForLocator = { targetTimestamp ->
                             actualViewModel.revealMessageForCurrentChat(targetTimestamp)
@@ -389,8 +389,8 @@ fun ChatScreenContent(
                         onShowLatestDisplayWindow = {
                             actualViewModel.showLatestMessagesForCurrentChat()
                         },
-                        loadMessageLocatorEntries = { chatId ->
-                            actualViewModel.loadChatMessageLocatorPreviews(chatId)
+                        loadMessageLocatorEntries = { chatId, query ->
+                            actualViewModel.loadChatMessageLocatorPreviews(chatId, query)
                         },
                         onRevealMessageForLocator = { targetTimestamp ->
                             actualViewModel.revealMessageForCurrentChat(targetTimestamp)

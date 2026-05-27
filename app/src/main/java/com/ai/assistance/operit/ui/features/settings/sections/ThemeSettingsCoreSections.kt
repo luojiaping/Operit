@@ -2533,6 +2533,20 @@ internal fun ThemeSettingsDisplayOptionsSection(
     onShowThinkingProcessInputChange: (Boolean) -> Unit,
     showStatusTagsInput: Boolean,
     onShowStatusTagsInputChange: (Boolean) -> Unit,
+    showModelProviderInput: Boolean,
+    onShowModelProviderInputChange: (Boolean) -> Unit,
+    showModelNameInput: Boolean,
+    onShowModelNameInputChange: (Boolean) -> Unit,
+    showRoleNameInput: Boolean,
+    onShowRoleNameInputChange: (Boolean) -> Unit,
+    showUserNameInput: Boolean,
+    onShowUserNameInputChange: (Boolean) -> Unit,
+    showMessageTokenStatsInput: Boolean,
+    onShowMessageTokenStatsInputChange: (Boolean) -> Unit,
+    showMessageTimingStatsInput: Boolean,
+    onShowMessageTimingStatsInputChange: (Boolean) -> Unit,
+    showMessageTimestampInput: Boolean,
+    onShowMessageTimestampInputChange: (Boolean) -> Unit,
     showInputProcessingStatusInput: Boolean,
     onShowInputProcessingStatusInputChange: (Boolean) -> Unit,
     showChatFloatingDotsAnimationInput: Boolean,
@@ -2569,6 +2583,209 @@ internal fun ThemeSettingsDisplayOptionsSection(
                         onShowThinkingProcessInputChange(it)
                         saveThemeSettingsWithCharacterCard {
                             preferencesManager.saveThemeSettings(showThinkingProcess = it)
+                        }
+                    },
+                )
+            }
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(id = R.string.show_model_provider),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    Text(
+                        text = stringResource(id = R.string.show_model_provider_description),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(
+                    checked = showModelProviderInput,
+                    onCheckedChange = {
+                        onShowModelProviderInputChange(it)
+                        saveThemeSettingsWithCharacterCard {
+                            preferencesManager.saveThemeSettings(showModelProvider = it)
+                        }
+                    },
+                )
+            }
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(id = R.string.show_model_name),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    Text(
+                        text = stringResource(id = R.string.show_model_name_description),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(
+                    checked = showModelNameInput,
+                    onCheckedChange = {
+                        onShowModelNameInputChange(it)
+                        saveThemeSettingsWithCharacterCard {
+                            preferencesManager.saveThemeSettings(showModelName = it)
+                        }
+                    },
+                )
+            }
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(id = R.string.show_role_name),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    Text(
+                        text = stringResource(id = R.string.show_role_name_description),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(
+                    checked = showRoleNameInput,
+                    onCheckedChange = {
+                        onShowRoleNameInputChange(it)
+                        saveThemeSettingsWithCharacterCard {
+                            preferencesManager.saveThemeSettings(showRoleName = it)
+                        }
+                    },
+                )
+            }
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(id = R.string.show_user_name),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    Text(
+                        text = stringResource(id = R.string.show_user_name_description),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(
+                    checked = showUserNameInput,
+                    onCheckedChange = {
+                        onShowUserNameInputChange(it)
+                        saveThemeSettingsWithCharacterCard {
+                            preferencesManager.saveThemeSettings(showUserName = it)
+                        }
+                    },
+                )
+            }
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(id = R.string.show_message_token_stats),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    Text(
+                        text = stringResource(id = R.string.show_message_token_stats_description),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(
+                    checked = showMessageTokenStatsInput,
+                    onCheckedChange = {
+                        onShowMessageTokenStatsInputChange(it)
+                        saveThemeSettingsWithCharacterCard {
+                            preferencesManager.saveThemeSettings(showMessageTokenStats = it)
+                        }
+                    },
+                )
+            }
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(id = R.string.show_message_timing_stats),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    Text(
+                        text = stringResource(id = R.string.show_message_timing_stats_description),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(
+                    checked = showMessageTimingStatsInput,
+                    onCheckedChange = {
+                        onShowMessageTimingStatsInputChange(it)
+                        saveThemeSettingsWithCharacterCard {
+                            preferencesManager.saveThemeSettings(showMessageTimingStats = it)
+                        }
+                    },
+                )
+            }
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(id = R.string.show_message_timestamp),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    Text(
+                        text = stringResource(id = R.string.show_message_timestamp_description),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(
+                    checked = showMessageTimestampInput,
+                    onCheckedChange = {
+                        onShowMessageTimestampInputChange(it)
+                        saveThemeSettingsWithCharacterCard {
+                            preferencesManager.saveThemeSettings(showMessageTimestamp = it)
                         }
                     },
                 )

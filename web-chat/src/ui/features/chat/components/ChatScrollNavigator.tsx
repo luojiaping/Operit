@@ -57,6 +57,7 @@ function normalizeMessageSearchText(text: string) {
 function toLocatorPreview(message: WebChatMessage): WebChatMessageLocatorPreview {
   const normalizedContent = normalizeMessageSearchText(message.content_raw);
   return {
+    message_index: null,
     timestamp: message.timestamp,
     sender: message.sender,
     preview_content: normalizedContent.slice(0, LOCATOR_PREVIEW_CHAR_COUNT),
@@ -147,6 +148,8 @@ function ChatMessageLocatorDialog({
   currentMessageTimestamp,
   isLoading,
   loadFailed,
+  currentChatId,
+  loadLocatorEntries,
   onDismiss,
   onToggleFavoriteMessage,
   onJumpToMessage
@@ -155,6 +158,8 @@ function ChatMessageLocatorDialog({
   currentMessageTimestamp: number;
   isLoading: boolean;
   loadFailed: boolean;
+  currentChatId: string | null;
+  loadLocatorEntries?: ((chatId: string, query?: string) => Promise<WebChatMessageLocatorPreview[]>) | null;
   onDismiss: () => void;
   onToggleFavoriteMessage?: ((timestamp: number, isFavorite: boolean) => Promise<void>) | null;
   onJumpToMessage: (timestamp: number) => void;
@@ -162,42 +167,91 @@ function ChatMessageLocatorDialog({
   const listRef = useRef<HTMLDivElement | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchFocused, setSearchFocused] = useState(false);
+  const [searchEntries, setSearchEntries] = useState<WebChatMessageLocatorPreview[]>([]);
+  const [isLoadingSearchEntries, setLoadingSearchEntries] = useState(false);
+  const [searchLoadFailed, setSearchLoadFailed] = useState(false);
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [favoriteOverrides, setFavoriteOverrides] = useState<Record<number, boolean>>({});
   const normalizedSearchQuery = normalizeMessageSearchText(searchQuery);
+  const activeLocatorEntries = normalizedSearchQuery ? searchEntries : locatorEntries;
+  const combinedLoading = isLoading || isLoadingSearchEntries;
+  const combinedLoadFailed = loadFailed || searchLoadFailed;
   const currentMessageIndex = locatorEntries.findIndex((entry) => entry.timestamp === currentMessageTimestamp);
   const indexedEntries = useMemo<ChatMessageLocatorEntry[]>(
-    () => locatorEntries.map((preview, index) => ({ index, preview })),
-    [locatorEntries]
+    () =>
+      activeLocatorEntries.map((preview, index) => ({
+        index: typeof preview.message_index === 'number' ? preview.message_index : index,
+        preview
+      })),
+    [activeLocatorEntries]
   );
+  useEffect(() => {
+    let cancelled = false;
+    let timeoutId = 0;
+
+    if (!normalizedSearchQuery) {
+      setSearchEntries([]);
+      setLoadingSearchEntries(false);
+      setSearchLoadFailed(false);
+      return;
+    }
+
+    if (!currentChatId || !loadLocatorEntries) {
+      setSearchEntries([]);
+      setLoadingSearchEntries(false);
+      setSearchLoadFailed(true);
+      return;
+    }
+
+    setLoadingSearchEntries(true);
+    setSearchLoadFailed(false);
+    timeoutId = window.setTimeout(() => {
+      void loadLocatorEntries(currentChatId, normalizedSearchQuery)
+        .then((entries) => {
+          if (!cancelled) {
+            setSearchEntries(entries);
+          }
+        })
+        .catch((error: unknown) => {
+          console.error('搜索消息定位列表失败', error);
+          if (!cancelled) {
+            setSearchEntries([]);
+            setSearchLoadFailed(true);
+          }
+        })
+        .finally(() => {
+          if (!cancelled) {
+            setLoadingSearchEntries(false);
+          }
+        });
+    }, 180);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
+    };
+  }, [currentChatId, loadLocatorEntries, normalizedSearchQuery]);
   const filteredEntries = useMemo(() => {
-    if (isLoading) {
+    if (combinedLoading) {
       return indexedEntries;
     }
 
     return indexedEntries.filter((entry) => {
       const isFavorite = favoriteOverrides[entry.preview.timestamp] ?? entry.preview.is_favorite;
       const matchesFavorite = !favoritesOnly || isFavorite;
-      const matchesSearch =
-        !normalizedSearchQuery ||
-        normalizeMessageSearchText(
-          visibleLocatorContent(entry.preview, HIDDEN_PLACEHOLDER_TEXT)
-        )
-          .toLowerCase()
-          .includes(normalizedSearchQuery.toLowerCase());
-      return matchesFavorite && matchesSearch;
+      return matchesFavorite;
     });
-  }, [favoriteOverrides, favoritesOnly, indexedEntries, isLoading, normalizedSearchQuery]);
+  }, [combinedLoading, favoriteOverrides, favoritesOnly, indexedEntries]);
   const maxMessageLength = useMemo(
     () =>
-      locatorEntries.reduce((max, preview) => {
+      activeLocatorEntries.reduce((max, preview) => {
         return Math.max(max, messageContentLength(preview, HIDDEN_PLACEHOLDER_TEXT));
       }, 1),
-    [locatorEntries]
+    [activeLocatorEntries]
   );
 
   useEffect(() => {
-    if (isLoading || filteredEntries.length === 0 || !listRef.current) {
+    if (combinedLoading || filteredEntries.length === 0 || !listRef.current) {
       return;
     }
 
@@ -228,7 +282,7 @@ function ChatMessageLocatorDialog({
     } else {
       listElement.scrollTo({ top: 0 });
     }
-  }, [currentMessageIndex, filteredEntries, isLoading, normalizedSearchQuery]);
+  }, [combinedLoading, currentMessageIndex, filteredEntries, normalizedSearchQuery]);
 
   return (
     <div className="dialog-scrim" onClick={onDismiss} role="presentation">
@@ -284,9 +338,9 @@ function ChatMessageLocatorDialog({
             <div className="chat-message-locator-hint">{`找到 ${filteredEntries.length} 条结果，点击即可跳转`}</div>
           ) : null}
 
-          {isLoading ? (
+          {combinedLoading ? (
             <div className="chat-message-locator-empty">正在加载...</div>
-          ) : loadFailed ? (
+          ) : combinedLoadFailed ? (
             <div className="chat-message-locator-empty">加载失败: 跳转到消息</div>
           ) : filteredEntries.length === 0 ? (
             <div className="chat-message-locator-empty">没有找到匹配的消息</div>
@@ -381,7 +435,7 @@ export function ChatScrollNavigator({
   scrollElement: HTMLDivElement | null;
   messageAnchors: Map<number, ChatScrollMessageAnchor>;
   viewportHeightPx: number;
-  loadLocatorEntries?: ((chatId: string) => Promise<WebChatMessageLocatorPreview[]>) | null;
+  loadLocatorEntries?: ((chatId: string, query?: string) => Promise<WebChatMessageLocatorPreview[]>) | null;
   onRequestLatestMessages?: (() => void) | null;
   onAutoScrollToBottomChange: (value: boolean) => void;
   onJumpToMessageTimestamp?: ((timestamp: number) => Promise<boolean>) | null;
@@ -390,7 +444,6 @@ export function ChatScrollNavigator({
 }) {
   const shouldRenderNavigator = chatHistory.length > 1 && viewportHeightPx > 0;
   const [showNavigatorChip, setShowNavigatorChip] = useState(false);
-  const [showScrollToBottomButton, setShowScrollToBottomButton] = useState(false);
   const [userScrollSessionActive, setUserScrollSessionActive] = useState(false);
   const [showLocatorDialog, setShowLocatorDialog] = useState(false);
   const [currentMessageIndex, setCurrentMessageIndex] = useState<number | null>(
@@ -410,9 +463,6 @@ export function ChatScrollNavigator({
 
   useEffect(() => {
     autoScrollToBottomRef.current = autoScrollToBottom;
-    if (autoScrollToBottom) {
-      setShowScrollToBottomButton(false);
-    }
   }, [autoScrollToBottom]);
 
   useEffect(() => {
@@ -567,7 +617,6 @@ export function ChatScrollNavigator({
           scrollToBottomInteractionActiveRef.current
         ) {
           onAutoScrollToBottomChange(false);
-          setShowScrollToBottomButton(true);
         }
       } else {
         const isAtBottom =
@@ -576,7 +625,6 @@ export function ChatScrollNavigator({
           ) <= 1 && !hasNewerDisplayHistoryRef.current;
         if (isAtBottom && !autoScrollToBottomRef.current) {
           onAutoScrollToBottomChange(true);
-          setShowScrollToBottomButton(false);
         }
       }
 
@@ -665,52 +713,47 @@ export function ChatScrollNavigator({
     <>
       {shouldShowNavigatorControl ? (
         <div className="chat-scroll-navigator-chip">
-          {showNavigatorChip ? (
-            <button
-              aria-label="跳转到消息"
-              className="chat-scroll-navigator-locator-button"
-              onClick={() => {
-                setShowLocatorDialog(true);
-                setShowNavigatorChip(false);
-                userScrollSessionActiveRef.current = false;
-                setUserScrollSessionActive(false);
-              }}
-              type="button"
-            >
-              <span className="chat-scroll-navigator-pill">
-                <span className="chat-scroll-navigator-track">
-                  <span className="chat-scroll-navigator-line" />
-                  <span
-                    className="chat-scroll-navigator-dot"
-                    style={{ top: `${2 + progress * 30}px` }}
-                  />
-                </span>
+          <button
+            aria-label="跳转到消息"
+            className="chat-scroll-navigator-locator-button"
+            onClick={() => {
+              setShowLocatorDialog(true);
+              setShowNavigatorChip(false);
+              userScrollSessionActiveRef.current = false;
+              setUserScrollSessionActive(false);
+            }}
+            type="button"
+          >
+            <span className="chat-scroll-navigator-pill">
+              <span className="chat-scroll-navigator-track">
+                <span className="chat-scroll-navigator-line" />
+                <span
+                  className="chat-scroll-navigator-dot"
+                  style={{ top: `${2 + progress * 30}px` }}
+                />
               </span>
-              <span className="chat-scroll-navigator-arrow" />
-            </button>
-          ) : null}
-          {showScrollToBottomButton ? (
-            <button
-              aria-label="滚动到底部"
-              className="chat-scroll-navigator-bottom-button"
-              onClick={() => {
-                if (hasNewerDisplayHistory && onRequestLatestMessages) {
-                  onRequestLatestMessages();
-                }
-                if (scrollElement) {
-                  scrollElement.scrollTo({
-                    top: scrollElement.scrollHeight,
-                    behavior: 'smooth'
-                  });
-                }
-                onAutoScrollToBottomChange(true);
-                setShowScrollToBottomButton(false);
-              }}
-              type="button"
-            >
-              <ChevronDownIcon size={14} />
-            </button>
-          ) : null}
+            </span>
+            <span className="chat-scroll-navigator-arrow" />
+          </button>
+          <button
+            aria-label="滚动到底部"
+            className="chat-scroll-navigator-bottom-button"
+            onClick={() => {
+              if (hasNewerDisplayHistory && onRequestLatestMessages) {
+                onRequestLatestMessages();
+              }
+              if (scrollElement) {
+                scrollElement.scrollTo({
+                  top: scrollElement.scrollHeight,
+                  behavior: 'smooth'
+                });
+              }
+              onAutoScrollToBottomChange(true);
+            }}
+            type="button"
+          >
+            <ChevronDownIcon size={14} />
+          </button>
         </div>
       ) : null}
 
@@ -719,6 +762,8 @@ export function ChatScrollNavigator({
           currentMessageTimestamp={activeMessageTimestamp}
           isLoading={isLoadingLocatorEntries}
           loadFailed={locatorLoadFailed}
+          currentChatId={currentChatId}
+          loadLocatorEntries={loadLocatorEntries}
           locatorEntries={locatorEntries}
           onDismiss={() => setShowLocatorDialog(false)}
           onJumpToMessage={(targetTimestamp) => {

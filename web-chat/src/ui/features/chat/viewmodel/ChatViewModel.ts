@@ -533,7 +533,10 @@ export interface ChatViewModelActions {
   selectMemoryProfile: (profileId: string) => Promise<void>;
   runManualMemoryUpdate: () => Promise<void>;
   runManualConversationSummary: () => Promise<void>;
-  loadMessageLocatorEntries: (chatId: string) => Promise<WebChatMessageLocatorPreview[]>;
+  loadMessageLocatorEntries: (
+    chatId: string,
+    query?: string
+  ) => Promise<WebChatMessageLocatorPreview[]>;
   revealMessageForCurrentChat: (targetTimestamp: number) => Promise<boolean>;
   toggleMessageFavorite: (timestamp: number, isFavorite: boolean) => Promise<void>;
 }
@@ -1486,14 +1489,15 @@ export function useChatViewModel(): ChatViewModel {
     }
   }
 
-  async function loadMessageLocatorEntries(chatId: string) {
+  async function loadMessageLocatorEntries(chatId: string, query = '') {
     if (!token) {
       return [];
     }
 
     try {
-      return await getMessageLocatorEntries(token, chatId);
+      return await getMessageLocatorEntries(token, chatId, query);
     } catch (actionError: unknown) {
+      console.error('加载消息定位列表失败', actionError);
       handleApiFailure(actionError);
       throw actionError;
     }

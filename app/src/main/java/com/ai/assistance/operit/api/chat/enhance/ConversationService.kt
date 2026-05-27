@@ -1038,7 +1038,6 @@ class ConversationService(
     private suspend fun replacePromptPlaceholders(prompt: String, aiName: String): String {
         var finalPrompt = prompt
         
-        // 获取全局用户名
         val globalUserName = displayPreferencesManager.globalUserName.first() ?: "User"
         
         // 替换占位符

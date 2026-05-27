@@ -361,12 +361,6 @@ class MessageCoordinationDelegate(
         if (targetMessage.sender != "ai") {
             throw IllegalArgumentException(context.getString(R.string.chat_only_ai_message_allowed))
         }
-        if (ChatMarkupRegex.containsAnyToolLikeTag(targetMessage.content)) {
-            throw IllegalStateException(
-                context.getString(R.string.chat_regenerate_single_tool_unsupported)
-            )
-        }
-
         val prefixHistory = currentHistory.subList(0, index).toList()
         val (requestHistory, requestMessageContent) =
             if (prefixHistory.lastOrNull()?.sender == "user") {

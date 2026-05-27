@@ -62,6 +62,7 @@ import com.ai.assistance.operit.ui.features.packages.dialogs.PackageDetailsDialo
 import com.ai.assistance.operit.ui.features.packages.dialogs.QuickPluginCreatorDialog
 import com.ai.assistance.operit.ui.features.packages.dialogs.ScriptExecutionDialog
 import com.ai.assistance.operit.ui.features.packages.lists.PackagesList
+import com.ai.assistance.operit.ui.features.packages.market.BindMarketSearchToTopBar
 import com.ai.assistance.operit.ui.features.packages.market.PluginCreationIntent
 import java.io.File
 import kotlinx.coroutines.Dispatchers
@@ -159,6 +160,7 @@ fun PackageManagerScreen(
 
     // Tab selection state
     var selectedTab by rememberSaveable { mutableStateOf(PackageTab.PACKAGES) }
+    var packageSearchQuery by rememberSaveable { mutableStateOf("") }
 
     // Environment variables dialog state
     var showEnvDialog by remember { mutableStateOf(false) }
@@ -199,6 +201,26 @@ fun PackageManagerScreen(
                 .toSet()
                 .toList()
                 .sorted()
+        }
+    }
+
+    val filteredAvailablePackages by remember {
+        derivedStateOf {
+            val searchText = packageSearchQuery.trim()
+            val packagesMap = availablePackages.value
+
+            if (searchText.isEmpty()) {
+                packagesMap
+            } else {
+                packagesMap.filter { (packageName, toolPackage) ->
+                    packageMatchesSearch(
+                        context = context,
+                        packageName = packageName,
+                        toolPackage = toolPackage,
+                        searchText = searchText
+                    )
+                }
+            }
         }
     }
 
@@ -360,6 +382,13 @@ fun PackageManagerScreen(
             isLoading = false
         }
     }
+
+    BindMarketSearchToTopBar(
+        enabled = selectedTab == PackageTab.PACKAGES,
+        searchQuery = packageSearchQuery,
+        onSearchQueryChanged = { packageSearchQuery = it },
+        searchPlaceholderRes = R.string.package_market_search_placeholder
+    )
 
     CustomScaffold(
         snackbarHost = {
@@ -596,7 +625,8 @@ fun PackageManagerScreen(
                                     color = MaterialTheme.colorScheme.background,
                                     shape = MaterialTheme.shapes.medium
                                 ) {
-                                    val packages = availablePackages.value
+                                    val packages = filteredAvailablePackages
+                                    val isPackageSearchActive = packageSearchQuery.isNotBlank()
                                     val groupedPackagesRaw = packages.entries.groupBy { it.value.category }
                                     val categoryOrder = listOf("ToolPkg", "Automatic", "Experimental", "Draw", "Other")
                                     val sortedCategories =
@@ -630,15 +660,26 @@ fun PackageManagerScreen(
                                         verticalArrangement = Arrangement.spacedBy(1.dp),
                                         contentPadding = PaddingValues(top = 12.dp, bottom = 120.dp)
                                     ) {
-                                        item(key = "quick_plugin_creator_entry") {
-                                            QuickPluginCreatorEntry(
-                                                onClick = { showQuickPluginCreatorDialog = true }
-                                            )
+                                        if (!isPackageSearchActive) {
+                                            item(key = "quick_plugin_creator_entry") {
+                                                QuickPluginCreatorEntry(
+                                                    onClick = { showQuickPluginCreatorDialog = true }
+                                                )
+                                            }
                                         }
 
-                                        if (availablePackages.value.isEmpty()) {
+                                        if (packages.isEmpty()) {
                                             item(key = "empty_packages_state") {
-                                                EmptyState(message = context.getString(R.string.no_packages_available))
+                                                EmptyState(
+                                                    message =
+                                                        context.getString(
+                                                            if (isPackageSearchActive) {
+                                                                R.string.no_matching_packages_found
+                                                            } else {
+                                                                R.string.no_packages_available
+                                                            }
+                                                        )
+                                                )
                                             }
                                         }
 
@@ -943,6 +984,47 @@ fun PackageManagerScreen(
                 )
             }
         }
+    }
+}
+
+private fun packageMatchesSearch(
+    context: android.content.Context,
+    packageName: String,
+    toolPackage: ToolPackage,
+    searchText: String
+): Boolean {
+    val searchableText =
+        buildList {
+            add(packageName)
+            add(toolPackage.name)
+            add(toolPackage.displayName.resolve(context))
+            add(toolPackage.description.resolve(context))
+            add(toolPackage.category)
+            addAll(toolPackage.author)
+            toolPackage.tools.forEach { tool ->
+                addPackageToolSearchText(context, tool)
+            }
+            toolPackage.states.forEach { state ->
+                add(state.id)
+                state.tools.forEach { tool ->
+                    addPackageToolSearchText(context, tool)
+                }
+            }
+        }
+
+    return searchableText.any { text -> text.contains(searchText, ignoreCase = true) }
+}
+
+private fun MutableList<String>.addPackageToolSearchText(
+    context: android.content.Context,
+    tool: PackageTool
+) {
+    add(tool.name)
+    add(tool.description.resolve(context))
+    tool.parameters.forEach { parameter ->
+        add(parameter.name)
+        add(parameter.description.resolve(context))
+        add(parameter.type)
     }
 }
 

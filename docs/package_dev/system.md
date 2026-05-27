@@ -9,7 +9,7 @@
 - 睡眠与基础系统设置读写。
 - 应用安装、卸载、启动、停止、枚举。
 - 应用前台使用时长统计。
-- 设备信息、通知、定位。
+- 设备信息、通知、定位、蓝牙。
 - Shell / Intent / Broadcast。
 - 持久终端会话。
 
@@ -106,6 +106,62 @@ getAppUsageTime({
 #### `getLocation(highAccuracy?, timeout?)`
 
 返回 `LocationData`。
+
+### 蓝牙
+
+蓝牙能力在 `Tools.System.bluetooth` 下。
+
+#### `bluetooth.requestPermission()`
+
+请求蓝牙附近设备权限，返回 `StringResultData`。
+
+#### `bluetooth.getState()`
+
+读取蓝牙适配器状态，返回 `BluetoothStateData`。
+
+#### `bluetooth.requestEnable()`
+
+打开系统蓝牙开启对话框，返回 `StringResultData`。
+
+#### `bluetooth.listBondedDevices()`
+
+列出已配对蓝牙设备，返回 `BluetoothBondedDevicesData`。
+
+#### `bluetooth.scan(options?)`
+
+```ts
+bluetooth.scan({ durationMs?, includeBle? }): Promise<BluetoothScanResultData>
+```
+
+扫描附近蓝牙 Classic 与 BLE 设备。
+
+#### Classic 连接和收发
+
+```ts
+bluetooth.connect({ address, uuid? }): Promise<BluetoothSessionData>
+bluetooth.listen({ name?, uuid? }): Promise<BluetoothSessionData>
+bluetooth.accept(listenerSessionId, timeoutMs?): Promise<BluetoothSessionData>
+bluetooth.send(sessionId, { text?, dataBase64? }): Promise<BluetoothTransferData>
+bluetooth.read(sessionId, { maxBytes?, timeoutMs? }): Promise<BluetoothReadData>
+bluetooth.sendAndRead(sessionId, { text?, dataBase64?, maxBytes?, timeoutMs? }): Promise<BluetoothReadData>
+bluetooth.close(sessionId): Promise<StringResultData>
+```
+
+`sendAndRead` 用于发送命令后立刻读取响应。文本按 UTF-8 发送，二进制用 `dataBase64`。
+
+#### BLE
+
+```ts
+bluetooth.ble.connect({ address, autoConnect? }): Promise<BluetoothSessionData>
+bluetooth.ble.discoverServices(sessionId, timeoutMs?): Promise<BluetoothBleServicesData>
+bluetooth.ble.readCharacteristic(sessionId, { serviceUuid, characteristicUuid, timeoutMs? }): Promise<BluetoothReadData>
+bluetooth.ble.writeCharacteristic(sessionId, { serviceUuid, characteristicUuid, text?, dataBase64? }): Promise<BluetoothTransferData>
+bluetooth.ble.writeAndReadCharacteristic(sessionId, { writeServiceUuid, writeCharacteristicUuid, readServiceUuid, readCharacteristicUuid, text?, dataBase64?, timeoutMs? }): Promise<BluetoothReadData>
+bluetooth.ble.subscribe(sessionId, { serviceUuid, characteristicUuid, enable? }): Promise<BluetoothTransferData>
+bluetooth.ble.readNotifications(sessionId, limit?): Promise<BluetoothBleNotificationData>
+```
+
+`writeAndReadCharacteristic` 用于写入命令后读取响应 characteristic。BLE 通知通过 `subscribe` 开启后，使用 `readNotifications` 读取已收到的数据。
 
 ### Shell 与 Intent
 

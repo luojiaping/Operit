@@ -1725,6 +1725,9 @@ class StandardSoftwareSettingsModifyTools(private val context: Context) {
             config.copy(enableDirectVideoProcessing = value)
         }
         applyBoolean("enable_google_search") { config, value -> config.copy(enableGoogleSearch = value) }
+        applyBoolean("enable_claude_1h_prompt_cache") { config, value ->
+            config.copy(enableClaude1hPromptCache = value)
+        }
         applyBoolean("enable_tool_call") { config, value -> config.copy(enableToolCall = value) }
 
         if (updated.llamaGpuLayers <= 0 && updated.llamaOffloadKqv) {
@@ -1785,6 +1788,7 @@ class StandardSoftwareSettingsModifyTools(private val context: Context) {
             enableDirectAudioProcessing = config.enableDirectAudioProcessing,
             enableDirectVideoProcessing = config.enableDirectVideoProcessing,
             enableGoogleSearch = config.enableGoogleSearch,
+            enableClaude1hPromptCache = config.enableClaude1hPromptCache,
             enableToolCall = config.enableToolCall,
             requestLimitPerMinute = config.requestLimitPerMinute,
             maxConcurrentRequests = config.maxConcurrentRequests,

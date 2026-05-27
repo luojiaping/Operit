@@ -3397,6 +3397,8 @@ Kini anda boleh menggunakan mod AutoGLM di antara muka perbualan.</string>
     <string name="enable_direct_video_processing_desc">Setelah diaktifkan, video akan dihantar terus kepada AI untuk diproses, bukan melalui alat yang mengekstrak bingkai/menganalisis</string>
     <string name="enable_google_search">Aktifkan Google Search</string>
     <string name="enable_google_search_desc">Setelah diaktifkan, Gemini akan menggunakan carian Google untuk meningkatkan jawapan (mungkin menyebabkan kos tambahan)</string>
+    <string name="enable_claude_1h_prompt_cache">Aktifkan cache prompt Claude 1 jam</string>
+    <string name="enable_claude_1h_prompt_cache_desc">Setelah diaktifkan, Claude dan penyedia serasi Claude akan menggunakan TTL cache prompt 1 jam</string>
     <string name="enable_tool_call">Model menyokong ToolCall</string>
     <string name="enable_tool_call_desc">Apabila ditutup, mekanisme panggilan alat dalam perisian akan digunakan, dan panggilan alat juga boleh diselesaikan. Setelah dibuka, antara muka khusus API akan digunakan untuk panggilan alat asli (memerlukan sokongan model)</string>
 
@@ -6794,7 +6796,6 @@ Kini anda boleh menggunakan mod AutoGLM di antara muka perbualan.</string>
     <string name="chat_regenerating_single">Sedang menjana semula jawapan ini...</string>
     <string name="chat_regenerate_single_failed">Gagal menjana semula satu: %1$s</string>
     <string name="chat_regenerate_busy">Sedang memproses mesej lain, sila cuba sebentar lagi</string>
-    <string name="chat_regenerate_single_tool_unsupported">Jawapan yang mengandungi panggilan alat tidak menyokong penjanaan semula satu</string>
     <string name="chat_switch_variant_failed">Gagal menukar jawapan: %1$s</string>
     <string name="chat_message_variant_counter">%1$d/%2$d</string>
     <string name="chat_previous_variant">Jawapan sebelumnya</string>

@@ -341,6 +341,118 @@ export interface AppUsageTimeResultData {
 }
 
 /**
+ * Bluetooth adapter state
+ */
+export interface BluetoothStateData {
+    supported: boolean;
+    enabled: boolean;
+    state: 'unsupported' | 'off' | 'turning_on' | 'on' | 'turning_off' | 'unknown';
+    toString(): string;
+}
+
+/**
+ * Bluetooth bonded device entry
+ */
+export interface BluetoothDeviceData {
+    name?: string;
+    address: string;
+    type: 'classic' | 'le' | 'dual' | 'unknown';
+    bondState: 'none' | 'bonding' | 'bonded' | 'unknown';
+}
+
+/**
+ * Bluetooth bonded devices result
+ */
+export interface BluetoothBondedDevicesData {
+    devices: BluetoothDeviceData[];
+    toString(): string;
+}
+
+/**
+ * Bluetooth scanned device entry
+ */
+export interface BluetoothScannedDeviceData extends BluetoothDeviceData {
+    source: 'classic' | 'ble';
+    rssi?: number;
+}
+
+/**
+ * Bluetooth scan result
+ */
+export interface BluetoothScanResultData {
+    devices: BluetoothScannedDeviceData[];
+    durationMs: number;
+    includesBle: boolean;
+    toString(): string;
+}
+
+/**
+ * Bluetooth session result
+ */
+export interface BluetoothSessionData {
+    sessionId: string;
+    address: string;
+    mode: 'classic' | 'classic_listener' | 'ble';
+    toString(): string;
+}
+
+/**
+ * Bluetooth write result
+ */
+export interface BluetoothTransferData {
+    sessionId: string;
+    bytesWritten: number;
+    toString(): string;
+}
+
+/**
+ * Bluetooth read result
+ */
+export interface BluetoothReadData {
+    sessionId: string;
+    bytesRead: number;
+    text?: string;
+    dataBase64?: string;
+    toString(): string;
+}
+
+/**
+ * BLE services result
+ */
+export interface BluetoothBleServicesData {
+    sessionId: string;
+    services: BluetoothBleServiceData[];
+    toString(): string;
+}
+
+export interface BluetoothBleServiceData {
+    uuid: string;
+    characteristics: BluetoothBleCharacteristicData[];
+}
+
+export interface BluetoothBleCharacteristicData {
+    uuid: string;
+    properties: Array<'read' | 'write' | 'write_no_response' | 'notify' | 'indicate'>;
+}
+
+/**
+ * BLE notification list result
+ */
+export interface BluetoothBleNotificationData {
+    sessionId: string;
+    notifications: BluetoothBleNotificationEntry[];
+    toString(): string;
+}
+
+export interface BluetoothBleNotificationEntry {
+    characteristicUuid: string;
+    bytesRead: number;
+    text?: string;
+    dataBase64?: string;
+    timestamp: number;
+}
+
+/**
  * Notification data structure
  */
 export interface NotificationData {
@@ -1291,6 +1403,7 @@ export interface ModelConfigResultItem {
     enableDirectAudioProcessing: boolean;
     enableDirectVideoProcessing: boolean;
     enableGoogleSearch: boolean;
+    enableClaude1hPromptCache: boolean;
     enableToolCall: boolean;
     requestLimitPerMinute: number;
     maxConcurrentRequests: number;

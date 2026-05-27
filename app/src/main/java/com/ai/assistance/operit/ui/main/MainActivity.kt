@@ -111,6 +111,7 @@ class MainActivity : ComponentActivity() {
     private var pendingGitHubAuthUri: Uri? = null
     private var pendingShortcutNavItem: NavItem? = null
     private var pendingShortcutRequestId: Long = 0L
+    private var currentMainNavItem: NavItem = NavItem.AiChat
     private var pendingRouteId: String? = null
     private var pendingRouteArgs: Map<String, Any?> = emptyMap()
     private var pendingRouteRequestId: Long = 0L
@@ -273,6 +274,7 @@ class MainActivity : ComponentActivity() {
         if (intent?.action == ACTION_OPEN_SETTINGS_SHORTCUT) {
             pendingShortcutNavItem = NavItem.Settings
             pendingShortcutRequestId = System.currentTimeMillis()
+            currentMainNavItem = NavItem.Settings
             AppLogger.d(TAG, "Shortcut requested opening settings")
             return true
         }
@@ -739,7 +741,7 @@ class MainActivity : ComponentActivity() {
                             val initialNavItem = when {
                                 showPreferencesGuide -> NavItem.UserPreferencesGuide
                                 shortcutNavItem != null -> shortcutNavItem
-                                else -> NavItem.AiChat
+                                else -> currentMainNavItem
                             }
 
                             CompositionLocalProvider(LocalPluginLoadingState provides pluginLoadingState) {
@@ -757,6 +759,9 @@ class MainActivity : ComponentActivity() {
                                                 pendingShortcutNavItem = null
                                                 pendingShortcutRequestId = 0L
                                             }
+                                        },
+                                        onCurrentNavItemChanged = { navItem ->
+                                            currentMainNavItem = navItem
                                         },
                                         onRouteNavHandled = { handledRequestId ->
                                             if (pendingRouteRequestId == handledRequestId) {

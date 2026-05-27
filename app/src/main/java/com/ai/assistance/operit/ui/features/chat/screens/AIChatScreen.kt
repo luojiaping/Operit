@@ -53,6 +53,7 @@ import com.ai.assistance.operit.data.model.ToolParameter
 import com.ai.assistance.operit.data.preferences.ApiPreferences
 import com.ai.assistance.operit.data.preferences.DisplayPreferencesManager
 import com.ai.assistance.operit.data.preferences.UserPreferencesManager
+import com.ai.assistance.operit.data.preferences.WaifuPreferences
 import com.ai.assistance.operit.ui.components.ErrorDialog
 import com.ai.assistance.operit.ui.features.chat.components.*
 import com.ai.assistance.operit.ui.features.chat.components.style.input.agent.AgentChatInputSection
@@ -1571,6 +1572,7 @@ private fun ChatInputBottomBar(
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
     val coroutineScope = rememberCoroutineScope()
+    val waifuPreferences = remember(context) { WaifuPreferences.getInstance(context) }
 
     val userMessage by actualViewModel.userMessage.collectAsState()
     val attachments by actualViewModel.attachments.collectAsState()
@@ -1579,6 +1581,13 @@ private fun ChatInputBottomBar(
     val permissionLevel by actualViewModel.masterPermissionLevel.collectAsState()
     val isSummarizing by actualViewModel.isSummarizing.collectAsState()
     val isSendTriggeredSummarizing by actualViewModel.isSendTriggeredSummarizing.collectAsState()
+    val isWaifuModeEnabled by waifuPreferences.enableWaifuModeFlow.collectAsState(initial = false)
+    val isWaifuMergeSendEnabled by
+        waifuPreferences.waifuEnableMergeSendFlow.collectAsState(initial = false)
+    val waifuMergeSendDelayMs by
+        waifuPreferences.waifuMergeSendDelayMsFlow.collectAsState(
+            initial = WaifuPreferences.DEFAULT_WAIFU_MERGE_SEND_DELAY_MS
+        )
 
     val isMessageProcessing =
         isLoading ||
@@ -1596,6 +1605,7 @@ private fun ChatInputBottomBar(
     var nextPendingQueueId by remember(currentChatId) { mutableStateOf(1L) }
     var wasQueueBlocked by remember(currentChatId) { mutableStateOf(false) }
     var suppressNextAutoDequeue by remember(currentChatId) { mutableStateOf(false) }
+    val waifuMergeBuffer = remember(currentChatId) { mutableStateListOf<String>() }
     val latestQueueBlocked = rememberUpdatedState(isQueueBlocked)
     val latestCurrentChatId = rememberUpdatedState(currentChatId)
 
@@ -1642,6 +1652,62 @@ private fun ChatInputBottomBar(
         if (normalizedMessage.isNotBlank()) {
             Toast.makeText(context, normalizedMessage, Toast.LENGTH_SHORT).show()
         }
+    }
+
+    LaunchedEffect(
+        currentChatId,
+        waifuMergeBuffer.size,
+        isWaifuModeEnabled,
+        isWaifuMergeSendEnabled,
+        waifuMergeSendDelayMs
+    ) {
+        if (!isWaifuModeEnabled || !isWaifuMergeSendEnabled) {
+            waifuMergeBuffer.clear()
+            return@LaunchedEffect
+        }
+        if (waifuMergeBuffer.isEmpty()) {
+            return@LaunchedEffect
+        }
+
+        delay(waifuMergeSendDelayMs.toLong())
+        snapshotFlow { latestQueueBlocked.value }.first { blocked -> !blocked }
+
+        val messages = waifuMergeBuffer.toList()
+        if (messages.isEmpty()) {
+            return@LaunchedEffect
+        }
+
+        val chatId = latestCurrentChatId.value
+        if (chatId.isNullOrBlank()) {
+            Toast.makeText(
+                context,
+                context.getString(R.string.chat_please_create_new_chat),
+                Toast.LENGTH_SHORT,
+            ).show()
+            return@LaunchedEffect
+        }
+
+        val triggerText = messages.last()
+        val removedVisibleMessage =
+            actualViewModel.removeLastVisibleUserMessageFromCurrentChat(triggerText)
+        if (!removedVisibleMessage) {
+            return@LaunchedEffect
+        }
+        waifuMergeBuffer.clear()
+
+        focusManager.clearFocus()
+        actualViewModel.sendTextMessage(triggerText)
+        onRequestAutoScrollToBottom()
+        ChatInputHookRegistry.dispatchNotification(
+            buildChatInputHookContext(
+                eventName = ChatInputEvents.SUBMITTED,
+                text = triggerText,
+                selectionStart = triggerText.length,
+                selectionEnd = triggerText.length,
+                source = "waifu_merge",
+                submitSource = "waifu_merge"
+            )
+        )
     }
 
     fun restorePendingQueueItem(item: PendingQueueMessageItem) {
@@ -1791,6 +1857,22 @@ private fun ChatInputBottomBar(
                         selection = TextRange(finalText.length)
                     )
                 )
+            }
+            val shouldUseWaifuMergeSend =
+                isWaifuModeEnabled &&
+                    isWaifuMergeSendEnabled &&
+                    attachments.isEmpty() &&
+                    replyToMessage == null &&
+                    finalText.isNotBlank()
+            if (shouldUseWaifuMergeSend) {
+                val visibleText = finalText.trim()
+                waifuMergeBuffer.add(visibleText)
+                actualViewModel.addVisibleUserMessageToCurrentChat(visibleText)
+                actualViewModel.updateUserMessage(TextFieldValue(""))
+                actualViewModel.resetAttachmentPanelState()
+                focusManager.clearFocus()
+                onRequestAutoScrollToBottom()
+                return@launch
             }
             focusManager.clearFocus()
             actualViewModel.sendUserMessage()

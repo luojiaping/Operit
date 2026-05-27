@@ -67,6 +67,7 @@ import com.ai.assistance.operit.data.model.ChatMessage
 import com.ai.assistance.operit.data.model.ChatMessageDisplayMode
 import com.ai.assistance.operit.data.model.ChatMessageLocatorPreview
 import com.ai.assistance.operit.ui.features.chat.components.lazy.LazyListState as ChatLazyListState
+import com.ai.assistance.operit.util.AppLogger
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -80,6 +81,7 @@ private data class ChatScrollNavigatorSnapshot(
 )
 
 private const val LOCATOR_PREVIEW_CHAR_COUNT = 48
+private const val TAG = "ChatScrollNavigator"
 
 internal data class ChatScrollMessageAnchor(
     val absoluteTopPx: Float,
@@ -98,7 +100,7 @@ internal fun ChatScrollNavigator(
     scrollState: ChatLazyListState,
     minVisibleIndex: Int,
     visibleMessageCount: Int,
-    loadLocatorEntries: (suspend (String) -> List<ChatMessageLocatorPreview>)? = null,
+    loadLocatorEntries: (suspend (String, String) -> List<ChatMessageLocatorPreview>)? = null,
     onJumpToMessageTimestamp: ((Long) -> Unit)? = null,
     onJumpToMessage: (Int) -> Unit,
     onToggleFavoriteMessage: ((Long, Boolean) -> Unit)? = null,
@@ -175,7 +177,7 @@ internal fun ChatScrollNavigator(
         isLoadingLocatorEntries = true
         locatorLoadFailed = false
         locatorEntries =
-            runCatching { loadLocatorEntries(currentChatId) }
+            runCatching { loadLocatorEntries(currentChatId, "") }
                 .onFailure { locatorLoadFailed = true }
                 .getOrElse { emptyList() }
         isLoadingLocatorEntries = false
@@ -282,6 +284,8 @@ internal fun ChatScrollNavigator(
             currentMessageTimestamp = activeMessageTimestamp,
             isLoading = isLoadingLocatorEntries,
             loadFailed = locatorLoadFailed,
+            currentChatId = currentChatId,
+            loadLocatorEntries = loadLocatorEntries,
             onDismiss = { showLocatorDialog = false },
             onToggleFavoriteMessage = onToggleFavoriteMessage,
             onJumpToMessage = { targetTimestamp ->
@@ -306,7 +310,7 @@ internal fun ChatScrollNavigator(
     viewportHeightPx: Int,
     autoScrollToBottom: Boolean,
     hasNewerDisplayHistory: Boolean = false,
-    loadLocatorEntries: (suspend (String) -> List<ChatMessageLocatorPreview>)? = null,
+    loadLocatorEntries: (suspend (String, String) -> List<ChatMessageLocatorPreview>)? = null,
     onRequestLatestMessages: (() -> Unit)? = null,
     onAutoScrollToBottomChange: ((Boolean) -> Unit)? = null,
     onJumpToMessageTimestamp: ((Long) -> Unit)? = null,
@@ -322,7 +326,6 @@ internal fun ChatScrollNavigator(
     val currentIsDragged by rememberUpdatedState(isDragged)
     val coroutineScope = rememberCoroutineScope()
     var showNavigatorChip by remember { mutableStateOf(false) }
-    var showScrollToBottomAction by remember { mutableStateOf(false) }
     var userScrollSessionActive by remember { mutableStateOf(false) }
     var showLocatorDialog by remember { mutableStateOf(false) }
     var currentMessageIndex by remember(chatHistory) {
@@ -332,12 +335,6 @@ internal fun ChatScrollNavigator(
     val currentHasNewerDisplayHistory by rememberUpdatedState(hasNewerDisplayHistory)
     val currentOnRequestLatestMessages by rememberUpdatedState(onRequestLatestMessages)
     val currentOnAutoScrollToBottomChange by rememberUpdatedState(onAutoScrollToBottomChange)
-
-    LaunchedEffect(autoScrollToBottom) {
-        if (autoScrollToBottom) {
-            showScrollToBottomAction = false
-        }
-    }
 
     LaunchedEffect(isDragged) {
         if (isDragged) {
@@ -391,7 +388,6 @@ internal fun ChatScrollNavigator(
                     if (movedAwayFromBottom) {
                         if (currentAutoScrollToBottom && currentIsDragged) {
                             currentOnAutoScrollToBottomChange?.invoke(false)
-                            showScrollToBottomAction = true
                         }
                     } else {
                         val isAtBottom =
@@ -399,7 +395,6 @@ internal fun ChatScrollNavigator(
                                 !currentHasNewerDisplayHistory
                         if (isAtBottom && !currentAutoScrollToBottom) {
                             currentOnAutoScrollToBottomChange?.invoke(true)
-                            showScrollToBottomAction = false
                         }
                     }
                 }
@@ -429,7 +424,7 @@ internal fun ChatScrollNavigator(
         isLoadingLocatorEntries = true
         locatorLoadFailed = false
         locatorEntries =
-            runCatching { loadLocatorEntries(currentChatId) }
+            runCatching { loadLocatorEntries(currentChatId, "") }
                 .onFailure { locatorLoadFailed = true }
                 .getOrElse { emptyList() }
         isLoadingLocatorEntries = false
@@ -469,111 +464,100 @@ internal fun ChatScrollNavigator(
                 (progressIndex.toFloat() / (progressTotalCount - 1).toFloat()).coerceIn(0f, 1f)
             }
 
-        Box(
-            modifier = Modifier.size(width = 34.dp, height = 114.dp),
-        ) {
-            if (showNavigatorChip) {
-                Row(
-                    modifier =
-                        Modifier
-                            .align(Alignment.CenterStart)
-                            .offset(x = 4.5.dp)
-                            .clickable {
-                                showLocatorDialog = true
-                                showNavigatorChip = false
-                                userScrollSessionActive = false
-                            },
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Box(
-                        modifier =
-                            Modifier
-                                .clip(navigatorShape)
-                                .background(bubbleColor)
-                                .border(1.dp, navigatorBorderColor, navigatorShape),
-                    ) {
-                        Box(
-                            modifier =
-                                Modifier
-                                    .width(20.dp)
-                                    .height(58.dp)
-                                    .padding(vertical = 8.dp),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Canvas(modifier = Modifier.size(width = 8.dp, height = 34.dp)) {
-                                val centerX = size.width / 2f
-                                val topY = 2.dp.toPx()
-                                val bottomY = size.height - 2.dp.toPx()
-                                val dotCenterY = topY + (bottomY - topY) * progress
-                                drawLine(
-                                    color = anchorLineColor,
-                                    start = Offset(centerX, topY),
-                                    end = Offset(centerX, bottomY),
-                                    strokeWidth = 1.5.dp.toPx(),
-                                )
-                                drawCircle(
-                                    color = anchorDotColor,
-                                    radius = 3.dp.toPx(),
-                                    center = Offset(centerX, dotCenterY),
-                                )
-                            }
-                        }
-                    }
-
-                    Canvas(
-                        modifier =
-                            Modifier
-                                .offset(x = (-1).dp)
-                                .size(width = 9.dp, height = 18.dp),
-                    ) {
-                        val arrowPath =
-                            Path().apply {
-                                moveTo(0f, 0f)
-                                lineTo(size.width, size.height / 2f)
-                                lineTo(0f, size.height)
-                                close()
-                            }
-                        drawPath(path = arrowPath, color = bubbleColor)
-                    }
-                }
-            }
-
-            AnimatedVisibility(
-                visible = showScrollToBottomAction,
-                enter = fadeIn(animationSpec = tween(120)),
-                exit = fadeOut(animationSpec = tween(120)),
+        Box(modifier = Modifier.size(width = 34.dp, height = 114.dp)) {
+            Row(
+                modifier =
+                    Modifier
+                        .align(Alignment.CenterStart)
+                        .offset(x = 4.5.dp)
+                        .clickable {
+                            showLocatorDialog = true
+                            showNavigatorChip = false
+                            userScrollSessionActive = false
+                        },
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 Box(
                     modifier =
                         Modifier
-                            .size(24.dp)
-                            .align(Alignment.TopStart)
-                            .offset(x = 2.5.dp, y = 90.dp)
-                            .clip(CircleShape)
+                            .clip(navigatorShape)
                             .background(bubbleColor)
-                            .border(1.dp, navigatorBorderColor, CircleShape)
-                            .clickable {
-                                coroutineScope.launch {
-                                    if (currentHasNewerDisplayHistory) {
-                                        currentOnRequestLatestMessages?.invoke()
-                                    }
-                                    scrollState.animateScrollTo(scrollState.maxValue)
-                                }
-                                currentOnAutoScrollToBottomChange?.invoke(true)
-                                showScrollToBottomAction = false
-                            },
+                            .border(1.dp, navigatorBorderColor, navigatorShape),
                 ) {
                     Box(
-                        modifier = Modifier.fillMaxWidth().fillMaxHeight(),
+                        modifier =
+                            Modifier
+                                .width(20.dp)
+                                .height(58.dp)
+                                .padding(vertical = 8.dp),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.KeyboardArrowDown,
-                            contentDescription = stringResource(R.string.history_scroll_to_bottom),
-                            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.92f),
-                            modifier = Modifier.size(16.dp),
-                        )
+                        Canvas(modifier = Modifier.size(width = 8.dp, height = 34.dp)) {
+                            val centerX = size.width / 2f
+                            val topY = 2.dp.toPx()
+                            val bottomY = size.height - 2.dp.toPx()
+                            val dotCenterY = topY + (bottomY - topY) * progress
+                            drawLine(
+                                color = anchorLineColor,
+                                start = Offset(centerX, topY),
+                                end = Offset(centerX, bottomY),
+                                strokeWidth = 1.5.dp.toPx(),
+                            )
+                            drawCircle(
+                                color = anchorDotColor,
+                                radius = 3.dp.toPx(),
+                                center = Offset(centerX, dotCenterY),
+                            )
+                        }
                     }
+                }
+
+                Canvas(
+                    modifier =
+                        Modifier
+                            .offset(x = (-1).dp)
+                            .size(width = 9.dp, height = 18.dp),
+                ) {
+                    val arrowPath =
+                        Path().apply {
+                            moveTo(0f, 0f)
+                            lineTo(size.width, size.height / 2f)
+                            lineTo(0f, size.height)
+                            close()
+                        }
+                    drawPath(path = arrowPath, color = bubbleColor)
+                }
+            }
+
+            Box(
+                modifier =
+                    Modifier
+                        .size(24.dp)
+                        .align(Alignment.TopStart)
+                        .offset(x = 2.5.dp, y = 90.dp)
+                        .clip(CircleShape)
+                        .background(bubbleColor)
+                        .border(1.dp, navigatorBorderColor, CircleShape)
+                        .clickable {
+                            coroutineScope.launch {
+                                if (currentHasNewerDisplayHistory) {
+                                    currentOnRequestLatestMessages?.invoke()
+                                }
+                                scrollState.animateScrollTo(scrollState.maxValue)
+                            }
+                            currentOnAutoScrollToBottomChange?.invoke(true)
+                        },
+            ) {
+                Box(
+                    modifier = Modifier.fillMaxWidth().fillMaxHeight(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.KeyboardArrowDown,
+                        contentDescription = stringResource(R.string.history_scroll_to_bottom),
+                        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.92f),
+                        modifier = Modifier.size(16.dp),
+                    )
                 }
             }
         }
@@ -585,6 +569,8 @@ internal fun ChatScrollNavigator(
             currentMessageTimestamp = activeMessageTimestamp,
             isLoading = isLoadingLocatorEntries,
             loadFailed = locatorLoadFailed,
+            currentChatId = currentChatId,
+            loadLocatorEntries = loadLocatorEntries,
             onDismiss = { showLocatorDialog = false },
             onToggleFavoriteMessage = onToggleFavoriteMessage,
             onJumpToMessage = { targetTimestamp ->
@@ -606,6 +592,8 @@ private fun ChatMessageLocatorDialog(
     currentMessageTimestamp: Long,
     isLoading: Boolean,
     loadFailed: Boolean,
+    currentChatId: String?,
+    loadLocatorEntries: (suspend (String, String) -> List<ChatMessageLocatorPreview>)?,
     onDismiss: () -> Unit,
     onToggleFavoriteMessage: ((Long, Boolean) -> Unit)?,
     onJumpToMessage: (Long) -> Unit,
@@ -618,41 +606,73 @@ private fun ChatMessageLocatorDialog(
             ?: 0
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = initialIndex)
     var searchQuery by remember { mutableStateOf("") }
+    var searchEntries by remember { mutableStateOf<List<ChatMessageLocatorPreview>>(emptyList()) }
+    var isLoadingSearchEntries by remember { mutableStateOf(false) }
+    var searchLoadFailed by remember { mutableStateOf(false) }
     var favoritesOnly by remember { mutableStateOf(false) }
     var favoriteOverrides by remember(locatorEntries) { mutableStateOf<Map<Long, Boolean>>(emptyMap()) }
     val hiddenPlaceholderText = stringResource(R.string.chat_hidden_user_message_placeholder)
     val normalizedSearchQuery = normalizeMessageSearchText(searchQuery)
+    val activeLocatorEntries =
+        if (normalizedSearchQuery.isBlank()) {
+            locatorEntries
+        } else {
+            searchEntries
+        }
+    val dialogIsLoading = isLoading || isLoadingSearchEntries
+    val dialogLoadFailed = loadFailed || searchLoadFailed
     val indexedEntries =
-        locatorEntries.mapIndexed { index, preview ->
-            ChatMessageLocatorEntry(index = index, preview = preview)
+        activeLocatorEntries.mapIndexed { index, preview ->
+            ChatMessageLocatorEntry(index = preview.messageIndex ?: index, preview = preview)
         }
     val filteredEntries =
-        if (isLoading) {
+        if (dialogIsLoading) {
             indexedEntries
         } else {
             indexedEntries.filter { entry ->
                 val isFavorite =
                     favoriteOverrides[entry.preview.timestamp] ?: entry.preview.isFavorite
                 val matchesFavorite = !favoritesOnly || isFavorite
-                val matchesSearch =
-                    normalizedSearchQuery.isBlank() ||
-                        normalizeMessageSearchText(
-                            visibleLocatorContent(entry.preview, hiddenPlaceholderText)
-                        ).contains(
-                            normalizedSearchQuery,
-                            ignoreCase = true,
-                        )
-                matchesFavorite && matchesSearch
+                matchesFavorite
             }
         }
     val maxMessageLength =
-        remember(locatorEntries) {
-            locatorEntries.maxOfOrNull { messageContentLength(it, hiddenPlaceholderText) }
+        remember(activeLocatorEntries) {
+            activeLocatorEntries.maxOfOrNull { messageContentLength(it, hiddenPlaceholderText) }
                 ?.coerceAtLeast(1) ?: 1
         }
 
-    LaunchedEffect(normalizedSearchQuery, filteredEntries.size, currentMessageIndex, isLoading) {
-        if (isLoading || filteredEntries.isEmpty()) {
+    LaunchedEffect(normalizedSearchQuery, currentChatId, loadLocatorEntries) {
+        if (normalizedSearchQuery.isBlank()) {
+            searchEntries = emptyList()
+            isLoadingSearchEntries = false
+            searchLoadFailed = false
+            return@LaunchedEffect
+        }
+
+        if (currentChatId.isNullOrBlank() || loadLocatorEntries == null) {
+            searchEntries = emptyList()
+            isLoadingSearchEntries = false
+            searchLoadFailed = true
+            return@LaunchedEffect
+        }
+
+        isLoadingSearchEntries = true
+        searchLoadFailed = false
+        delay(180)
+        try {
+            searchEntries = loadLocatorEntries(currentChatId, normalizedSearchQuery)
+        } catch (e: Exception) {
+            AppLogger.e(TAG, "搜索聊天定位预览失败", e)
+            searchEntries = emptyList()
+            searchLoadFailed = true
+        } finally {
+            isLoadingSearchEntries = false
+        }
+    }
+
+    LaunchedEffect(normalizedSearchQuery, filteredEntries.size, currentMessageIndex, dialogIsLoading) {
+        if (dialogIsLoading || filteredEntries.isEmpty()) {
             return@LaunchedEffect
         }
 
@@ -792,7 +812,7 @@ private fun ChatMessageLocatorDialog(
                     )
                 }
 
-                if (isLoading) {
+                if (dialogIsLoading) {
                     Box(
                         modifier = Modifier.fillMaxWidth().height(160.dp),
                         contentAlignment = Alignment.Center,
@@ -804,7 +824,7 @@ private fun ChatMessageLocatorDialog(
                             textAlign = TextAlign.Center,
                         )
                     }
-                } else if (loadFailed) {
+                } else if (dialogLoadFailed) {
                     Box(
                         modifier = Modifier.fillMaxWidth().height(160.dp),
                         contentAlignment = Alignment.Center,

@@ -57,7 +57,14 @@ private enum class CodeBlockPreviewType {
  * 8. Mermaid图表支持
  */
 @Composable
-fun EnhancedCodeBlock(code: String, language: String = "", modifier: Modifier = Modifier) {
+internal fun EnhancedCodeBlock(
+    code: String,
+    language: String = "",
+    modifier: Modifier = Modifier,
+    textSelectionRequest: MarkdownTextSelectionRequest? = null,
+    selectionState: MarkdownCanvasTextSelectionState? = null,
+    nodeIndex: Int = -1,
+) {
     val clipboardManager = LocalClipboardManager.current
     val scope = rememberCoroutineScope()
     var showCopiedToast by remember { mutableStateOf(false) }
@@ -282,6 +289,9 @@ fun EnhancedCodeBlock(code: String, language: String = "", modifier: Modifier = 
                     highlightedLines = if (preferStreamingBody) null else highlightedLines,
                     autoWrapEnabled = autoWrapEnabled,
                     maxScrollableHeight = maxScrollableHeight,
+                    textSelectionRequest = textSelectionRequest,
+                    selectionState = selectionState,
+                    nodeIndex = nodeIndex,
                 )
             }
 

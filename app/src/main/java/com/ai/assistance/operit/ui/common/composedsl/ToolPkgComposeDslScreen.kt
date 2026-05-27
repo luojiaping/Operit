@@ -76,6 +76,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -3478,12 +3479,12 @@ internal fun resolveColorValue(value: Any?): Color? {
 
 internal fun iconFromName(name: String): ImageVector {
     val iconKey = name.trim()
-    require(iconKey.isNotEmpty()) { "icon name is blank" }
-    return requireNotNull(
-        com.ai.assistance.operit.ui.common.icons.MaterialIconNameResolver.resolveOrNull(iconKey)
-    ) {
-        "icon name is invalid: $name"
+    if (iconKey.isEmpty()) {
+        return Icons.Default.Info
     }
+    return runCatching {
+        com.ai.assistance.operit.ui.common.icons.MaterialIconNameResolver.resolveOrNull(iconKey)
+    }.getOrNull() ?: Icons.Default.Info
 }
 
 @Composable

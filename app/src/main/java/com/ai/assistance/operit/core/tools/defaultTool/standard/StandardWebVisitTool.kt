@@ -662,9 +662,7 @@ class StandardWebVisitTool(private val context: Context) : ToolExecutor {
                                 },
                                 isExpanded = isExpandedState,
                                 onMinimizeRequested = {
-                                    if (!isCaptchaDetectedState.value) {
-                                        setExpanded(false)
-                                    }
+                                    setExpanded(false)
                                 }
                         )
                     }
@@ -1385,7 +1383,7 @@ class StandardWebVisitTool(private val context: Context) : ToolExecutor {
                                 )
                             }
 
-                            if (isExpanded.value && !isCaptchaVerification.value) {
+                            if (isExpanded.value) {
                                 FilledTonalIconButton(
                                         onClick = onMinimizeRequested,
                                         modifier = Modifier.size(42.dp)

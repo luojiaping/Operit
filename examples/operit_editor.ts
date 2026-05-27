@@ -185,6 +185,8 @@
 - `OPENAI_WS_TTS`：需填写 `url_template`、`api_key`、`model_name`、`voice_id`。其中 `url_template` 应为 Realtime WebSocket 地址（例如 `wss://api.openai.com/v1/realtime`）。
 - `SILICONFLOW_TTS`：需填写 `api_key`、`model_name`、`voice_id`。
 - `MINIMAX_TTS`：需填写 `api_key`，可选填写 `url_template`、`model_name`、`voice_id`。默认接口为 `https://api.minimaxi.com/v1/t2a_v2`，内部固定按 `data.audio -> http_get` 解析音频。
+- `MIMO_TTS`：需填写 `api_key`，可选填写 `url_template`、`model_name`、`voice_id`。默认接口为 `https://api.xiaomimimo.com/v1/chat/completions`，内部固定按 `choices[0].message.audio.data -> base64_decode` 解析音频。
+- `DOUBAO_TTS`：豆包 TTS，需填写 `url_template`、`api_key`（Token）、`model_name`（App ID）、`voice_id`（voice_type）。默认接口为 `https://openspeech.bytedance.com/api/v1/tts`，继承 HTTP TTS 队列和响应管线，内部固定按 `data -> base64_decode` 解析音频。
 - `OPENAI_TTS`：需填写 `url_template`、`api_key`、`model_name`、`voice_id`。
 - `VITS_TTS`：本地 VITS/Piper TTS。`tts_vits_package_path` 填本地模型包 `.zip` 或已解压目录，`tts_vits_speaker_id` 可选填数字 speaker id，`tts_vits_options` 可选填写 `sample_rate`、`threads`、`noise_scale`、`length_scale`、`noise_w`、`frontend`、`text_mode`、`speaker_count`、输入名和 blank/bos/eos token 等本地参数。
 3) STT（语音转文本）可选引擎：
@@ -207,7 +209,7 @@
   - 当 `http_method=GET` 时，`{text}` 必须在 `url_template` 里。
   - 当 `http_method=POST` 时，`{text}` 必须在 `request_body` 里。
 - 可选占位符：`{rate}`、`{pitch}`、`{voice}`。
-- 当前对外可稳定使用的占位符只有：`{text}`、`{rate}`、`{pitch}`、`{voice}`。
+- 当前对外可稳定使用的占位符：`{text}`、`{rate}`、`{pitch}`、`{voice}`、`{apiKey}`、`{model}`、`{locale}`、`{uuid}`。
 6) HTTP_TTS 响应处理说明（已发布版本兼容）：
 - `response_pipeline` 留空或传 `[]`：保持旧行为，直接把首个响应体当音频。
 - 当服务端先返回 JSON、字段或下载链接时，再填写 `response_pipeline`，按步骤解析。
@@ -431,6 +433,8 @@
 - `OPENAI_WS_TTS`: fill `url_template`, `api_key`, `model_name`, `voice_id`. `url_template` should be a Realtime WebSocket endpoint such as `wss://api.openai.com/v1/realtime`.
 - `SILICONFLOW_TTS`: fill `api_key`, `model_name`, `voice_id`.
 - `MINIMAX_TTS`: fill `api_key`; optionally set `url_template`, `model_name`, and `voice_id`. Default endpoint is `https://api.minimaxi.com/v1/t2a_v2`, and audio is resolved from `data.audio` automatically.
+- `MIMO_TTS`: fill `api_key`; optionally set `url_template`, `model_name`, and `voice_id`. Default endpoint is `https://api.xiaomimimo.com/v1/chat/completions`, and audio is resolved from `choices[0].message.audio.data` with Base64 decoding.
+- `DOUBAO_TTS`: Doubao TTS. Fill `url_template`, `api_key` (token), `model_name` (App ID), and `voice_id` (voice_type). Default endpoint is `https://openspeech.bytedance.com/api/v1/tts`; it inherits the HTTP TTS queue and response pipeline and resolves audio from `data` with Base64 decoding.
 - `OPENAI_TTS`: fill `url_template`, `api_key`, `model_name`, `voice_id`.
 - `VITS_TTS`: local VITS/Piper TTS. Set `tts_vits_package_path` to the local model package `.zip` or extracted package directory, optionally set `tts_vits_speaker_id` to a numeric speaker id, and use `tts_vits_options` for local options such as `sample_rate`, `threads`, `noise_scale`, `length_scale`, `noise_w`, `frontend`, `text_mode`, `speaker_count`, input names, and blank/bos/eos token settings.
 3) STT (speech-to-text) engines:
@@ -453,7 +457,7 @@
   - When `http_method=GET`, `{text}` must appear in `url_template`.
   - When `http_method=POST`, `{text}` must appear in `request_body`.
 - Optional placeholders: `{rate}`, `{pitch}`, `{voice}`.
-- Only these placeholders are stably supported for external configuration: `{text}`, `{rate}`, `{pitch}`, `{voice}`.
+- Stable placeholders for external configuration: `{text}`, `{rate}`, `{pitch}`, `{voice}`, `{apiKey}`, `{model}`, `{locale}`, `{uuid}`.
 6) HTTP_TTS response handling notes (forward-compatible with released configs):
 - Leave `response_pipeline` empty or use `[]` to keep the old behavior: the first response body is treated as audio directly.
 - Only fill `response_pipeline` when the service returns JSON, nested fields, or a follow-up download URL before audio is available.
@@ -781,8 +785,8 @@
         {
           name: "tts_service_type"
           description: {
-            zh: "可选，SIMPLE_TTS/HTTP_TTS/OPENAI_WS_TTS/SILICONFLOW_TTS/MINIMAX_TTS/OPENAI_TTS/VITS_TTS"
-            en: "Optional, SIMPLE_TTS/HTTP_TTS/OPENAI_WS_TTS/SILICONFLOW_TTS/MINIMAX_TTS/OPENAI_TTS/VITS_TTS"
+            zh: "可选，SIMPLE_TTS/HTTP_TTS/OPENAI_WS_TTS/SILICONFLOW_TTS/MINIMAX_TTS/MIMO_TTS/DOUBAO_TTS/OPENAI_TTS/VITS_TTS"
+            en: "Optional, SIMPLE_TTS/HTTP_TTS/OPENAI_WS_TTS/SILICONFLOW_TTS/MINIMAX_TTS/MIMO_TTS/DOUBAO_TTS/OPENAI_TTS/VITS_TTS"
           }
           type: string
           required: false
@@ -1318,6 +1322,15 @@
           required: false
         },
         {
+          name: "enable_claude_1h_prompt_cache"
+          description: {
+            zh: "可选，是否启用 Claude 1h Prompt Cache"
+            en: "Optional Claude 1h prompt cache switch"
+          }
+          type: boolean
+          required: false
+        },
+        {
           name: "enable_tool_call"
           description: {
             zh: "可选，是否开启Tool Call"
@@ -1691,6 +1704,15 @@
           description: {
             zh: "可选，是否启用 Google Search"
             en: "Optional Google Search switch"
+          }
+          type: boolean
+          required: false
+        },
+        {
+          name: "enable_claude_1h_prompt_cache"
+          description: {
+            zh: "可选，是否启用 Claude 1h Prompt Cache"
+            en: "Optional Claude 1h prompt cache switch"
           }
           type: boolean
           required: false
@@ -3153,6 +3175,8 @@ type TtsServiceType =
   | "OPENAI_WS_TTS"
   | "SILICONFLOW_TTS"
   | "MINIMAX_TTS"
+  | "MIMO_TTS"
+  | "DOUBAO_TTS"
   | "OPENAI_TTS"
   | "VITS_TTS";
 
@@ -3329,6 +3353,7 @@ async function create_model_config(params?: {
   enable_direct_audio_processing?: boolean;
   enable_direct_video_processing?: boolean;
   enable_google_search?: boolean;
+  enable_claude_1h_prompt_cache?: boolean;
   enable_tool_call?: boolean;
   mnn_forward_type?: number;
   mnn_thread_count?: number;
@@ -3388,6 +3413,7 @@ async function update_model_config(params?: {
   enable_direct_audio_processing?: boolean;
   enable_direct_video_processing?: boolean;
   enable_google_search?: boolean;
+  enable_claude_1h_prompt_cache?: boolean;
   enable_tool_call?: boolean;
   mnn_forward_type?: number;
   mnn_thread_count?: number;

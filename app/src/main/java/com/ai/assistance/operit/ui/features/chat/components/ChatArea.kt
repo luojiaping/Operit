@@ -1,5 +1,6 @@
 package com.ai.assistance.operit.ui.features.chat.components
 
+import android.widget.Toast
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.StartOffset
 import androidx.compose.animation.core.animateFloat
@@ -35,6 +36,7 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
@@ -64,9 +66,11 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -76,7 +80,7 @@ import com.ai.assistance.operit.data.model.AiReference
 import com.ai.assistance.operit.data.model.ChatMessage
 import com.ai.assistance.operit.data.model.ChatMessageDisplayMode
 import com.ai.assistance.operit.data.model.ChatMessageLocatorPreview
-import com.ai.assistance.operit.data.preferences.DisplayPreferencesManager
+import com.ai.assistance.operit.data.preferences.UserPreferencesManager
 
 import androidx.compose.ui.window.PopupProperties
 
@@ -89,18 +93,51 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.AccountTree
 import androidx.compose.material.icons.filled.Summarize
 import androidx.compose.ui.draw.alpha
+import com.ai.assistance.operit.api.chat.llmprovider.MediaLinkParser
 import com.ai.assistance.operit.ui.common.markdown.LocalMarkdownTextSelectionAutoScrollController
 import com.ai.assistance.operit.ui.common.markdown.MarkdownTextSelectionRequest
 import com.ai.assistance.operit.ui.common.markdown.MarkdownTextSelectionAutoScrollController
 import com.ai.assistance.operit.ui.features.chat.components.style.cursor.CursorStyleChatMessage
 import com.ai.assistance.operit.ui.features.chat.components.style.bubble.BubbleImageStyleConfig
 import com.ai.assistance.operit.ui.features.chat.components.style.bubble.BubbleStyleChatMessage
-import com.ai.assistance.operit.util.WaifuMessageProcessor
+import com.ai.assistance.operit.util.ChatMarkupRegex
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
+
+/**
+ * 清理消息中的XML标签，保留Markdown格式和纯文本内容
+ */
+private fun cleanXmlTags(content: String): String {
+    return content
+        // 移除状态标签
+        .replace(ChatMarkupRegex.statusTag, "")
+        .replace(ChatMarkupRegex.statusSelfClosingTag, "")
+        // 移除思考标签（包括 <think> 和 <thinking>）
+        .replace(ChatMarkupRegex.thinkTag, "")
+        .replace(ChatMarkupRegex.thinkSelfClosingTag, "")
+        // 移除搜索来源标签
+        .replace(ChatMarkupRegex.searchTag, "")
+        .replace(ChatMarkupRegex.searchSelfClosingTag, "")
+        // 移除工具标签
+        .replace(ChatMarkupRegex.toolTag, "")
+        .replace(ChatMarkupRegex.toolSelfClosingTag, "")
+        // 移除工具结果标签
+        .replace(ChatMarkupRegex.toolResultTag, "")
+        .replace(ChatMarkupRegex.toolResultSelfClosingTag, "")
+        // 移除emotion标签
+        .replace(ChatMarkupRegex.emotionTag, "")
+        // 移除附件与工作区上下文
+        .replace(ChatMarkupRegex.workspaceAttachmentTag, "")
+        .replace(ChatMarkupRegex.attachmentTag, "")
+        .replace(ChatMarkupRegex.attachmentSelfClosingTag, "")
+        // 移除多媒体链接标签
+        .let(MediaLinkParser::removeImageLinks)
+        .let(MediaLinkParser::removeMediaLinks)
+        .trim()
+}
 
 private fun isHiddenUserPlaceholder(message: ChatMessage): Boolean {
     return message.sender == "user" &&
@@ -152,7 +189,7 @@ fun ChatArea(
     onLoadOlderDisplayWindow: (() -> Unit)? = null,
     onLoadNewerDisplayWindow: (() -> Unit)? = null,
     onShowLatestDisplayWindow: (() -> Unit)? = null,
-    loadMessageLocatorEntries: (suspend (String) -> List<ChatMessageLocatorPreview>)? = null,
+    loadMessageLocatorEntries: (suspend (String, String) -> List<ChatMessageLocatorPreview>)? = null,
     onRevealMessageForLocator: (suspend (Long) -> Boolean)? = null,
     topPadding: Dp = 0.dp,
     bottomPadding: Dp = 0.dp,
@@ -181,13 +218,13 @@ fun ChatArea(
     val context = LocalContext.current
     val density = LocalDensity.current
     val coroutineScope = rememberCoroutineScope()
-    val displayPreferencesManager = remember { DisplayPreferencesManager.getInstance(context) }
+    val preferencesManager = remember { UserPreferencesManager.getInstance(context) }
     val showMessageTokenStats by
-        displayPreferencesManager.showMessageTokenStats.collectAsState(initial = false)
+        preferencesManager.showMessageTokenStats.collectAsState(initial = false)
     val showMessageTimingStats by
-        displayPreferencesManager.showMessageTimingStats.collectAsState(initial = false)
+        preferencesManager.showMessageTimingStats.collectAsState(initial = false)
     val showMessageTimestamp by
-        displayPreferencesManager.showMessageTimestamp.collectAsState(initial = false)
+        preferencesManager.showMessageTimestamp.collectAsState(initial = false)
     var viewportHeightPx by remember { mutableStateOf(0) }
     var viewportTopInWindowPx by remember { mutableStateOf(0f) }
     val messageAnchors = remember(currentChatId) { mutableStateMapOf<Long, ChatScrollMessageAnchor>() }
@@ -665,13 +702,15 @@ private fun MessageItem(
     var textSelectionRequest by remember(message.timestamp) {
         mutableStateOf<MarkdownTextSelectionRequest?>(null)
     }
+    val context = LocalContext.current
+    val clipboardManager = LocalClipboardManager.current
 
 
     // 只有用户和AI的消息才能被操作
     val isActionable = message.sender == "user" || message.sender == "ai"
     val isHiddenUserMessage = isHiddenUserPlaceholder(message)
     val currentTextSelectionRequest =
-        if (message.sender == "ai") textSelectionRequest else null
+        if (message.sender == "ai" && !isHiddenUserMessage) textSelectionRequest else null
 
     Box(
         modifier =
@@ -806,35 +845,66 @@ private fun MessageItem(
             )
         ) {
             if (!isHiddenUserMessage) {
-                if (message.sender == "ai") {
-                    // 复制选项
+                if (isActionable) {
                     DropdownMenuItem(
                         text = {
                             Text(
-                                stringResource(id = R.string.copy_message),
+                                stringResource(id = R.string.copy_full_message),
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontSize = 13.sp
                             )
                         },
                         onClick = {
-                            selectionRequestId += 1L
-                            textSelectionRequest =
-                                MarkdownTextSelectionRequest(
-                                    id = selectionRequestId,
-                                    positionInWindow = lastPressPositionInWindow,
-                                )
+                            clipboardManager.setText(
+                                AnnotatedString(cleanXmlTags(message.content))
+                            )
+                            Toast.makeText(
+                                context,
+                                context.getString(R.string.message_copied_to_clipboard),
+                                Toast.LENGTH_SHORT,
+                            ).show()
                             showContextMenu = false
                         },
                         leadingIcon = {
                             Icon(
                                 imageVector = Icons.Default.ContentCopy,
-                                contentDescription = stringResource(id = R.string.copy_message),
+                                contentDescription = stringResource(id = R.string.copy_full_message),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(16.dp)
                             )
                         },
                         modifier = Modifier.height(36.dp)
                     )
+
+                    if (message.sender == "ai") {
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    stringResource(id = R.string.select_copy),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontSize = 13.sp
+                                )
+                            },
+                            onClick = {
+                                selectionRequestId += 1L
+                                textSelectionRequest =
+                                    MarkdownTextSelectionRequest(
+                                        id = selectionRequestId,
+                                        positionInWindow = lastPressPositionInWindow,
+                                    )
+                                showContextMenu = false
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.SelectAll,
+                                    contentDescription = stringResource(id = R.string.select_copy),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            },
+                            modifier = Modifier.height(36.dp)
+                        )
+                    }
                 }
 
                 // 朗读消息选项

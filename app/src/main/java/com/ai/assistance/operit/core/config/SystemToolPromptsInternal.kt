@@ -1772,7 +1772,7 @@ object SystemToolPromptsInternal {
                                     ToolParameterSchema(
                                         name = "tts_service_type",
                                         type = "string",
-                                        description = "optional, SIMPLE_TTS/HTTP_TTS/OPENAI_WS_TTS/SILICONFLOW_TTS/MINIMAX_TTS/OPENAI_TTS/VITS_TTS",
+                                        description = "optional, SIMPLE_TTS/HTTP_TTS/OPENAI_WS_TTS/SILICONFLOW_TTS/MINIMAX_TTS/MIMO_TTS/DOUBAO_TTS/OPENAI_TTS/VITS_TTS",
                                         required = false
                                     ),
                                     ToolParameterSchema(
@@ -2313,6 +2313,12 @@ object SystemToolPromptsInternal {
                                         required = false
                                     ),
                                     ToolParameterSchema(
+                                        name = "enable_claude_1h_prompt_cache",
+                                        type = "boolean",
+                                        description = "optional, Claude 1-hour prompt cache switch",
+                                        required = false
+                                    ),
+                                    ToolParameterSchema(
                                         name = "enable_tool_call",
                                         type = "boolean",
                                         description = "optional, enable provider-native tool call",
@@ -2681,6 +2687,175 @@ object SystemToolPromptsInternal {
                                         required = false,
                                         default = "true"
                                     )
+                                )
+                        ),
+                        ToolPrompt(
+                            name = "request_bluetooth_permission",
+                            description = "Request Bluetooth nearby devices permission.",
+                            parametersStructured = listOf()
+                        ),
+                        ToolPrompt(
+                            name = "get_bluetooth_state",
+                            description = "Get Bluetooth adapter state.",
+                            parametersStructured = listOf()
+                        ),
+                        ToolPrompt(
+                            name = "request_enable_bluetooth",
+                            description = "Open the system dialog to enable Bluetooth.",
+                            parametersStructured = listOf()
+                        ),
+                        ToolPrompt(
+                            name = "list_bluetooth_bonded_devices",
+                            description = "List bonded Bluetooth devices.",
+                            parametersStructured = listOf()
+                        ),
+                        ToolPrompt(
+                            name = "scan_bluetooth_devices",
+                            description = "Scan nearby Bluetooth classic and BLE devices.",
+                            parametersStructured =
+                                listOf(
+                                    ToolParameterSchema("duration_ms", "integer", "optional, scan duration in milliseconds", false, "10000"),
+                                    ToolParameterSchema("include_ble", "boolean", "optional, include BLE scan", false, "true")
+                                )
+                        ),
+                        ToolPrompt(
+                            name = "bluetooth_connect",
+                            description = "Connect to a Bluetooth classic device.",
+                            parametersStructured =
+                                listOf(
+                                    ToolParameterSchema("address", "string", "Bluetooth MAC address", true),
+                                    ToolParameterSchema("uuid", "string", "optional RFCOMM UUID", false)
+                                )
+                        ),
+                        ToolPrompt(
+                            name = "bluetooth_listen",
+                            description = "Listen for another device connecting to this phone over Bluetooth classic.",
+                            parametersStructured =
+                                listOf(
+                                    ToolParameterSchema("name", "string", "optional service name", false, "Operit Bluetooth"),
+                                    ToolParameterSchema("uuid", "string", "optional RFCOMM UUID", false)
+                                )
+                        ),
+                        ToolPrompt(
+                            name = "bluetooth_accept",
+                            description = "Accept an incoming Bluetooth classic connection from a listener session.",
+                            parametersStructured =
+                                listOf(
+                                    ToolParameterSchema("listener_session_id", "string", "listener session ID", true),
+                                    ToolParameterSchema("timeout_ms", "integer", "optional wait time in milliseconds", false, "30000")
+                                )
+                        ),
+                        ToolPrompt(
+                            name = "bluetooth_send",
+                            description = "Send text or base64 bytes to a Bluetooth classic session.",
+                            parametersStructured =
+                                listOf(
+                                    ToolParameterSchema("session_id", "string", "Bluetooth session ID", true),
+                                    ToolParameterSchema("text", "string", "UTF-8 text to send", false),
+                                    ToolParameterSchema("data_base64", "string", "base64 bytes to send", false)
+                                )
+                        ),
+                        ToolPrompt(
+                            name = "bluetooth_read",
+                            description = "Read text or bytes from a Bluetooth classic session.",
+                            parametersStructured =
+                                listOf(
+                                    ToolParameterSchema("session_id", "string", "Bluetooth session ID", true),
+                                    ToolParameterSchema("max_bytes", "integer", "optional maximum bytes to read", false, "4096"),
+                                    ToolParameterSchema("timeout_ms", "integer", "optional wait time in milliseconds", false, "3000")
+                                )
+                        ),
+                        ToolPrompt(
+                            name = "bluetooth_send_and_read",
+                            description = "Send text or bytes to a Bluetooth classic session and read the response.",
+                            parametersStructured =
+                                listOf(
+                                    ToolParameterSchema("session_id", "string", "Bluetooth session ID", true),
+                                    ToolParameterSchema("text", "string", "UTF-8 text to send", false),
+                                    ToolParameterSchema("data_base64", "string", "base64 bytes to send", false),
+                                    ToolParameterSchema("max_bytes", "integer", "optional maximum bytes to read", false, "4096"),
+                                    ToolParameterSchema("timeout_ms", "integer", "optional wait time in milliseconds", false, "3000")
+                                )
+                        ),
+                        ToolPrompt(
+                            name = "bluetooth_close",
+                            description = "Close a Bluetooth classic, listener, or BLE session.",
+                            parametersStructured = listOf(ToolParameterSchema("session_id", "string", "Bluetooth session ID", true))
+                        ),
+                        ToolPrompt(
+                            name = "bluetooth_ble_connect",
+                            description = "Connect to a BLE device.",
+                            parametersStructured =
+                                listOf(
+                                    ToolParameterSchema("address", "string", "Bluetooth MAC address", true),
+                                    ToolParameterSchema("auto_connect", "boolean", "optional BLE autoConnect flag", false, "false")
+                                )
+                        ),
+                        ToolPrompt(
+                            name = "bluetooth_ble_discover_services",
+                            description = "Discover BLE services and characteristics.",
+                            parametersStructured =
+                                listOf(
+                                    ToolParameterSchema("session_id", "string", "BLE session ID", true),
+                                    ToolParameterSchema("timeout_ms", "integer", "optional wait time in milliseconds", false, "10000")
+                                )
+                        ),
+                        ToolPrompt(
+                            name = "bluetooth_ble_read_characteristic",
+                            description = "Read a BLE characteristic.",
+                            parametersStructured =
+                                listOf(
+                                    ToolParameterSchema("session_id", "string", "BLE session ID", true),
+                                    ToolParameterSchema("service_uuid", "string", "service UUID", true),
+                                    ToolParameterSchema("characteristic_uuid", "string", "characteristic UUID", true),
+                                    ToolParameterSchema("timeout_ms", "integer", "optional wait time in milliseconds", false, "5000")
+                                )
+                        ),
+                        ToolPrompt(
+                            name = "bluetooth_ble_write_characteristic",
+                            description = "Write text or base64 bytes to a BLE characteristic.",
+                            parametersStructured =
+                                listOf(
+                                    ToolParameterSchema("session_id", "string", "BLE session ID", true),
+                                    ToolParameterSchema("service_uuid", "string", "service UUID", true),
+                                    ToolParameterSchema("characteristic_uuid", "string", "characteristic UUID", true),
+                                    ToolParameterSchema("text", "string", "UTF-8 text to write", false),
+                                    ToolParameterSchema("data_base64", "string", "base64 bytes to write", false)
+                                )
+                        ),
+                        ToolPrompt(
+                            name = "bluetooth_ble_write_and_read_characteristic",
+                            description = "Write text or base64 bytes to a BLE characteristic and read another characteristic response.",
+                            parametersStructured =
+                                listOf(
+                                    ToolParameterSchema("session_id", "string", "BLE session ID", true),
+                                    ToolParameterSchema("write_service_uuid", "string", "write service UUID", true),
+                                    ToolParameterSchema("write_characteristic_uuid", "string", "write characteristic UUID", true),
+                                    ToolParameterSchema("read_service_uuid", "string", "read service UUID", true),
+                                    ToolParameterSchema("read_characteristic_uuid", "string", "read characteristic UUID", true),
+                                    ToolParameterSchema("text", "string", "UTF-8 text to write", false),
+                                    ToolParameterSchema("data_base64", "string", "base64 bytes to write", false),
+                                    ToolParameterSchema("timeout_ms", "integer", "optional wait time in milliseconds", false, "5000")
+                                )
+                        ),
+                        ToolPrompt(
+                            name = "bluetooth_ble_subscribe_characteristic",
+                            description = "Subscribe or unsubscribe BLE characteristic notifications.",
+                            parametersStructured =
+                                listOf(
+                                    ToolParameterSchema("session_id", "string", "BLE session ID", true),
+                                    ToolParameterSchema("service_uuid", "string", "service UUID", true),
+                                    ToolParameterSchema("characteristic_uuid", "string", "characteristic UUID", true),
+                                    ToolParameterSchema("enable", "boolean", "optional subscription state", false, "true")
+                                )
+                        ),
+                        ToolPrompt(
+                            name = "bluetooth_ble_read_notifications",
+                            description = "Read received BLE notifications.",
+                            parametersStructured =
+                                listOf(
+                                    ToolParameterSchema("session_id", "string", "BLE session ID", true),
+                                    ToolParameterSchema("limit", "integer", "optional notification count", false, "20")
                                 )
                         )
                     )
@@ -4526,7 +4701,7 @@ object SystemToolPromptsInternal {
                                     ToolParameterSchema(
                                         name = "tts_service_type",
                                         type = "string",
-                                        description = "可选，SIMPLE_TTS/HTTP_TTS/OPENAI_WS_TTS/SILICONFLOW_TTS/MINIMAX_TTS/OPENAI_TTS/VITS_TTS",
+                                        description = "可选，SIMPLE_TTS/HTTP_TTS/OPENAI_WS_TTS/SILICONFLOW_TTS/MINIMAX_TTS/MIMO_TTS/DOUBAO_TTS/OPENAI_TTS/VITS_TTS",
                                         required = false
                                     ),
                                     ToolParameterSchema(
@@ -5067,6 +5242,12 @@ object SystemToolPromptsInternal {
                                         required = false
                                     ),
                                     ToolParameterSchema(
+                                        name = "enable_claude_1h_prompt_cache",
+                                        type = "boolean",
+                                        description = "可选，Claude 1 小时提示缓存开关",
+                                        required = false
+                                    ),
+                                    ToolParameterSchema(
                                         name = "enable_tool_call",
                                         type = "boolean",
                                         description = "可选，是否开启模型原生 Tool Call",
@@ -5435,6 +5616,175 @@ object SystemToolPromptsInternal {
                                         required = false,
                                         default = "true"
                                     )
+                                )
+                        ),
+                        ToolPrompt(
+                            name = "request_bluetooth_permission",
+                            description = "请求蓝牙附近设备权限。",
+                            parametersStructured = listOf()
+                        ),
+                        ToolPrompt(
+                            name = "get_bluetooth_state",
+                            description = "获取蓝牙适配器状态。",
+                            parametersStructured = listOf()
+                        ),
+                        ToolPrompt(
+                            name = "request_enable_bluetooth",
+                            description = "打开系统蓝牙开启对话框。",
+                            parametersStructured = listOf()
+                        ),
+                        ToolPrompt(
+                            name = "list_bluetooth_bonded_devices",
+                            description = "列出已配对蓝牙设备。",
+                            parametersStructured = listOf()
+                        ),
+                        ToolPrompt(
+                            name = "scan_bluetooth_devices",
+                            description = "扫描附近蓝牙 Classic 与 BLE 设备。",
+                            parametersStructured =
+                                listOf(
+                                    ToolParameterSchema("duration_ms", "integer", "可选，扫描时长毫秒", false, "10000"),
+                                    ToolParameterSchema("include_ble", "boolean", "可选，包含 BLE 扫描", false, "true")
+                                )
+                        ),
+                        ToolPrompt(
+                            name = "bluetooth_connect",
+                            description = "连接蓝牙 Classic 设备。",
+                            parametersStructured =
+                                listOf(
+                                    ToolParameterSchema("address", "string", "蓝牙 MAC 地址", true),
+                                    ToolParameterSchema("uuid", "string", "可选，RFCOMM UUID", false)
+                                )
+                        ),
+                        ToolPrompt(
+                            name = "bluetooth_listen",
+                            description = "监听其他设备通过蓝牙 Classic 连接本机。",
+                            parametersStructured =
+                                listOf(
+                                    ToolParameterSchema("name", "string", "可选，服务名", false, "Operit Bluetooth"),
+                                    ToolParameterSchema("uuid", "string", "可选，RFCOMM UUID", false)
+                                )
+                        ),
+                        ToolPrompt(
+                            name = "bluetooth_accept",
+                            description = "从蓝牙 Classic 监听会话接受一个传入连接。",
+                            parametersStructured =
+                                listOf(
+                                    ToolParameterSchema("listener_session_id", "string", "监听会话 ID", true),
+                                    ToolParameterSchema("timeout_ms", "integer", "可选，等待毫秒数", false, "30000")
+                                )
+                        ),
+                        ToolPrompt(
+                            name = "bluetooth_send",
+                            description = "向蓝牙 Classic 会话发送文本或 base64 字节。",
+                            parametersStructured =
+                                listOf(
+                                    ToolParameterSchema("session_id", "string", "蓝牙会话 ID", true),
+                                    ToolParameterSchema("text", "string", "要发送的 UTF-8 文本", false),
+                                    ToolParameterSchema("data_base64", "string", "要发送的 base64 字节", false)
+                                )
+                        ),
+                        ToolPrompt(
+                            name = "bluetooth_read",
+                            description = "从蓝牙 Classic 会话读取文本或字节。",
+                            parametersStructured =
+                                listOf(
+                                    ToolParameterSchema("session_id", "string", "蓝牙会话 ID", true),
+                                    ToolParameterSchema("max_bytes", "integer", "可选，最大读取字节数", false, "4096"),
+                                    ToolParameterSchema("timeout_ms", "integer", "可选，等待毫秒数", false, "3000")
+                                )
+                        ),
+                        ToolPrompt(
+                            name = "bluetooth_send_and_read",
+                            description = "向蓝牙 Classic 会话发送文本或字节并读取响应。",
+                            parametersStructured =
+                                listOf(
+                                    ToolParameterSchema("session_id", "string", "蓝牙会话 ID", true),
+                                    ToolParameterSchema("text", "string", "要发送的 UTF-8 文本", false),
+                                    ToolParameterSchema("data_base64", "string", "要发送的 base64 字节", false),
+                                    ToolParameterSchema("max_bytes", "integer", "可选，最大读取字节数", false, "4096"),
+                                    ToolParameterSchema("timeout_ms", "integer", "可选，等待毫秒数", false, "3000")
+                                )
+                        ),
+                        ToolPrompt(
+                            name = "bluetooth_close",
+                            description = "关闭蓝牙 Classic、监听或 BLE 会话。",
+                            parametersStructured = listOf(ToolParameterSchema("session_id", "string", "蓝牙会话 ID", true))
+                        ),
+                        ToolPrompt(
+                            name = "bluetooth_ble_connect",
+                            description = "连接 BLE 设备。",
+                            parametersStructured =
+                                listOf(
+                                    ToolParameterSchema("address", "string", "蓝牙 MAC 地址", true),
+                                    ToolParameterSchema("auto_connect", "boolean", "可选，BLE autoConnect 标记", false, "false")
+                                )
+                        ),
+                        ToolPrompt(
+                            name = "bluetooth_ble_discover_services",
+                            description = "发现 BLE service 和 characteristic。",
+                            parametersStructured =
+                                listOf(
+                                    ToolParameterSchema("session_id", "string", "BLE 会话 ID", true),
+                                    ToolParameterSchema("timeout_ms", "integer", "可选，等待毫秒数", false, "10000")
+                                )
+                        ),
+                        ToolPrompt(
+                            name = "bluetooth_ble_read_characteristic",
+                            description = "读取 BLE characteristic。",
+                            parametersStructured =
+                                listOf(
+                                    ToolParameterSchema("session_id", "string", "BLE 会话 ID", true),
+                                    ToolParameterSchema("service_uuid", "string", "service UUID", true),
+                                    ToolParameterSchema("characteristic_uuid", "string", "characteristic UUID", true),
+                                    ToolParameterSchema("timeout_ms", "integer", "可选，等待毫秒数", false, "5000")
+                                )
+                        ),
+                        ToolPrompt(
+                            name = "bluetooth_ble_write_characteristic",
+                            description = "向 BLE characteristic 写入文本或 base64 字节。",
+                            parametersStructured =
+                                listOf(
+                                    ToolParameterSchema("session_id", "string", "BLE 会话 ID", true),
+                                    ToolParameterSchema("service_uuid", "string", "service UUID", true),
+                                    ToolParameterSchema("characteristic_uuid", "string", "characteristic UUID", true),
+                                    ToolParameterSchema("text", "string", "要写入的 UTF-8 文本", false),
+                                    ToolParameterSchema("data_base64", "string", "要写入的 base64 字节", false)
+                                )
+                        ),
+                        ToolPrompt(
+                            name = "bluetooth_ble_write_and_read_characteristic",
+                            description = "向 BLE characteristic 写入文本或 base64 字节并读取另一个 characteristic 响应。",
+                            parametersStructured =
+                                listOf(
+                                    ToolParameterSchema("session_id", "string", "BLE 会话 ID", true),
+                                    ToolParameterSchema("write_service_uuid", "string", "写入 service UUID", true),
+                                    ToolParameterSchema("write_characteristic_uuid", "string", "写入 characteristic UUID", true),
+                                    ToolParameterSchema("read_service_uuid", "string", "读取 service UUID", true),
+                                    ToolParameterSchema("read_characteristic_uuid", "string", "读取 characteristic UUID", true),
+                                    ToolParameterSchema("text", "string", "要写入的 UTF-8 文本", false),
+                                    ToolParameterSchema("data_base64", "string", "要写入的 base64 字节", false),
+                                    ToolParameterSchema("timeout_ms", "integer", "可选，等待毫秒数", false, "5000")
+                                )
+                        ),
+                        ToolPrompt(
+                            name = "bluetooth_ble_subscribe_characteristic",
+                            description = "订阅或取消订阅 BLE characteristic 通知。",
+                            parametersStructured =
+                                listOf(
+                                    ToolParameterSchema("session_id", "string", "BLE 会话 ID", true),
+                                    ToolParameterSchema("service_uuid", "string", "service UUID", true),
+                                    ToolParameterSchema("characteristic_uuid", "string", "characteristic UUID", true),
+                                    ToolParameterSchema("enable", "boolean", "可选，订阅状态", false, "true")
+                                )
+                        ),
+                        ToolPrompt(
+                            name = "bluetooth_ble_read_notifications",
+                            description = "读取已收到的 BLE 通知。",
+                            parametersStructured =
+                                listOf(
+                                    ToolParameterSchema("session_id", "string", "BLE 会话 ID", true),
+                                    ToolParameterSchema("limit", "integer", "可选，通知条数", false, "20")
                                 )
                         )
                     )

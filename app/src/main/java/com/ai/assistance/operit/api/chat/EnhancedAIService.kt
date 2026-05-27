@@ -20,6 +20,7 @@ import com.ai.assistance.operit.core.chat.hooks.PromptTurn
 import com.ai.assistance.operit.core.chat.hooks.PromptTurnKind
 import com.ai.assistance.operit.core.chat.hooks.appendUserTurnIfMissing
 import com.ai.assistance.operit.core.chat.hooks.buildActivePromptHookMetadata
+import com.ai.assistance.operit.core.chat.hooks.mergeAdjacentTurns
 import com.ai.assistance.operit.core.chat.hooks.toPromptTurns
 import com.ai.assistance.operit.core.chat.hooks.toRoleContentPairs
 import com.ai.assistance.operit.core.application.ActivityLifecycleManager
@@ -790,7 +791,11 @@ class EnhancedAIService private constructor(private val context: Context) {
                 preparedHistory = finalPreparedHistory,
                 originalCurrentMessage = message,
                 finalizedCurrentMessage = finalProcessedInput
-            )
+            ).mergeAdjacentTurns { previous, current ->
+                previous.kind == PromptTurnKind.USER &&
+                    current.kind == PromptTurnKind.USER &&
+                    previous.toolName == current.toolName
+            }
 
         return estimatePreparedRequestWindow(
             serviceForFunction = serviceForFunction,
@@ -1004,7 +1009,11 @@ class EnhancedAIService private constructor(private val context: Context) {
                             preparedHistory = finalPreparedHistory,
                             originalCurrentMessage = message,
                             finalizedCurrentMessage = finalProcessedInput
-                        )
+                        ).mergeAdjacentTurns { previous, current ->
+                            previous.kind == PromptTurnKind.USER &&
+                                current.kind == PromptTurnKind.USER &&
+                                previous.toolName == current.toolName
+                        }
                     execContext.conversationHistory.clear()
                     execContext.conversationHistory.addAll(requestHistory)
                     estimatePreparedRequestWindow(

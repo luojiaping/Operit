@@ -5,6 +5,8 @@
 import {
     StringResultData, SleepResultData, SystemSettingData, AppOperationData, AppListData,
     AppUsageTimeResultData, DeviceInfoResultData, NotificationData, LocationData,
+    BluetoothStateData, BluetoothBondedDevicesData, BluetoothScanResultData, BluetoothSessionData,
+    BluetoothTransferData, BluetoothReadData, BluetoothBleServicesData, BluetoothBleNotificationData,
     ADBResultData, IntentResultData, TerminalCommandResultData, TerminalStreamEventData, HiddenTerminalCommandResultData,
     TerminalSessionCreationResultData, TerminalSessionCloseResultData, TerminalSessionScreenResultData,
     MusicPlaybackResultData
@@ -117,6 +119,114 @@ export namespace System {
      * @returns Promise resolving to location data
      */
     function getLocation(highAccuracy?: boolean, timeout?: number): Promise<LocationData>;
+
+    /**
+     * Bluetooth operations.
+     */
+    namespace bluetooth {
+        /** Request Bluetooth nearby devices permission. */
+        function requestPermission(): Promise<StringResultData>;
+
+        /** Get Bluetooth adapter state. */
+        function getState(): Promise<BluetoothStateData>;
+
+        /** Open the system dialog to enable Bluetooth. */
+        function requestEnable(): Promise<StringResultData>;
+
+        /** List bonded Bluetooth devices. */
+        function listBondedDevices(): Promise<BluetoothBondedDevicesData>;
+
+        /** Scan nearby Bluetooth classic and BLE devices. */
+        function scan(options?: {
+            durationMs?: number | string;
+            includeBle?: boolean;
+        }): Promise<BluetoothScanResultData>;
+
+        /** Connect to a Bluetooth classic device. */
+        function connect(options: {
+            address: string;
+            uuid?: string;
+        }): Promise<BluetoothSessionData>;
+
+        /** Listen for another device connecting to this phone over Bluetooth classic. */
+        function listen(options?: {
+            name?: string;
+            uuid?: string;
+        }): Promise<BluetoothSessionData>;
+
+        /** Accept one incoming Bluetooth classic connection. */
+        function accept(listenerSessionId: string, timeoutMs?: number | string): Promise<BluetoothSessionData>;
+
+        /** Send text or bytes to a Bluetooth classic session. */
+        function send(sessionId: string, options: {
+            text?: string;
+            dataBase64?: string;
+        }): Promise<BluetoothTransferData>;
+
+        /** Read text or bytes from a Bluetooth classic session. */
+        function read(sessionId: string, options?: {
+            maxBytes?: number | string;
+            timeoutMs?: number | string;
+        }): Promise<BluetoothReadData>;
+
+        /** Send text or bytes and read the response from a Bluetooth classic session. */
+        function sendAndRead(sessionId: string, options: {
+            text?: string;
+            dataBase64?: string;
+            maxBytes?: number | string;
+            timeoutMs?: number | string;
+        }): Promise<BluetoothReadData>;
+
+        /** Close a Bluetooth classic, listener, or BLE session. */
+        function close(sessionId: string): Promise<StringResultData>;
+
+        namespace ble {
+            /** Connect to a BLE device. */
+            function connect(options: {
+                address: string;
+                autoConnect?: boolean;
+            }): Promise<BluetoothSessionData>;
+
+            /** Discover BLE services and characteristics. */
+            function discoverServices(sessionId: string, timeoutMs?: number | string): Promise<BluetoothBleServicesData>;
+
+            /** Read a BLE characteristic. */
+            function readCharacteristic(sessionId: string, options: {
+                serviceUuid: string;
+                characteristicUuid: string;
+                timeoutMs?: number | string;
+            }): Promise<BluetoothReadData>;
+
+            /** Write text or bytes to a BLE characteristic. */
+            function writeCharacteristic(sessionId: string, options: {
+                serviceUuid: string;
+                characteristicUuid: string;
+                text?: string;
+                dataBase64?: string;
+            }): Promise<BluetoothTransferData>;
+
+            /** Write text or bytes to one BLE characteristic and read another characteristic response. */
+            function writeAndReadCharacteristic(sessionId: string, options: {
+                writeServiceUuid: string;
+                writeCharacteristicUuid: string;
+                readServiceUuid: string;
+                readCharacteristicUuid: string;
+                text?: string;
+                dataBase64?: string;
+                timeoutMs?: number | string;
+            }): Promise<BluetoothReadData>;
+
+            /** Subscribe or unsubscribe BLE characteristic notifications. */
+            function subscribe(sessionId: string, options: {
+                serviceUuid: string;
+                characteristicUuid: string;
+                enable?: boolean;
+            }): Promise<BluetoothTransferData>;
+
+            /** Read received BLE notifications. */
+            function readNotifications(sessionId: string, limit?: number | string): Promise<BluetoothBleNotificationData>;
+        }
+    }
 
     /**
      * Execute an shell command (requires root access)

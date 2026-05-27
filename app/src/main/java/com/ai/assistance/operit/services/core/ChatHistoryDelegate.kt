@@ -353,8 +353,11 @@ class ChatHistoryDelegate(
             upToTimestampInclusive = upToTimestampInclusive,
         )
 
-    suspend fun loadChatMessageLocatorPreviews(chatId: String): List<ChatMessageLocatorPreview> =
-        chatHistoryManager.loadChatMessageLocatorPreviews(chatId)
+    suspend fun loadChatMessageLocatorPreviews(
+        chatId: String,
+        query: String = "",
+    ): List<ChatMessageLocatorPreview> =
+        chatHistoryManager.loadChatMessageLocatorPreviews(chatId, query)
 
     suspend fun hasUserMessage(chatId: String): Boolean = chatHistoryManager.hasUserMessage(chatId)
 

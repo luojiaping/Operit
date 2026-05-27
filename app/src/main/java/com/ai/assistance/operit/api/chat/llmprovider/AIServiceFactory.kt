@@ -341,7 +341,8 @@ object AIServiceFactory {
                     httpClient,
                     customHeaders,
                     providerType,
-                    enableToolCall
+                    enableToolCall,
+                    config.enableClaude1hPromptCache
                 )
 
             // Gemini格式，支持Google Gemini系列及通用Gemini端点

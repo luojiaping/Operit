@@ -3169,7 +3169,6 @@ Ahora puede usar el modo AutoGLM en la interfaz de conversación.</string>
     <string name="chat_regenerating_single">Regenerando esta respuesta...</string>
     <string name="chat_regenerate_single_failed">Error al regenerar individualmente: %1$s</string>
     <string name="chat_regenerate_busy">Ya hay un mensaje en proceso, intente de nuevo más tarde</string>
-    <string name="chat_regenerate_single_tool_unsupported">Las respuestas que incluyen llamadas a herramientas no admiten regeneración individual por ahora</string>
     <string name="chat_switch_variant_failed">Error al cambiar de respuesta: %1$s</string>
     <string name="chat_message_variant_counter">%1$d/%2$d</string>
     <string name="chat_previous_variant">Respuesta anterior</string>
@@ -3712,6 +3711,8 @@ Ahora puede usar el modo AutoGLM en la interfaz de conversación.</string>
     <string name="enable_direct_video_processing_desc">Al activarlo, el video se enviará directamente a la IA para su procesamiento, en lugar de extraer fotogramas/analizar mediante una herramienta</string>
     <string name="enable_google_search">Habilitar Google Search</string>
     <string name="enable_google_search_desc">Al activarlo, Gemini usará Google Search para mejorar las respuestas (pueden generarse costos adicionales)</string>
+    <string name="enable_claude_1h_prompt_cache">Habilitar caché de prompts de Claude de 1 hora</string>
+    <string name="enable_claude_1h_prompt_cache_desc">Al activarlo, Claude y proveedores compatibles con Claude usarán un TTL de caché de prompts de 1 hora</string>
     <string name="search_sources">Fuentes de búsqueda</string>
     <string name="clear">Limpiar</string>
     <string name="models_selected_suffix"> seleccionado(s)</string>

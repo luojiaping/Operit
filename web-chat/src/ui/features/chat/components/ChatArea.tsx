@@ -57,7 +57,10 @@ export function ChatArea({
   onLoadOlder: () => Promise<void>;
   onLoadNewer: () => Promise<void>;
   onJumpToLatest: () => Promise<void>;
-  onLoadMessageLocatorEntries: (chatId: string) => Promise<WebChatMessageLocatorPreview[]>;
+  onLoadMessageLocatorEntries: (
+    chatId: string,
+    query?: string
+  ) => Promise<WebChatMessageLocatorPreview[]>;
   onRevealMessageForLocator: (targetTimestamp: number) => Promise<boolean>;
   onToggleFavoriteMessage: (timestamp: number, isFavorite: boolean) => Promise<void>;
   theme: WebThemeSnapshot | null;

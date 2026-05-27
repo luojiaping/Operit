@@ -44,7 +44,8 @@ class ClaudeProvider(
     private val client: OkHttpClient,
     private val customHeaders: Map<String, String> = emptyMap(),
     private val providerType: ApiProviderType = ApiProviderType.ANTHROPIC,
-    private val enableToolCall: Boolean = false // 是否启用Tool Call接口（预留，Claude有原生tool支持）
+    private val enableToolCall: Boolean = false, // 是否启用Tool Call接口（预留，Claude有原生tool支持）
+    private val enableClaude1hPromptCache: Boolean = false
 ) : AIService {
     // private val client: OkHttpClient = HttpClientFactory.instance
 
@@ -540,6 +541,9 @@ class ClaudeProvider(
     private fun cacheControlObject(): JSONObject {
         return JSONObject().apply {
             put("type", PROMPT_CACHE_CONTROL_TYPE)
+            if (enableClaude1hPromptCache) {
+                put("ttl", "1h")
+            }
         }
     }
 

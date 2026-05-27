@@ -710,6 +710,7 @@
 
     <!-- Context Menu -->
     <string name="copy_message">Copy Message</string>
+    <string name="copy_full_message">Copy All</string>
     <string name="chat_hidden_user_message_placeholder">Auto-triggered user message (content hidden)</string>
     <string name="chat_hidden_user_message_badge">AUTO</string>
     <string name="info">Info</string>
@@ -732,7 +733,7 @@
     <string name="edit_and_resend">Edit &amp; Resend</string>
     <string name="rollback_to_here">Rollback to Here</string>
     <string name="reply_message">Reply</string>
-    <string name="select_copy">Select &amp; Copy</string>
+    <string name="select_copy">Select Copy</string>
     <string name="insert_summary">Insert Summary</string>
     <string name="create_branch">Create Branch</string>
     <string name="branch">Branch</string>
@@ -2523,6 +2524,8 @@
     <string name="speech_services_tts_type_http">HTTP API (Remote)</string>
     <string name="speech_services_tts_type_siliconflow">SiliconFlow TTS</string>
     <string name="speech_services_tts_type_minimax">MiniMax TTS</string>
+    <string name="speech_services_tts_type_mimo">MiMo TTS</string>
+    <string name="speech_services_tts_type_doubao">Doubao TTS</string>
     <string name="speech_services_tts_type_openai_ws">OpenAI Realtime (WebSocket)</string>
     <string name="speech_services_tts_type_openai">OpenAI Voice (HTTP)</string>
     
@@ -2593,6 +2596,36 @@
     <string name="speech_services_minimax_voice_id">voice_id</string>
     <string name="speech_services_minimax_voice_id_placeholder">e.g.: male-qn-qingse</string>
     <string name="speech_services_minimax_voice_id_hint">Leave blank to use male-qn-qingse. It is sent as voice_setting.voice_id.</string>
+
+    <string name="speech_services_mimo_config">MiMo TTS Configuration</string>
+    <string name="speech_services_mimo_url">URL</string>
+    <string name="speech_services_mimo_url_placeholder">e.g.: https://api.xiaomimimo.com/v1/chat/completions</string>
+    <string name="speech_services_mimo_url_hint">Leave blank to use the MiMo Chat Completions speech synthesis endpoint. This provider reads choices[0].message.audio.data and decodes Base64 audio.</string>
+    <string name="speech_services_mimo_api_key">API Key</string>
+    <string name="speech_services_mimo_api_key_placeholder">Enter your MiMo API key</string>
+    <string name="speech_services_mimo_model_name">model</string>
+    <string name="speech_services_mimo_model_name_placeholder">e.g.: mimo-v2.5-tts</string>
+    <string name="speech_services_mimo_model_name_hint">Leave blank to use mimo-v2.5-tts. Use mimo-v2.5-tts for preset voices.</string>
+    <string name="speech_services_mimo_voice_select">Select preset voice</string>
+    <string name="speech_services_mimo_voice_select_icon">Select voice</string>
+    <string name="speech_services_mimo_voice_custom">Custom voice</string>
+    <string name="speech_services_mimo_voice_id">voice</string>
+    <string name="speech_services_mimo_voice_id_placeholder">e.g.: mimo_default, 冰糖, Mia, Chloe</string>
+    <string name="speech_services_mimo_voice_id_hint">Preset voices: mimo_default, 冰糖, 茉莉, 苏打, 白桦, Mia, Chloe, Milo, Dean.</string>
+    <string name="speech_services_doubao_config">Doubao TTS Configuration</string>
+    <string name="speech_services_doubao_url">URL</string>
+    <string name="speech_services_doubao_url_placeholder">https://openspeech.bytedance.com/api/v1/tts</string>
+    <string name="speech_services_doubao_url_hint">Doubao speech synthesis HTTP endpoint.</string>
+    <string name="speech_services_doubao_appid">App ID</string>
+    <string name="speech_services_doubao_appid_placeholder">Enter the Doubao speech App ID</string>
+    <string name="speech_services_doubao_token">Token</string>
+    <string name="speech_services_doubao_token_placeholder">Enter the Doubao speech token</string>
+    <string name="speech_services_doubao_voice_select">Select voice</string>
+    <string name="speech_services_doubao_voice_select_icon">Select voice</string>
+    <string name="speech_services_doubao_voice_custom">Custom voice</string>
+    <string name="speech_services_doubao_voice_id">voice_type</string>
+    <string name="speech_services_doubao_voice_id_placeholder">e.g.: BV700_V2_streaming</string>
+    <string name="speech_services_doubao_voice_id_hint">Use the voice_type from the Doubao speech console.</string>
 
     <string name="speech_services_openai_ws_config">OpenAI Realtime Configuration</string>
     <string name="speech_services_openai_ws_url">Realtime WebSocket URL</string>
@@ -3135,7 +3168,6 @@
     <string name="chat_regenerating_single">Regenerating this reply...</string>
     <string name="chat_regenerate_single_failed">Failed to regenerate reply: %1$s</string>
     <string name="chat_regenerate_busy">Another message is still being processed. Please try again later</string>
-    <string name="chat_regenerate_single_tool_unsupported">Replies containing tool calls cannot be regenerated individually yet</string>
     <string name="chat_switch_variant_failed">Failed to switch reply: %1$s</string>
     <string name="chat_message_variant_counter">%1$d/%2$d</string>
     <string name="chat_previous_variant">Previous reply</string>
@@ -3775,6 +3807,8 @@
     <string name="enable_direct_video_processing_desc">When enabled, video will be sent directly to the AI for processing instead of tool-based frame extraction/analysis</string>
     <string name="enable_google_search">Enable Google Search</string>
     <string name="enable_google_search_desc">When enabled, Gemini will use Google Search to enhance responses (may incur additional charges)</string>
+    <string name="enable_claude_1h_prompt_cache">Enable Claude 1-hour prompt cache</string>
+    <string name="enable_claude_1h_prompt_cache_desc">When enabled, Claude and Claude-compatible providers use a 1-hour prompt cache TTL</string>
     <string name="enable_tool_call">Model supports ToolCall</string>
     <string name="enable_tool_call_desc">When disabled, uses the built-in tool invocation mechanism which also supports tool calls. When enabled, uses the API\'s dedicated native interface (requires model support)</string>
     <string name="enable_deepseek_reasoning">Enable DeepSeek Reasoning Mode</string>
@@ -4056,6 +4090,11 @@
     <string name="waifu_mode_description">When enabled, AI responses will be split by punctuation and sent sentence by sentence for a more natural conversation experience.</string>
     <string name="enable_waifu_mode">Enable Waifu Mode</string>
     <string name="waifu_mode_toggle_desc">AI responses will be split and sent by sentences</string>
+    <string name="waifu_merge_send">Merge Send</string>
+    <string name="waifu_merge_send_desc">When several short messages are sent in a row, combine them into one message after a pause before sending to AI</string>
+    <string name="waifu_merge_send_delay">Merge Send Interval</string>
+    <string name="waifu_merge_send_delay_desc">How long to wait after the last user send before submitting to AI</string>
+    <string name="waifu_merge_send_delay_format">Current: %dms</string>
     <string name="typing_speed_settings">Typing Speed Settings</string>
     <string name="typing_speed_desc">Control the delay time per character to simulate real typing rhythm</string>
     <string name="current_speed_format">Current speed: %.1f characters per second</string>
@@ -4079,7 +4118,7 @@
     <string name="appearance_prompt_placeholder">e.g.: long hair, purple eyes, sweater vest...</string>
     <string name="appearance_prompt_tip">Tip: Use English keywords to describe appearance features, separate multiple keywords with commas</string>
     <string name="feature_explanation">Feature Explanation</string>
-    <string name="waifu_mode_explanation">• Normal Mode: AI responses sent all at once\n• Waifu Mode: AI responses split by sentences, each in separate bubbles\n• Smart Delay: Calculate delay time based on sentence length\n• Auto Cleanup: Remove status tags, show only plain text\n• Optional Features: Remove end punctuation, edit Waifu prompt, enable emoticons\n• Use Case: Simulate more natural conversation rhythm\n• Note: This mode may not adapt well to tool calls</string>
+    <string name="waifu_mode_explanation">• Normal Mode: AI responses sent all at once\n• Waifu Mode: AI responses split by sentences, each in separate bubbles\n• Smart Delay: Calculate delay time based on sentence length\n• Merge Send: consecutive short user messages are combined into one message after a pause\n• Auto Cleanup: Remove status tags, show only plain text\n• Optional Features: merge send, remove end punctuation, edit Waifu prompt, enable emoticons\n• Use Case: Simulate more natural conversation rhythm\n• Note: This mode may not adapt well to tool calls</string>
     <string name="settings_saved_message">Settings saved</string>
 
     <string name="settings_section_account">Account</string>
@@ -6852,6 +6891,7 @@
     <string name="minimax_tts_error_audio_url_missing">MiniMax TTS response did not contain a data.audio download URL</string>
     <string name="minimax_tts_error_audio_download_failed">Failed to download MiniMax TTS audio</string>
     <string name="minimax_tts_error_audio_download_empty">MiniMax TTS audio download returned an empty body</string>
+    <string name="mimo_tts_error_api_key_not_set">MiMo API key not set, please fill in settings.</string>
     <string name="openai_realtime_tts_error_url_not_set">OpenAI Realtime WebSocket URL not set. Please enter the full endpoint address (for example, wss://api.openai.com/v1/realtime).</string>
     <string name="openai_realtime_tts_error_url_invalid_scheme">OpenAI Realtime WebSocket URL must start with ws:// or wss://.</string>
     <string name="openai_realtime_tts_error_api_key_not_set">OpenAI Realtime API Key not set. Please fill in settings.</string>

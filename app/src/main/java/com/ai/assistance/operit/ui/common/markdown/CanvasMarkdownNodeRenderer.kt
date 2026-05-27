@@ -182,6 +182,12 @@ private fun splitPlainTextParagraphs(content: CharSequence): List<CharSequence> 
     return paragraphs.filter { it.isNotEmpty() }
 }
 
+private fun stripBlockQuoteMarkers(content: String): String {
+    return content.lines().joinToString("\n") {
+        it.removePrefix("> ").removePrefix(">")
+    }
+}
+
 /**
  * Paint 对象池 - 避免重复创建相同样式的 Paint
  */
@@ -717,7 +723,12 @@ private fun DrawInstruction.selectableTextLength(): Int {
 private fun DrawInstruction.selectedText(range: TextSelectionRange): CharSequence {
     return when (this) {
         is DrawInstruction.Text -> text.subSequence(range.start, range.end)
-        is DrawInstruction.TextLayout -> layout.text.subSequence(range.start, range.end)
+        is DrawInstruction.TextLayout ->
+            selectedTextWithInlineCodeMarkers(
+                text = layout.text,
+                start = range.start,
+                end = range.end,
+            )
         is DrawInstruction.Line -> ""
     }
 }
@@ -1030,6 +1041,16 @@ internal fun createInitialSelection(
             start = TextSelectionPoint(nodeIndex, instructionIndex, 0),
             end = TextSelectionPoint(nodeIndex, instructionIndex, text.length),
         )
+    }
+
+    if (instruction is DrawInstruction.TextLayout) {
+        val inlineCodeRange = inlineCodeRangeAt(text, offset)
+        if (inlineCodeRange != null) {
+            return ActiveTextSelection(
+                start = TextSelectionPoint(nodeIndex, instructionIndex, inlineCodeRange.start),
+                end = TextSelectionPoint(nodeIndex, instructionIndex, inlineCodeRange.end),
+            )
+        }
     }
 
     var anchor = offset.coerceIn(0, text.length)
@@ -1664,7 +1685,10 @@ private fun renderNodeContent(
             EnhancedCodeBlock(
                 code = codeContent,
                 language = language,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                textSelectionRequest = textSelectionRequest,
+                selectionState = selectionState,
+                nodeIndex = index,
             )
         }
         
@@ -1698,17 +1722,25 @@ private fun renderNodeContent(
                         )
                         .padding(4.dp)
                 ) {
-                    val quoteText = content.lines().joinToString("\n") {
-                        it.removePrefix("> ").removePrefix(">")
-                    }
-                    
-                    SingleTextCanvas(
-                        text = quoteText,
+                    UnifiedCanvasRenderer(
+                        nodeKey = nodeKey,
+                        node = stableNode,
                         textColor = textColor,
-                        fontSize = fontSizes.bodyMedium,
-                        fontWeight = FontWeight.Normal,
+                        bodyMediumSize = fontSizes.bodyMedium,
+                        headlineLargeSize = fontSizes.headlineLarge,
+                        headlineMediumSize = fontSizes.headlineMedium,
+                        headlineSmallSize = fontSizes.headlineSmall,
+                        titleLargeSize = fontSizes.titleLarge,
+                        titleMediumSize = fontSizes.titleMedium,
+                        titleSmallSize = fontSizes.titleSmall,
                         density = density,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        onLinkClick = onLinkClick,
+                        fillMaxWidth = true,
+                        textSelectionRequest = textSelectionRequest,
+                        selectionState = selectionState,
+                        nodeIndex = index,
+                        isLastNode = isLastNode
                     )
                 }
             }
@@ -3102,6 +3134,31 @@ private fun calculateLayout(
             if (!isLastNode) {
                 currentY += 6f * density.density
             }
+        }
+
+        MarkdownProcessorType.BLOCK_QUOTE -> {
+            val quoteText = stripBlockQuoteMarkers(content)
+            if (quoteText.trimAll().isEmpty()) return LayoutResult(0f, 0f, emptyList())
+
+            val textSizePx = with(density) { bodyMediumSize.toPx() }
+            val textPaint = PaintCache.getTextPaint(
+                textColor,
+                textSizePx,
+                normalTypeface,
+                calculateCanvasLetterSpacingEm(bodyMediumSize, globalLetterSpacingSp)
+            )
+            val layout = LayoutCache.getLayout(
+                quoteText,
+                textPaint,
+                safeAvailableWidthPx,
+                textColor,
+                normalTypeface,
+                lineSpacingMultiplier
+            )
+
+            instructions.add(DrawInstruction.TextLayout(layout, 0f, currentY, layout.text))
+            currentY += layout.height
+            maxWidth = maxOf(maxWidth, calculateActualWidth(layout, 0f, safeAvailableWidthPx))
         }
         
         else -> {

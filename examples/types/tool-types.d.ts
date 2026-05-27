@@ -9,7 +9,9 @@ import {
     FindFilesResultData, FileInfoData, FileConversionResultData, FileFormatConversionsResultData,
     HttpResponseData, VisitWebResultData,
     SleepResultData, StringResultData, SystemSettingData, AppOperationData, AppListData,
-    DeviceInfoResultData, NotificationData, LocationData,
+    DeviceInfoResultData, NotificationData, LocationData, BluetoothStateData, BluetoothBondedDevicesData,
+    BluetoothScanResultData, BluetoothSessionData, BluetoothTransferData, BluetoothReadData,
+    BluetoothBleServicesData, BluetoothBleNotificationData,
     UIPageResultData, UIActionResultData, CombinedOperationResultData, AutomationExecutionResultData,
     CalculationResultData, FFmpegResultData, ADBResultData, IntentResultData, TerminalCommandResultData, HiddenTerminalCommandResultData, TerminalSessionScreenResultData, MusicPlaybackResultData,
     FilePartContentData, FileApplyResultData, WorkflowListResultData, WorkflowResultData, WorkflowDetailResultData,
@@ -97,6 +99,25 @@ export interface ToolResultMap {
     'device_info': DeviceInfoResultData;
     'get_notifications': NotificationData;
     'get_device_location': LocationData;
+    'request_bluetooth_permission': StringResultData;
+    'get_bluetooth_state': BluetoothStateData;
+    'request_enable_bluetooth': StringResultData;
+    'list_bluetooth_bonded_devices': BluetoothBondedDevicesData;
+    'scan_bluetooth_devices': BluetoothScanResultData;
+    'bluetooth_connect': BluetoothSessionData;
+    'bluetooth_listen': BluetoothSessionData;
+    'bluetooth_accept': BluetoothSessionData;
+    'bluetooth_send': BluetoothTransferData;
+    'bluetooth_read': BluetoothReadData;
+    'bluetooth_send_and_read': BluetoothReadData;
+    'bluetooth_close': StringResultData;
+    'bluetooth_ble_connect': BluetoothSessionData;
+    'bluetooth_ble_discover_services': BluetoothBleServicesData;
+    'bluetooth_ble_read_characteristic': BluetoothReadData;
+    'bluetooth_ble_write_characteristic': BluetoothTransferData;
+    'bluetooth_ble_write_and_read_characteristic': BluetoothReadData;
+    'bluetooth_ble_subscribe_characteristic': BluetoothTransferData;
+    'bluetooth_ble_read_notifications': BluetoothBleNotificationData;
     'read_environment_variable': EnvironmentVariableReadResultData;
     'write_environment_variable': EnvironmentVariableWriteResultData;
     'list_sandbox_packages': SandboxPackagesResultData;

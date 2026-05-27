@@ -134,6 +134,11 @@ fun ModelApiSettingsSection(
     
     // Google Search Grounding 配置状态 (仅Gemini)
     var enableGoogleSearchInput by remember(config.id) { mutableStateOf(config.enableGoogleSearch) }
+
+    // Claude 1小时提示缓存配置状态 (仅Claude)
+    var enableClaude1hPromptCacheInput by remember(config.id) {
+        mutableStateOf(config.enableClaude1hPromptCache)
+    }
     
     // Tool Call配置状态
     var enableToolCallInput by remember(config.id) { mutableStateOf(config.enableToolCall) }
@@ -153,6 +158,7 @@ fun ModelApiSettingsSection(
         val enableDirectAudioProcessing: Boolean,
         val enableDirectVideoProcessing: Boolean,
         val enableGoogleSearch: Boolean,
+        val enableClaude1hPromptCache: Boolean,
         val enableToolCall: Boolean,
     )
 
@@ -176,6 +182,7 @@ fun ModelApiSettingsSection(
                     enableDirectAudioProcessing = state.enableDirectAudioProcessing,
                     enableDirectVideoProcessing = state.enableDirectVideoProcessing,
                     enableGoogleSearch = state.enableGoogleSearch,
+                    enableClaude1hPromptCache = state.enableClaude1hPromptCache,
                     enableToolCall = state.enableToolCall,
                 )
 
@@ -202,6 +209,7 @@ fun ModelApiSettingsSection(
             enableDirectAudioProcessing = enableDirectAudioProcessingInput,
             enableDirectVideoProcessing = enableDirectVideoProcessingInput,
             enableGoogleSearch = enableGoogleSearchInput,
+            enableClaude1hPromptCache = enableClaude1hPromptCacheInput,
             enableToolCall = enableToolCallInput,
         )
     }
@@ -385,6 +393,7 @@ fun ModelApiSettingsSection(
                                 enableDirectAudioProcessing = enableDirectAudioProcessingInput,
                                 enableDirectVideoProcessing = enableDirectVideoProcessingInput,
                                 enableGoogleSearch = enableGoogleSearchInput,
+                                enableClaude1hPromptCache = enableClaude1hPromptCacheInput,
                                 enableToolCall = enableToolCallInput
                             ),
                         modelConfigManager = configManager,
@@ -748,6 +757,17 @@ fun ModelApiSettingsSection(
                         subtitle = stringResource(R.string.enable_google_search_desc),
                             checked = enableGoogleSearchInput,
                             onCheckedChange = { enableGoogleSearchInput = it }
+                    )
+            }
+
+            // Claude 1小时提示缓存开关 (仅Claude支持)
+            if (selectedApiProvider == ApiProviderType.ANTHROPIC ||
+                selectedApiProvider == ApiProviderType.ANTHROPIC_GENERIC) {
+                SettingsSwitchRow(
+                        title = stringResource(R.string.enable_claude_1h_prompt_cache),
+                        subtitle = stringResource(R.string.enable_claude_1h_prompt_cache_desc),
+                        checked = enableClaude1hPromptCacheInput,
+                        onCheckedChange = { enableClaude1hPromptCacheInput = it }
                     )
             }
             

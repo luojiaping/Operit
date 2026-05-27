@@ -430,6 +430,16 @@ fun ThemeSettingsScreen() {
     // Collect new display settings
     val showThinkingProcess = preferencesManager.showThinkingProcess.collectAsState(initial = true).value
     val showStatusTags = preferencesManager.showStatusTags.collectAsState(initial = true).value
+    val showModelProvider = preferencesManager.showModelProvider.collectAsState(initial = false).value
+    val showModelName = preferencesManager.showModelName.collectAsState(initial = false).value
+    val showRoleName = preferencesManager.showRoleName.collectAsState(initial = false).value
+    val showUserName = preferencesManager.showUserName.collectAsState(initial = false).value
+    val showMessageTokenStats =
+        preferencesManager.showMessageTokenStats.collectAsState(initial = false).value
+    val showMessageTimingStats =
+        preferencesManager.showMessageTimingStats.collectAsState(initial = false).value
+    val showMessageTimestamp =
+        preferencesManager.showMessageTimestamp.collectAsState(initial = false).value
     val showInputProcessingStatus = preferencesManager.showInputProcessingStatus.collectAsState(initial = true).value
     val showChatFloatingDotsAnimation =
         preferencesManager.showChatFloatingDotsAnimation.collectAsState(initial = true).value
@@ -653,6 +663,13 @@ fun ThemeSettingsScreen() {
     // New display settings state
     var showThinkingProcessInput by remember { mutableStateOf(showThinkingProcess) }
     var showStatusTagsInput by remember { mutableStateOf(showStatusTags) }
+    var showModelProviderInput by remember { mutableStateOf(showModelProvider) }
+    var showModelNameInput by remember { mutableStateOf(showModelName) }
+    var showRoleNameInput by remember { mutableStateOf(showRoleName) }
+    var showUserNameInput by remember { mutableStateOf(showUserName) }
+    var showMessageTokenStatsInput by remember { mutableStateOf(showMessageTokenStats) }
+    var showMessageTimingStatsInput by remember { mutableStateOf(showMessageTimingStats) }
+    var showMessageTimestampInput by remember { mutableStateOf(showMessageTimestamp) }
     var showInputProcessingStatusInput by remember { mutableStateOf(showInputProcessingStatus) }
     var showChatFloatingDotsAnimationInput by remember {
         mutableStateOf(showChatFloatingDotsAnimation)
@@ -664,11 +681,8 @@ fun ThemeSettingsScreen() {
     var avatarShapeInput by remember { mutableStateOf(avatarShape) }
     var avatarCornerRadiusInput by remember { mutableStateOf(avatarCornerRadius) }
 
-    // 添加全局用户头像状态（已迁移到DisplayPreferencesManager）
     val globalUserAvatarUri = displayPreferencesManager.globalUserAvatarUri.collectAsState(initial = null).value
     var globalUserAvatarUriInput by remember { mutableStateOf(globalUserAvatarUri) }
-
-    // 添加全局用户名称状态（已迁移到DisplayPreferencesManager）
     val globalUserName = displayPreferencesManager.globalUserName.collectAsState(initial = null).value
     var globalUserNameInput by remember { mutableStateOf(globalUserName) }
 
@@ -1299,6 +1313,13 @@ fun ThemeSettingsScreen() {
             bubbleAiContentPaddingRight,
             showThinkingProcess,
             showStatusTags,
+            showModelProvider,
+            showModelName,
+            showRoleName,
+            showUserName,
+            showMessageTokenStats,
+            showMessageTimingStats,
+            showMessageTimestamp,
             showInputProcessingStatus,
             userAvatarUri,
             aiAvatarUri,
@@ -1414,6 +1435,13 @@ fun ThemeSettingsScreen() {
         bubbleAiContentPaddingRightInput = bubbleAiContentPaddingRight
         showThinkingProcessInput = showThinkingProcess
         showStatusTagsInput = showStatusTags
+        showModelProviderInput = showModelProvider
+        showModelNameInput = showModelName
+        showRoleNameInput = showRoleName
+        showUserNameInput = showUserName
+        showMessageTokenStatsInput = showMessageTokenStats
+        showMessageTimingStatsInput = showMessageTimingStats
+        showMessageTimestampInput = showMessageTimestamp
         showInputProcessingStatusInput = showInputProcessingStatus
         userAvatarUriInput = userAvatarUri
         aiAvatarUriInput = aiAvatarUri
@@ -1539,7 +1567,9 @@ fun ThemeSettingsScreen() {
                             "ai" -> {
                                 AppLogger.d("ThemeSettings", "AI avatar saved to: $internalUri")
                                 aiAvatarUriInput = internalUri.toString()
-                                preferencesManager.saveThemeSettings(customAiAvatarUri = internalUri.toString())
+                                saveThemeSettingsWithCharacterCard {
+                                    preferencesManager.saveThemeSettings(customAiAvatarUri = internalUri.toString())
+                                }
                             }
                             "global_user" -> {
                                 AppLogger.d("ThemeSettings", "Global user avatar saved to: $internalUri")
@@ -1707,6 +1737,13 @@ fun ThemeSettingsScreen() {
         bubbleAiContentPaddingRightInput = 12f
         showThinkingProcessInput = true
         showStatusTagsInput = true
+        showModelProviderInput = false
+        showModelNameInput = false
+        showRoleNameInput = false
+        showUserNameInput = false
+        showMessageTokenStatsInput = false
+        showMessageTimingStatsInput = false
+        showMessageTimestampInput = false
         showInputProcessingStatusInput = true
         showChatFloatingDotsAnimationInput = true
         userAvatarUriInput = null
@@ -2174,6 +2211,20 @@ fun ThemeSettingsScreen() {
             onShowThinkingProcessInputChange = { showThinkingProcessInput = it },
             showStatusTagsInput = showStatusTagsInput,
             onShowStatusTagsInputChange = { showStatusTagsInput = it },
+            showModelProviderInput = showModelProviderInput,
+            onShowModelProviderInputChange = { showModelProviderInput = it },
+            showModelNameInput = showModelNameInput,
+            onShowModelNameInputChange = { showModelNameInput = it },
+            showRoleNameInput = showRoleNameInput,
+            onShowRoleNameInputChange = { showRoleNameInput = it },
+            showUserNameInput = showUserNameInput,
+            onShowUserNameInputChange = { showUserNameInput = it },
+            showMessageTokenStatsInput = showMessageTokenStatsInput,
+            onShowMessageTokenStatsInputChange = { showMessageTokenStatsInput = it },
+            showMessageTimingStatsInput = showMessageTimingStatsInput,
+            onShowMessageTimingStatsInputChange = { showMessageTimingStatsInput = it },
+            showMessageTimestampInput = showMessageTimestampInput,
+            onShowMessageTimestampInputChange = { showMessageTimestampInput = it },
             showInputProcessingStatusInput = showInputProcessingStatusInput,
             onShowInputProcessingStatusInputChange = { showInputProcessingStatusInput = it },
             showChatFloatingDotsAnimationInput = showChatFloatingDotsAnimationInput,

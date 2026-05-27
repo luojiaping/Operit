@@ -355,6 +355,7 @@ class ModelConfigManager(private val context: Context) {
             enableDirectAudioProcessing: Boolean,
             enableDirectVideoProcessing: Boolean,
             enableGoogleSearch: Boolean,
+            enableClaude1hPromptCache: Boolean,
             enableToolCall: Boolean
     ): ModelConfigData {
         return updateConfigInternal(configId) {
@@ -373,6 +374,7 @@ class ModelConfigManager(private val context: Context) {
                     enableDirectAudioProcessing = enableDirectAudioProcessing,
                     enableDirectVideoProcessing = enableDirectVideoProcessing,
                     enableGoogleSearch = enableGoogleSearch,
+                    enableClaude1hPromptCache = enableClaude1hPromptCache,
                     enableToolCall = enableToolCall
             )
         }
@@ -503,6 +505,12 @@ class ModelConfigManager(private val context: Context) {
     // 更新 Google Search Grounding 配置 (仅Gemini支持)
     suspend fun updateGoogleSearch(configId: String, enableGoogleSearch: Boolean): ModelConfigData {
         return updateConfigInternal(configId) { it.copy(enableGoogleSearch = enableGoogleSearch) }
+    }
+
+    suspend fun updateClaude1hPromptCache(configId: String, enableClaude1hPromptCache: Boolean): ModelConfigData {
+        return updateConfigInternal(configId) {
+            it.copy(enableClaude1hPromptCache = enableClaude1hPromptCache)
+        }
     }
 
     // 更新 Tool Call 配置
