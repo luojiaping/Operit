@@ -54,6 +54,47 @@ enum class ApiProviderType {
         }
 }
 
+/** 子模型参数覆盖配置，用于同一配置内不同模型的独立参数设置 */
+@Serializable
+data class ModelOverrideConfig(
+        // 标准参数 enabled 状态（null = 使用配置默认值）
+        val maxTokensEnabled: Boolean? = null,
+        val temperatureEnabled: Boolean? = null,
+        val topPEnabled: Boolean? = null,
+        val topKEnabled: Boolean? = null,
+        val presencePenaltyEnabled: Boolean? = null,
+        val frequencyPenaltyEnabled: Boolean? = null,
+        val repetitionPenaltyEnabled: Boolean? = null,
+
+        // 标准参数值（null = 使用配置默认值）
+        val maxTokens: Int? = null,
+        val temperature: Float? = null,
+        val topP: Float? = null,
+        val topK: Int? = null,
+        val presencePenalty: Float? = null,
+        val frequencyPenalty: Float? = null,
+        val repetitionPenalty: Float? = null,
+
+        // 自定义参数 JSON（null = 使用配置默认值）
+        val customParameters: String? = null,
+
+        // 自定义请求头 JSON（null = 使用配置默认值）
+        val customHeaders: String? = null
+) {
+        /** 检查是否有任何自定义配置 */
+        fun hasOverrides(): Boolean {
+                return maxTokensEnabled != null || temperatureEnabled != null ||
+                        topPEnabled != null || topKEnabled != null ||
+                        presencePenaltyEnabled != null || frequencyPenaltyEnabled != null ||
+                        repetitionPenaltyEnabled != null ||
+                        maxTokens != null || temperature != null ||
+                        topP != null || topK != null ||
+                        presencePenalty != null || frequencyPenalty != null ||
+                        repetitionPenalty != null ||
+                        customParameters != null || customHeaders != null
+        }
+}
+
 object ModelConfigDefaults {
         const val DEFAULT_CONTEXT_LENGTH = 64.0f
         const val DEFAULT_MAX_CONTEXT_LENGTH = 200.0f
@@ -152,7 +193,10 @@ data class ModelConfigData(
 
         // 请求频率限制配置
         val requestLimitPerMinute: Int = 0, // 每分钟最大请求次数，0表示不限流
-        val maxConcurrentRequests: Int = 0 // 最大并发请求数，0表示不限制
+        val maxConcurrentRequests: Int = 0, // 最大并发请求数，0表示不限制
+
+        // 子模型自定义参数（key=模型名，value=覆盖配置）
+        val modelOverrides: Map<String, ModelOverrideConfig> = emptyMap()
 )
 
 /** 简化版的模型配置数据，用于列表显示 */

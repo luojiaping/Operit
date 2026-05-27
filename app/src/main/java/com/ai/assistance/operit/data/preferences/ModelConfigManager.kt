@@ -12,6 +12,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import com.ai.assistance.operit.data.model.CustomParameterData
 import com.ai.assistance.operit.data.model.ModelConfigData
 import com.ai.assistance.operit.data.model.ModelConfigSummary
+import com.ai.assistance.operit.data.model.ModelOverrideConfig
 import com.ai.assistance.operit.data.model.ModelParameter
 import com.ai.assistance.operit.data.model.ParameterCategory
 import com.ai.assistance.operit.data.model.ParameterValueType
@@ -682,7 +683,211 @@ class ModelConfigManager(private val context: Context) {
 
         return parameters
     }
-    
+
+    /**
+     * 根据配置ID和模型名获取完整的模型参数列表（支持子模型参数覆盖）
+     * @param configId 配置ID
+     * @param modelName 模型名称（可选，为null时使用配置默认参数）
+     * @return 模型参数列表
+     */
+    suspend fun getModelParametersForConfigAndModel(
+        configId: String,
+        modelName: String? = null
+    ): List<ModelParameter<*>> {
+        val config = getModelConfigFlow(configId).first()
+        val override = modelName?.let { config.modelOverrides[it] }
+        val parameters = mutableListOf<ModelParameter<*>>()
+
+        // 映射标准参数，优先使用覆盖值
+        StandardModelParameters.DEFINITIONS.forEach { def ->
+            val (currentValue, isEnabled) =
+                    when (def.id) {
+                        "max_tokens" -> {
+                            val value = override?.maxTokens ?: config.maxTokens
+                            val enabled = override?.maxTokensEnabled ?: config.maxTokensEnabled
+                            value to enabled
+                        }
+                        "temperature" -> {
+                            val value = override?.temperature ?: config.temperature
+                            val enabled = override?.temperatureEnabled ?: config.temperatureEnabled
+                            value to enabled
+                        }
+                        "top_p" -> {
+                            val value = override?.topP ?: config.topP
+                            val enabled = override?.topPEnabled ?: config.topPEnabled
+                            value to enabled
+                        }
+                        "top_k" -> {
+                            val value = override?.topK ?: config.topK
+                            val enabled = override?.topKEnabled ?: config.topKEnabled
+                            value to enabled
+                        }
+                        "presence_penalty" -> {
+                            val value = override?.presencePenalty ?: config.presencePenalty
+                            val enabled = override?.presencePenaltyEnabled ?: config.presencePenaltyEnabled
+                            value to enabled
+                        }
+                        "frequency_penalty" -> {
+                            val value = override?.frequencyPenalty ?: config.frequencyPenalty
+                            val enabled = override?.frequencyPenaltyEnabled ?: config.frequencyPenaltyEnabled
+                            value to enabled
+                        }
+                        "repetition_penalty" -> {
+                            val value = override?.repetitionPenalty ?: config.repetitionPenalty
+                            val enabled = override?.repetitionPenaltyEnabled ?: config.repetitionPenaltyEnabled
+                            value to enabled
+                        }
+                        else -> null to null
+                    }
+
+            if (currentValue != null && isEnabled != null) {
+                parameters.add(
+                        ModelParameter(
+                                id = def.id,
+                                name = def.name,
+                                apiName = def.apiName,
+                                description = def.description,
+                                defaultValue = def.defaultValue,
+                                currentValue = currentValue,
+                                isEnabled = isEnabled,
+                                valueType = def.valueType,
+                                minValue = def.minValue,
+                                maxValue = def.maxValue,
+                                category = def.category
+                        )
+                )
+            }
+        }
+
+        // 处理自定义参数，优先使用覆盖值
+        val customParamsJson = override?.customParameters ?: config.customParameters
+        val hasCustomParams = customParamsJson.isNotBlank() && customParamsJson != "[]"
+        if (hasCustomParams) {
+            try {
+                val customParamsData =
+                        json.decodeFromString<List<com.ai.assistance.operit.data.model.CustomParameterData>>(
+                                customParamsJson
+                        )
+                customParamsData.forEach { data ->
+                    val valueType = ParameterValueType.valueOf(data.valueType)
+                    val category = ParameterCategory.valueOf(data.category)
+
+                    val convertedParam =
+                            when (valueType) {
+                                ParameterValueType.INT ->
+                                        ModelParameter(
+                                                id = data.id,
+                                                name = data.name,
+                                                apiName = data.apiName,
+                                                description = data.description,
+                                                defaultValue = data.defaultValue.toInt(),
+                                                currentValue = data.currentValue.toInt(),
+                                                isEnabled = data.isEnabled,
+                                                valueType = valueType,
+                                                minValue = data.minValue?.toInt(),
+                                                maxValue = data.maxValue?.toInt(),
+                                                category = category,
+                                                isCustom = true
+                                        )
+                                ParameterValueType.FLOAT ->
+                                        ModelParameter(
+                                                id = data.id,
+                                                name = data.name,
+                                                apiName = data.apiName,
+                                                description = data.description,
+                                                defaultValue = data.defaultValue.toFloat(),
+                                                currentValue = data.currentValue.toFloat(),
+                                                isEnabled = data.isEnabled,
+                                                valueType = valueType,
+                                                minValue = data.minValue?.toFloat(),
+                                                maxValue = data.maxValue?.toFloat(),
+                                                category = category,
+                                                isCustom = true
+                                        )
+                                ParameterValueType.BOOLEAN ->
+                                        ModelParameter(
+                                                id = data.id,
+                                                name = data.name,
+                                                apiName = data.apiName,
+                                                description = data.description,
+                                                defaultValue = data.defaultValue.toBoolean(),
+                                                currentValue = data.currentValue.toBoolean(),
+                                                isEnabled = data.isEnabled,
+                                                valueType = valueType,
+                                                category = category,
+                                                isCustom = true
+                                        )
+                                ParameterValueType.STRING ->
+                                        ModelParameter(
+                                                id = data.id,
+                                                name = data.name,
+                                                apiName = data.apiName,
+                                                description = data.description,
+                                                defaultValue = data.defaultValue,
+                                                currentValue = data.currentValue,
+                                                isEnabled = data.isEnabled,
+                                                valueType = valueType,
+                                                category = category,
+                                                isCustom = true
+                                        )
+                                ParameterValueType.OBJECT ->
+                                        ModelParameter(
+                                                id = data.id,
+                                                name = data.name,
+                                                apiName = data.apiName,
+                                                description = data.description,
+                                                defaultValue = data.defaultValue,
+                                                currentValue = data.currentValue,
+                                                isEnabled = data.isEnabled,
+                                                valueType = valueType,
+                                                category = category,
+                                                isCustom = true
+                                        )
+                            }
+                    parameters.add(convertedParam)
+                }
+            } catch (e: Exception) {
+                AppLogger.e("ModelConfigManager", "Failed to parse or convert custom parameters for model override", e)
+            }
+        }
+
+        return parameters
+    }
+
+    /**
+     * 更新子模型覆盖配置
+     * @param configId 配置ID
+     * @param modelName 模型名称
+     * @param override 覆盖配置
+     */
+    suspend fun updateModelOverride(
+        configId: String,
+        modelName: String,
+        override: ModelOverrideConfig
+    ): ModelConfigData {
+        return updateConfigInternal(configId) { config ->
+            val newOverrides = config.modelOverrides.toMutableMap()
+            newOverrides[modelName] = override
+            config.copy(modelOverrides = newOverrides)
+        }
+    }
+
+    /**
+     * 删除子模型覆盖配置
+     * @param configId 配置ID
+     * @param modelName 模型名称
+     */
+    suspend fun deleteModelOverride(
+        configId: String,
+        modelName: String
+    ): ModelConfigData {
+        return updateConfigInternal(configId) { config ->
+            val newOverrides = config.modelOverrides.toMutableMap()
+            newOverrides.remove(modelName)
+            config.copy(modelOverrides = newOverrides)
+        }
+    }
+
     /**
      * 导出所有模型配置为JSON字符串
      * @return JSON格式的所有配置数据

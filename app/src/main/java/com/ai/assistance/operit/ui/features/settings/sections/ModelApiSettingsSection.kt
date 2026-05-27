@@ -713,6 +713,13 @@ fun ModelApiSettingsSection(
                     }
             )
 
+            // 子模型参数设置（多模型时显示）
+            SubModelListSection(
+                config = config,
+                configManager = configManager,
+                showNotification = showNotification
+            )
+
             SettingsSwitchRow(
                 title = stringResource(R.string.enable_direct_image_processing),
                 subtitle = stringResource(R.string.enable_direct_image_processing_desc),

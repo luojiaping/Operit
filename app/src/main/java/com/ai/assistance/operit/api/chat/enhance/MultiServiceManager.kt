@@ -272,7 +272,7 @@ class MultiServiceManager(private val context: Context) {
     }
 
     /**
-     * 获取指定功能类型的模型参数列表
+     * 获取指定功能类型的模型参数列表（支持子模型参数覆盖）
      * @param functionType 功能类型
      * @return 模型参数列表
      */
@@ -281,7 +281,9 @@ class MultiServiceManager(private val context: Context) {
     ): List<com.ai.assistance.operit.data.model.ModelParameter<*>> {
         ensureInitialized()
         val configMapping = functionalConfigManager.getConfigMappingForFunction(functionType)
-        return modelConfigManager.getModelParametersForConfig(configMapping.configId)
+        val config = modelConfigManager.getModelConfigFlow(configMapping.configId).first()
+        val modelName = getModelByIndex(config.modelName, configMapping.modelIndex)
+        return modelConfigManager.getModelParametersForConfigAndModel(configMapping.configId, modelName)
     }
 
     /**
