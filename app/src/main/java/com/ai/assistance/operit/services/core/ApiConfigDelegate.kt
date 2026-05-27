@@ -9,6 +9,7 @@ import com.ai.assistance.operit.data.model.CharacterCardChatModelBindingMode
 import com.ai.assistance.operit.data.model.FunctionType
 import com.ai.assistance.operit.data.model.ModelConfigData
 import com.ai.assistance.operit.data.model.ModelConfigDefaults
+import com.ai.assistance.operit.data.model.getModelList
 import com.ai.assistance.operit.data.preferences.ActivePromptManager
 import com.ai.assistance.operit.data.preferences.ApiPreferences
 import com.ai.assistance.operit.data.preferences.CharacterCardManager
@@ -346,11 +347,13 @@ class ApiConfigDelegate(
         val modelName = config.modelName
         if (modelName.isBlank()) return ModelConfigDefaults.DEFAULT_MAX_CONTEXT_LENGTH
         
-        // 获取当前模型索引对应的模型名
-        val models = modelName.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+        // 获取所有模型名
+        val models = getModelList(modelName)
         if (models.isEmpty()) return ModelConfigDefaults.DEFAULT_MAX_CONTEXT_LENGTH
         
-        // 遍历所有可能的模型名，查找覆盖配置
+        // 遍历所有模型，返回第一个有maxContextLength覆盖的值
+        // 注意：如果有多个子模型且都设置了不同的maxContextLength，这里会返回第一个找到的值
+        // 理想情况下应该根据当前活跃的模型索引来查找，但目前没有获取modelIndex的途径
         for (model in models) {
             val override = config.modelOverrides[model]
             if (override?.maxContextLength != null) {
@@ -606,11 +609,13 @@ class ApiConfigDelegate(
         coroutineScope.launch {
             val configId = resolveEditableChatConfigId()
             val current = modelConfigManager.getModelConfig(configId) ?: return@launch
-            modelConfigManager.updateContextSettings(
+            modelConfigManager.updateSummarySettings(
                     configId = configId,
                     contextLength = length,
-                    maxContextLength = current.maxContextLength,
-                    enableMaxContextMode = current.enableMaxContextMode
+                    enableSummary = current.enableSummary,
+                    summaryTokenThreshold = current.summaryTokenThreshold,
+                    enableSummaryByMessageCount = current.enableSummaryByMessageCount,
+                    summaryMessageCountThreshold = current.summaryMessageCountThreshold
             )
         }
     }
@@ -620,6 +625,7 @@ class ApiConfigDelegate(
             val current = modelConfigManager.getModelConfig(configId) ?: return@launch
             modelConfigManager.updateSummarySettings(
                     configId = configId,
+                    contextLength = current.contextLength,
                     enableSummary = current.enableSummary,
                     summaryTokenThreshold = threshold,
                     enableSummaryByMessageCount = current.enableSummaryByMessageCount,
@@ -628,17 +634,11 @@ class ApiConfigDelegate(
         }
     }
 
+    /** 更新最大上下文长度（已移至子模型参数，此方法保留兼容性） */
     fun updateMaxContextLength(length: Float) {
-        coroutineScope.launch {
-            val configId = resolveEditableChatConfigId()
-            val current = modelConfigManager.getModelConfig(configId) ?: return@launch
-            modelConfigManager.updateContextSettings(
-                    configId = configId,
-                    contextLength = current.contextLength,
-                    maxContextLength = length,
-                    enableMaxContextMode = current.enableMaxContextMode
-            )
-        }
+        // maxContextLength 已移至子模型覆盖配置，此方法暂时不执行操作
+        // 用户需要在子模型参数中设置最大上下文长度
+        AppLogger.w(TAG, "maxContextLength 已移至子模型参数，请在子模型设置中配置")
     }
 
     fun toggleEnableMaxContextMode() {
@@ -646,10 +646,8 @@ class ApiConfigDelegate(
             val configId = resolveEditableChatConfigId()
             val current = modelConfigManager.getModelConfig(configId) ?: return@launch
             val newValue = !current.enableMaxContextMode
-            modelConfigManager.updateContextSettings(
+            modelConfigManager.updateEnableMaxContextMode(
                     configId = configId,
-                    contextLength = current.contextLength,
-                    maxContextLength = current.maxContextLength,
                     enableMaxContextMode = newValue
             )
         }
@@ -662,6 +660,7 @@ class ApiConfigDelegate(
             val newValue = !current.enableSummary
             modelConfigManager.updateSummarySettings(
                     configId = configId,
+                    contextLength = current.contextLength,
                     enableSummary = newValue,
                     summaryTokenThreshold = current.summaryTokenThreshold,
                     enableSummaryByMessageCount = current.enableSummaryByMessageCount,
@@ -678,6 +677,7 @@ class ApiConfigDelegate(
             val newValue = !current.enableSummaryByMessageCount
             modelConfigManager.updateSummarySettings(
                     configId = configId,
+                    contextLength = current.contextLength,
                     enableSummary = current.enableSummary,
                     summaryTokenThreshold = current.summaryTokenThreshold,
                     enableSummaryByMessageCount = newValue,
@@ -693,6 +693,7 @@ class ApiConfigDelegate(
             val current = modelConfigManager.getModelConfig(configId) ?: return@launch
             modelConfigManager.updateSummarySettings(
                     configId = configId,
+                    contextLength = current.contextLength,
                     enableSummary = current.enableSummary,
                     summaryTokenThreshold = current.summaryTokenThreshold,
                     enableSummaryByMessageCount = current.enableSummaryByMessageCount,

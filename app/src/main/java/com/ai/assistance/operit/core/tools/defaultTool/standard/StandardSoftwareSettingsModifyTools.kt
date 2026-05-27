@@ -40,6 +40,7 @@ import com.ai.assistance.operit.data.model.AITool
 import com.ai.assistance.operit.data.model.ApiProviderType
 import com.ai.assistance.operit.data.model.FunctionType
 import com.ai.assistance.operit.data.model.ModelConfigData
+import com.ai.assistance.operit.data.model.ModelConfigDefaults
 import com.ai.assistance.operit.data.preferences.EnvPreferences
 import com.ai.assistance.operit.data.model.ToolResult
 import com.ai.assistance.operit.data.model.getModelByIndex
@@ -1655,9 +1656,6 @@ class StandardSoftwareSettingsModifyTools(private val context: Context) {
         applyFloat("context_length") { config, value ->
             config.copy(contextLength = value.coerceAtLeast(1f))
         }
-        applyFloat("max_context_length") { config, value ->
-            config.copy(maxContextLength = value.coerceAtLeast(1f))
-        }
         applyBoolean("enable_max_context_mode") { config, value ->
             config.copy(enableMaxContextMode = value)
         }
@@ -1767,7 +1765,7 @@ class StandardSoftwareSettingsModifyTools(private val context: Context) {
             hasCustomHeaders = config.customHeaders.trim().let { it.isNotEmpty() && it != "{}" },
             customHeaders = config.customHeaders,
             contextLength = config.contextLength,
-            maxContextLength = config.maxContextLength,
+            maxContextLength = ModelConfigDefaults.DEFAULT_MAX_CONTEXT_LENGTH,
             enableMaxContextMode = config.enableMaxContextMode,
             summaryTokenThreshold = config.summaryTokenThreshold,
             enableSummary = config.enableSummary,

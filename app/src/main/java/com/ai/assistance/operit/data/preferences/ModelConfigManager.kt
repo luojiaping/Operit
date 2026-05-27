@@ -539,6 +539,15 @@ class ModelConfigManager(private val context: Context) {
         }
     }
 
+    suspend fun updateEnableMaxContextMode(
+            configId: String,
+            enableMaxContextMode: Boolean
+    ): ModelConfigData {
+        return updateConfigInternal(configId) {
+            it.copy(enableMaxContextMode = enableMaxContextMode)
+        }
+    }
+
     /**
      * 根据配置ID获取完整的模型参数列表（包括标准和自定义参数）
      * @param configId 配置ID
