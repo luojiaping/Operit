@@ -128,9 +128,6 @@ fun ContextSummarySettingsScreen(onBackPressed: () -> Unit) {
     var contextLengthInput by remember(currentConfig?.id) {
         mutableStateOf(formatFloatValue(currentConfig?.contextLength))
     }
-    var maxContextLengthInput by remember(currentConfig?.id) {
-        mutableStateOf(formatFloatValue(currentConfig?.maxContextLength))
-    }
     var contextError by remember { mutableStateOf<String?>(null) }
 
     var enableSummary by remember(currentConfig?.id) {
@@ -150,9 +147,6 @@ fun ContextSummarySettingsScreen(onBackPressed: () -> Unit) {
     LaunchedEffect(currentConfig?.id, currentConfig?.contextLength) {
         contextLengthInput = formatFloatValue(currentConfig?.contextLength)
     }
-    LaunchedEffect(currentConfig?.id, currentConfig?.maxContextLength) {
-        maxContextLengthInput = formatFloatValue(currentConfig?.maxContextLength)
-    }
     LaunchedEffect(currentConfig?.id, currentConfig?.enableSummary) {
         enableSummary = currentConfig?.enableSummary ?: false
     }
@@ -168,8 +162,6 @@ fun ContextSummarySettingsScreen(onBackPressed: () -> Unit) {
     }
 
     val errorValidContextLength = stringResource(id = R.string.model_config_error_valid_context_length)
-    val errorValidMaxContextLength =
-        stringResource(id = R.string.model_config_error_valid_max_context_length)
     val errorSaveFailed = stringResource(id = R.string.model_config_error_save_failed)
     val errorSummaryThresholdRange =
         stringResource(id = R.string.model_config_error_summary_threshold_range)
@@ -184,7 +176,7 @@ fun ContextSummarySettingsScreen(onBackPressed: () -> Unit) {
 
     ContextSummaryAutoSaveEffects(
         currentConfig = currentConfig,
-        contextInputsProvider = { contextLengthInput to maxContextLengthInput },
+        contextInputsProvider = { contextLengthInput },
         summaryInputsProvider = {
             listOf(
                 enableSummary,
@@ -195,7 +187,6 @@ fun ContextSummarySettingsScreen(onBackPressed: () -> Unit) {
         },
         modelConfigManager = modelConfigManager,
         errorValidContextLength = errorValidContextLength,
-        errorValidMaxContextLength = errorValidMaxContextLength,
         errorSaveFailed = errorSaveFailed,
         errorSummaryThresholdRange = errorSummaryThresholdRange,
         errorValidMessageCount = errorValidMessageCount,
@@ -243,11 +234,6 @@ fun ContextSummarySettingsScreen(onBackPressed: () -> Unit) {
                     contextLengthInput = contextLengthInput,
                     onContextLengthInputChange = {
                         contextLengthInput = it
-                        contextError = null
-                    },
-                    maxContextLengthInput = maxContextLengthInput,
-                    onMaxContextLengthInputChange = {
-                        maxContextLengthInput = it
                         contextError = null
                     },
                     contextError = contextError,
@@ -303,11 +289,10 @@ fun ContextSummarySettingsScreen(onBackPressed: () -> Unit) {
 @Composable
 private fun ContextSummaryAutoSaveEffects(
     currentConfig: ModelConfigData?,
-    contextInputsProvider: () -> Pair<String, String>,
+    contextInputsProvider: () -> String,
     summaryInputsProvider: () -> List<Any>,
     modelConfigManager: ModelConfigManager,
     errorValidContextLength: String,
-    errorValidMaxContextLength: String,
     errorSaveFailed: String,
     errorSummaryThresholdRange: String,
     errorValidMessageCount: String,
@@ -316,114 +301,106 @@ private fun ContextSummaryAutoSaveEffects(
 ) {
     val latestConfig by rememberUpdatedState(currentConfig)
 
+    // 合并上下文长度和总结设置的自动保存
     LaunchedEffect(currentConfig?.id) {
         val configId = currentConfig?.id ?: return@LaunchedEffect
-        snapshotFlow { contextInputsProvider() }
-            .drop(1)
-            .debounce(700)
-            .distinctUntilChanged()
-            .collectLatest { (contextText, maxText) ->
-                val contextValue = contextText.toFloatOrNull()
-                val maxValue = maxText.toFloatOrNull()
-                when {
-                    contextValue == null || contextValue <= 0f ->
-                        onContextErrorChange(errorValidContextLength)
-                    maxValue == null || maxValue <= 0f ->
-                        onContextErrorChange(errorValidMaxContextLength)
-                    else -> {
-                        val current = latestConfig ?: return@collectLatest
-                        if (current.id != configId) return@collectLatest
-                        if (current.contextLength == contextValue && current.maxContextLength == maxValue) {
-                            onContextErrorChange(null)
-                            return@collectLatest
-                        }
-                        try {
-                            modelConfigManager.updateContextSettings(
-                                configId = current.id,
-                                contextLength = contextValue,
-                                maxContextLength = maxValue,
-                                enableMaxContextMode = current.enableMaxContextMode
-                            )
-                            onContextErrorChange(null)
-                        } catch (e: Exception) {
-                            onContextErrorChange(e.message ?: errorSaveFailed)
-                        }
-                    }
-                }
+        
+        // 同时监听上下文长度和总结设置
+        combine(
+            snapshotFlow { contextInputsProvider() }.drop(1),
+            snapshotFlow { summaryInputsProvider() }.drop(1)
+        ) { contextText, summaryValues ->
+            Pair(contextText, summaryValues)
+        }
+        .debounce(700)
+        .distinctUntilChanged()
+        .collectLatest { (contextText, summaryValues) ->
+            val current = latestConfig ?: return@collectLatest
+            if (current.id != configId) return@collectLatest
+
+            // 验证上下文长度
+            val contextValue = contextText.toFloatOrNull()
+            if (contextValue == null || contextValue <= 0f) {
+                onContextErrorChange(errorValidContextLength)
+                return@collectLatest
             }
-    }
 
-    LaunchedEffect(currentConfig?.id) {
-        val configId = currentConfig?.id ?: return@LaunchedEffect
-        snapshotFlow { summaryInputsProvider() }
-            .drop(1)
-            .debounce(700)
-            .distinctUntilChanged()
-            .collectLatest {
-                val current = latestConfig ?: return@collectLatest
-                if (current.id != configId) return@collectLatest
+            // 解析总结设置
+            val enableSummary = summaryValues[0] as Boolean
+            val summaryTokenThresholdInput = summaryValues[1] as String
+            val enableSummaryByMessageCount = summaryValues[2] as Boolean
+            val summaryMessageCountThresholdInput = summaryValues[3] as String
 
-                val enableSummary = it[0] as Boolean
-                val summaryTokenThresholdInput = it[1] as String
-                val enableSummaryByMessageCount = it[2] as Boolean
-                val summaryMessageCountThresholdInput = it[3] as String
+            // 如果总结未启用，只保存上下文长度和enableSummary
+            if (!enableSummary) {
+                try {
+                    modelConfigManager.updateSummarySettings(
+                        configId = current.id,
+                        contextLength = contextValue,
+                        enableSummary = false,
+                        summaryTokenThreshold = current.summaryTokenThreshold,
+                        enableSummaryByMessageCount = current.enableSummaryByMessageCount,
+                        summaryMessageCountThreshold = current.summaryMessageCountThreshold
+                    )
+                    onContextErrorChange(null)
+                    onSummaryErrorChange(null)
+                } catch (e: Exception) {
+                    onContextErrorChange(e.message ?: errorSaveFailed)
+                }
+                return@collectLatest
+            }
 
-                if (!enableSummary) {
-                    if (current.enableSummary) {
-                        try {
-                            modelConfigManager.updateSummarySettings(
-                                configId = current.id,
-                                enableSummary = false,
-                                summaryTokenThreshold = current.summaryTokenThreshold,
-                                enableSummaryByMessageCount = current.enableSummaryByMessageCount,
-                                summaryMessageCountThreshold = current.summaryMessageCountThreshold
-                            )
-                            onSummaryErrorChange(null)
-                        } catch (e: Exception) {
-                            onSummaryErrorChange(e.message ?: errorSaveFailed)
-                        }
-                    }
+            // 验证总结设置
+            val threshold = summaryTokenThresholdInput.toFloatOrNull()
+            val messageCount = summaryMessageCountThresholdInput.toIntOrNull()
+            when {
+                threshold == null || threshold <= 0f || threshold >= 1f -> {
+                    onSummaryErrorChange(errorSummaryThresholdRange)
                     return@collectLatest
                 }
-
-                val threshold = summaryTokenThresholdInput.toFloatOrNull()
-                val messageCount = summaryMessageCountThresholdInput.toIntOrNull()
-                when {
-                    threshold == null || threshold <= 0f || threshold >= 1f ->
-                        onSummaryErrorChange(errorSummaryThresholdRange)
-                    enableSummaryByMessageCount && (messageCount == null || messageCount <= 0) ->
-                        onSummaryErrorChange(errorValidMessageCount)
-                    else -> {
-                        val nextMessageCount =
-                            if (enableSummaryByMessageCount) {
-                                messageCount ?: current.summaryMessageCountThreshold
-                            } else {
-                                current.summaryMessageCountThreshold
-                            }
-                        val isNoOp =
-                            current.enableSummary == enableSummary &&
-                                current.summaryTokenThreshold == threshold &&
-                                current.enableSummaryByMessageCount == enableSummaryByMessageCount &&
-                                current.summaryMessageCountThreshold == nextMessageCount
-                        if (isNoOp) {
-                            onSummaryErrorChange(null)
-                            return@collectLatest
+                enableSummaryByMessageCount && (messageCount == null || messageCount <= 0) -> {
+                    onSummaryErrorChange(errorValidMessageCount)
+                    return@collectLatest
+                }
+                else -> {
+                    val nextMessageCount =
+                        if (enableSummaryByMessageCount) {
+                            messageCount ?: current.summaryMessageCountThreshold
+                        } else {
+                            current.summaryMessageCountThreshold
                         }
-                        try {
-                            modelConfigManager.updateSummarySettings(
-                                configId = current.id,
-                                enableSummary = enableSummary,
-                                summaryTokenThreshold = threshold,
-                                enableSummaryByMessageCount = enableSummaryByMessageCount,
-                                summaryMessageCountThreshold = nextMessageCount
-                            )
-                            onSummaryErrorChange(null)
-                        } catch (e: Exception) {
-                            onSummaryErrorChange(e.message ?: errorSaveFailed)
-                        }
+                    
+                    // 检查是否有变化
+                    val isNoOp =
+                        current.contextLength == contextValue &&
+                        current.enableSummary == enableSummary &&
+                        current.summaryTokenThreshold == threshold &&
+                        current.enableSummaryByMessageCount == enableSummaryByMessageCount &&
+                        current.summaryMessageCountThreshold == nextMessageCount
+                    
+                    if (isNoOp) {
+                        onContextErrorChange(null)
+                        onSummaryErrorChange(null)
+                        return@collectLatest
+                    }
+                    
+                    try {
+                        modelConfigManager.updateSummarySettings(
+                            configId = current.id,
+                            contextLength = contextValue,
+                            enableSummary = enableSummary,
+                            summaryTokenThreshold = threshold,
+                            enableSummaryByMessageCount = enableSummaryByMessageCount,
+                            summaryMessageCountThreshold = nextMessageCount
+                        )
+                        onContextErrorChange(null)
+                        onSummaryErrorChange(null)
+                    } catch (e: Exception) {
+                        onContextErrorChange(e.message ?: errorSaveFailed)
                     }
                 }
             }
+        }
     }
 }
 
@@ -471,8 +448,6 @@ private fun RenderContextSummaryConfigSections(
     componentBackgroundColor: Color,
     contextLengthInput: String,
     onContextLengthInputChange: (String) -> Unit,
-    maxContextLengthInput: String,
-    onMaxContextLengthInputChange: (String) -> Unit,
     contextError: String?,
     enableSummary: Boolean,
     onEnableSummaryChange: (Boolean) -> Unit,
@@ -485,11 +460,11 @@ private fun RenderContextSummaryConfigSections(
     summaryError: String?
 ) {
     SectionTitle(
-        text = stringResource(id = R.string.settings_context_title),
+        text = stringResource(id = R.string.settings_context_summary_title),
         icon = Icons.Default.Analytics
     )
     SettingsInfoBanner(
-        text = stringResource(id = R.string.settings_context_card_content),
+        text = stringResource(id = R.string.settings_context_summary_card_content),
         backgroundColor = componentBackgroundColor
     )
     SettingsInputField(
@@ -502,17 +477,6 @@ private fun RenderContextSummaryConfigSections(
         allowDecimal = true,
         keyboardOptions =
             KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Next)
-    )
-    SettingsInputField(
-        title = stringResource(id = R.string.settings_max_context_length),
-        subtitle = stringResource(id = R.string.settings_max_context_length_subtitle),
-        value = maxContextLengthInput,
-        onValueChange = onMaxContextLengthInputChange,
-        unitText = "K",
-        backgroundColor = componentBackgroundColor,
-        allowDecimal = true,
-        keyboardOptions =
-            KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done)
     )
     contextError?.let {
         Text(

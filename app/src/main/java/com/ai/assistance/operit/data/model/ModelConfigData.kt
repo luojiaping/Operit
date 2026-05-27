@@ -75,6 +75,9 @@ data class ModelOverrideConfig(
         val frequencyPenalty: Float? = null,
         val repetitionPenalty: Float? = null,
 
+        // 上下文长度（null = 使用配置默认值）
+        val maxContextLength: Float? = null,
+
         // 自定义参数 JSON（null = 使用配置默认值）
         val customParameters: String? = null,
 
@@ -91,6 +94,7 @@ data class ModelOverrideConfig(
                         topP != null || topK != null ||
                         presencePenalty != null || frequencyPenalty != null ||
                         repetitionPenalty != null ||
+                        maxContextLength != null ||
                         customParameters != null || customHeaders != null
         }
 }
@@ -153,7 +157,6 @@ data class ModelConfigData(
 
         // 上下文/总结配置
         val contextLength: Float = ModelConfigDefaults.DEFAULT_CONTEXT_LENGTH,
-        val maxContextLength: Float = ModelConfigDefaults.DEFAULT_MAX_CONTEXT_LENGTH,
         val enableMaxContextMode: Boolean = ModelConfigDefaults.DEFAULT_ENABLE_MAX_CONTEXT_MODE,
         val summaryTokenThreshold: Float = ModelConfigDefaults.DEFAULT_SUMMARY_TOKEN_THRESHOLD,
         val enableSummary: Boolean = ModelConfigDefaults.DEFAULT_ENABLE_SUMMARY,

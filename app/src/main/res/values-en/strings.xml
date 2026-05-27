@@ -1875,6 +1875,8 @@
     
     <!-- Context and Summary Settings Screen -->
     <string name="screen_title_context_summary_settings">Context and Summary Settings</string>
+    <string name="settings_context_summary_title">Context Summary Settings</string>
+    <string name="settings_context_summary_card_content">Set conversation context length and summary trigger conditions. Context length controls the actual conversation context size, and summary settings control when to automatically summarize the conversation.</string>
     <string name="settings_context_title">Context Settings</string>
     <string name="settings_summary_title">Summary Settings</string>
     <string name="settings_context_summary_subtitle">Manage context, summary, and history media retention settings</string>
@@ -3931,6 +3933,8 @@
     <string name="sub_model_inherit">Inherit</string>
     <string name="sub_model_reset">Reset to Default</string>
     <string name="sub_model_parameter_settings">%s Parameter Settings</string>
+    <string name="sub_model_max_context_length">Max Context Length</string>
+    <string name="sub_model_max_context_length_desc">Maximum context length supported by the model (fallback limit). Default 200K, recommend setting according to model official documentation</string>
   
     <!-- Custom Parameters Dialog -->
     <string name="add_custom_parameter">Add</string>

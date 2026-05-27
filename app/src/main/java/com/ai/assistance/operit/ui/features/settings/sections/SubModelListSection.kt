@@ -255,6 +255,14 @@ private fun SubModelParameterPanel(
         mutableStateOf((existingOverride?.repetitionPenalty ?: config.repetitionPenalty).toString())
     }
 
+    // 上下文长度参数
+    var maxContextLengthEnabled by remember(modelName) {
+        mutableStateOf(existingOverride?.maxContextLength != null)
+    }
+    var maxContextLength by remember(modelName) {
+        mutableStateOf((existingOverride?.maxContextLength ?: ModelConfigDefaults.DEFAULT_MAX_CONTEXT_LENGTH).toString())
+    }
+
     // 自定义参数和请求头
     var customParameters by remember(modelName) {
         mutableStateOf(existingOverride?.customParameters ?: config.customParameters)
@@ -282,6 +290,7 @@ private fun SubModelParameterPanel(
                     presencePenalty = presencePenalty.toFloatOrNull(),
                     frequencyPenalty = frequencyPenalty.toFloatOrNull(),
                     repetitionPenalty = repetitionPenalty.toFloatOrNull(),
+                    maxContextLength = if (maxContextLengthEnabled) maxContextLength.toFloatOrNull() else null,
                     customParameters = customParameters,
                     customHeaders = customHeaders
                 )
@@ -316,6 +325,17 @@ private fun SubModelParameterPanel(
             onValueChange = { temperature = it },
             onValueSave = { saveOverride() },
             description = stringResource(R.string.temperature_description)
+        )
+
+        // Max Context Length (最大上下文长度)
+        SubModelParameterRow(
+            name = stringResource(R.string.sub_model_max_context_length),
+            enabled = maxContextLengthEnabled,
+            onEnabledChange = { maxContextLengthEnabled = it; saveOverride() },
+            value = maxContextLength,
+            onValueChange = { maxContextLength = it },
+            onValueSave = { saveOverride() },
+            description = stringResource(R.string.sub_model_max_context_length_desc)
         )
 
         // Top P

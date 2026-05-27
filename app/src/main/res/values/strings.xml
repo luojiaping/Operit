@@ -3851,6 +3851,8 @@
     <string name="sub_model_inherit">继承配置</string>
     <string name="sub_model_reset">重置为默认</string>
     <string name="sub_model_parameter_settings">%s 参数设置</string>
+    <string name="sub_model_max_context_length">最大上下文长度</string>
+    <string name="sub_model_max_context_length_desc">模型支持的最大上下文长度（兜底限制）。默认200K，建议根据模型官方文档设置</string>
     <string name="overseas_provider_warning">检测到您在中国大陆，但选择了海外服务商。请确认是否已开启代理工具</string>
     
     <!-- 自定义参数对话框 -->
@@ -4627,6 +4629,8 @@
 
     <!-- Context and Summary Settings Screen -->
     <string name="screen_title_context_summary_settings">上下文和总结设置</string>
+    <string name="settings_context_summary_title">上下文总结设置</string>
+    <string name="settings_context_summary_card_content">设置对话上下文长度和总结触发条件。上下文长度控制实际对话时的上下文大小，总结设置控制何时自动进行对话总结。</string>
     <string name="settings_context_title">上下文设置</string>
     <string name="settings_summary_title">总结设置</string>
     <string name="settings_context_summary_subtitle">管理上下文、总结与历史媒体保留设置</string>

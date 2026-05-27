@@ -520,23 +520,9 @@ class ModelConfigManager(private val context: Context) {
         }
     }
 
-    suspend fun updateContextSettings(
-            configId: String,
-            contextLength: Float,
-            maxContextLength: Float,
-            enableMaxContextMode: Boolean
-    ): ModelConfigData {
-        return updateConfigInternal(configId) {
-            it.copy(
-                    contextLength = contextLength,
-                    maxContextLength = maxContextLength,
-                    enableMaxContextMode = enableMaxContextMode
-            )
-        }
-    }
-
     suspend fun updateSummarySettings(
             configId: String,
+            contextLength: Float,
             enableSummary: Boolean,
             summaryTokenThreshold: Float,
             enableSummaryByMessageCount: Boolean,
@@ -544,6 +530,7 @@ class ModelConfigManager(private val context: Context) {
     ): ModelConfigData {
         return updateConfigInternal(configId) {
             it.copy(
+                    contextLength = contextLength,
                     enableSummary = enableSummary,
                     summaryTokenThreshold = summaryTokenThreshold,
                     enableSummaryByMessageCount = enableSummaryByMessageCount,

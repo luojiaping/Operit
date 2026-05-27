@@ -206,7 +206,7 @@ class ApiConfigDelegate(
 
     val effectiveMaxContextLengthSetting: StateFlow<Float> =
             effectiveChatConfig
-                .map { config -> config.maxContextLength }
+                .map { config -> getMaxContextLengthForModel(config) }
                 .stateIn(
                     coroutineScope,
                     kotlinx.coroutines.flow.SharingStarted.Eagerly,
@@ -332,7 +332,8 @@ class ApiConfigDelegate(
         _modelName.value = config.modelName
         _apiProviderType.value = config.apiProviderType
         _contextLength.value = config.contextLength
-        _maxContextLength.value = config.maxContextLength
+        // maxContextLength 从子模型读取，这里使用默认值
+        _maxContextLength.value = getMaxContextLengthForModel(config)
         _enableMaxContextMode.value = config.enableMaxContextMode
         _summaryTokenThreshold.value = config.summaryTokenThreshold
         _enableSummary.value = config.enableSummary
@@ -340,13 +341,34 @@ class ApiConfigDelegate(
         _summaryMessageCountThreshold.value = config.summaryMessageCountThreshold
     }
 
+    private fun getMaxContextLengthForModel(config: ModelConfigData): Float {
+        // 从子模型参数中读取maxContextLength，如果没有则使用默认值200K
+        val modelName = config.modelName
+        if (modelName.isBlank()) return ModelConfigDefaults.DEFAULT_MAX_CONTEXT_LENGTH
+        
+        // 获取当前模型索引对应的模型名
+        val models = modelName.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+        if (models.isEmpty()) return ModelConfigDefaults.DEFAULT_MAX_CONTEXT_LENGTH
+        
+        // 遍历所有可能的模型名，查找覆盖配置
+        for (model in models) {
+            val override = config.modelOverrides[model]
+            if (override?.maxContextLength != null) {
+                return override.maxContextLength
+            }
+        }
+        
+        return ModelConfigDefaults.DEFAULT_MAX_CONTEXT_LENGTH
+    }
+
     private fun buildChatContextSettings(configId: String, config: ModelConfigData): ChatContextSettings {
+        val maxContextLength = getMaxContextLengthForModel(config)
         val effectiveContextLength =
-            if (config.enableMaxContextMode) config.maxContextLength else config.contextLength
+            if (config.enableMaxContextMode) maxContextLength else config.contextLength
         return ChatContextSettings(
             configId = configId,
             baseContextLength = config.contextLength,
-            maxContextLength = config.maxContextLength,
+            maxContextLength = maxContextLength,
             enableMaxContextMode = config.enableMaxContextMode,
             effectiveContextLength = effectiveContextLength,
             summaryTokenThreshold = config.summaryTokenThreshold,
