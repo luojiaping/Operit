@@ -3,18 +3,6 @@ name: Android Build
 on:
   workflow_dispatch:
     inputs:
-      deps_source:
-        description: Manual dependency source, release or google_drive
-        required: true
-        default: google_drive
-        type: choice
-        options:
-          - google_drive
-          - release
-      deps_tag:
-        description: GitHub Release tag containing models.zip, subpack.zip, jniLibs.zip, and libs.zip
-        required: true
-        default: build-deps
       google_drive_folder:
         description: Public Google Drive folder URL containing dependency zip files
         required: false
@@ -41,7 +29,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 17
+          java-version: 21
           cache: gradle
 
       - name: Set up Node.js
@@ -68,20 +56,6 @@ jobs:
           EOF
 
       - name: Download manual dependencies
-        if: ${{ inputs.deps_source == 'release' }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh release download "${{ inputs.deps_tag }}" \
-            --repo "${{ github.repository }}" \
-            --pattern "models.zip*" \
-            --pattern "subpack.zip*" \
-            --pattern "jniLibs.zip*" \
-            --pattern "libs.zip*" \
-            --dir manual-deps
-
-      - name: Download manual dependencies from Google Drive
-        if: ${{ inputs.deps_source == 'google_drive' }}
         run: |
           python3 -m pip install --user gdown
           mkdir -p manual-deps
@@ -108,12 +82,12 @@ jobs:
           restore_zip subpack.zip
           restore_zip jniLibs.zip
           restore_zip libs.zip
+          mkdir -p app/src/main/jniLibs app/libs
 
-          mkdir -p app/src/main/assets/models app/src/main/assets/subpack app/src/main/jniLibs app/libs
-          unzip -q manual-deps/models.zip -d app/src/main/assets/models
-          unzip -q manual-deps/subpack.zip -d app/src/main/assets/subpack
-          unzip -q manual-deps/jniLibs.zip -d app/src/main/jniLibs
-          unzip -q manual-deps/libs.zip -d app/libs
+          unzip -qo manual-deps/models.zip
+          unzip -qo manual-deps/subpack.zip
+          unzip -qo manual-deps/jniLibs.zip
+          unzip -qo manual-deps/libs.zip
 
       - name: Install root npm dependencies
         run: npm install
@@ -125,7 +99,7 @@ jobs:
         run: npm run build:webchat
 
       - name: Install pnpm
-        run: npm install -g pnpm
+        run: npm install -g pnpm@9
 
       - name: Build example packages
         run: python3 ./sync_example_packages.py
