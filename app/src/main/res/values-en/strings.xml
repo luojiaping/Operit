@@ -3935,6 +3935,12 @@
     <string name="sub_model_parameter_settings">%s Parameter Settings</string>
     <string name="sub_model_max_context_length">Max Context Length</string>
     <string name="sub_model_max_context_length_desc">Maximum context length supported by the model (fallback limit). Default 200K, recommend setting according to model official documentation</string>
+    <string name="sub_model_add_parameter">Add Parameter</string>
+    <string name="sub_model_select_parameter">Select parameter to add</string>
+    <string name="sub_model_remove_parameter">Remove</string>
+    <string name="sub_model_no_more_params">No more parameters to add</string>
+    <string name="enabled">Enabled</string>
+    <string name="disabled">Disabled</string>
   
     <!-- Custom Parameters Dialog -->
     <string name="add_custom_parameter">Add</string>

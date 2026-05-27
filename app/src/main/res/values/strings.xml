@@ -3853,6 +3853,12 @@
     <string name="sub_model_parameter_settings">%s 参数设置</string>
     <string name="sub_model_max_context_length">最大上下文长度</string>
     <string name="sub_model_max_context_length_desc">模型支持的最大上下文长度（兜底限制）。默认200K，建议根据模型官方文档设置</string>
+    <string name="sub_model_add_parameter">添加参数</string>
+    <string name="sub_model_select_parameter">选择要添加的参数</string>
+    <string name="sub_model_remove_parameter">移除</string>
+    <string name="sub_model_no_more_params">没有更多可添加的参数</string>
+    <string name="enabled">已启用</string>
+    <string name="disabled">未启用</string>
     <string name="overseas_provider_warning">检测到您在中国大陆，但选择了海外服务商。请确认是否已开启代理工具</string>
     
     <!-- 自定义参数对话框 -->
