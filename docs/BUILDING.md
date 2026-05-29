@@ -116,12 +116,12 @@ yes | sdkmanager --licenses
 2. 安装平台工具、SDK 平台和构建工具:  
 Operit 项目依赖于 android-34 平台和 34.0.0 构建工具。  
 ```bash
-sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+sdkmanager "platform-tools" "platforms;android-34" "platforms;android-36" "build-tools;34.0.0"
 ```
 3. 安装项目指定的 NDK 版本:  
 本项目要求使用 NDK 25.1.8937393。  
 ```bash
-sdkmanager "ndk;25.1.8937393"
+sdkmanager "ndk;25.1.8937393" "cmake;3.22.1"
 ```
 
 ## **附：性能优化 - 配置编译资源**
