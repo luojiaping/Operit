@@ -1038,8 +1038,11 @@ class ClaudeProvider(
             when (format) {
                 ThinkingFormat.ADAPTIVE -> {
                     // adaptive thinking: thinking.type=adaptive + output_config.effort
+                    // Opus 4.8/4.7/Mythos default display to "omitted" (empty thinking),
+                    // must explicitly set "summarized" to receive thinking content.
                     val thinkingObject = JSONObject()
                     thinkingObject.put("type", "adaptive")
+                    thinkingObject.put("display", "summarized")
                     jsonObject.put("thinking", thinkingObject)
 
                     // effort 参数放在独立的 output_config 对象中（Anthropic API规范）
