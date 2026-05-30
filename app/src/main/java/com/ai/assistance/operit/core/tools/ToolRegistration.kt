@@ -2606,4 +2606,30 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
                 ffmpegConvertTool.invoke(tool)
             }
     )
+
+    // ─── 子代理工具 ────────────────────────────────────────
+
+    val subAgentTools = com.ai.assistance.operit.core.tools.defaultTool.standard.StandardSubAgentTools(context)
+
+    handler.registerTool(
+            name = "spawn_subagent",
+            descriptionGenerator = { tool ->
+                val task = tool.parameters.find { it.name == "task" }?.value ?: ""
+                val maxRounds = tool.parameters.find { it.name == "max_rounds" }?.value ?: "10"
+                s(R.string.toolreg_spawn_subagent_desc, task, maxRounds)
+            },
+            executor = { tool ->
+                runBlocking(Dispatchers.IO) { subAgentTools.spawnSubAgent(tool) }
+            }
+    )
+
+    handler.registerTool(
+            name = "spawn_subagents_parallel",
+            descriptionGenerator = { tool ->
+                s(R.string.toolreg_spawn_subagents_parallel_desc)
+            },
+            executor = { tool ->
+                runBlocking(Dispatchers.IO) { subAgentTools.spawnSubAgentsParallel(tool) }
+            }
+    )
 }

@@ -7669,4 +7669,6 @@
     <string name="package_conflict_delete_source">删除源文件</string>
     <string name="package_conflict_delete_success">冲突包源文件已删除</string>
     <string name="package_conflict_delete_failed">删除冲突包源文件失败</string>
+ <string name="toolreg_spawn_subagent_desc">创建子代理执行任务「%1$s」（最多%2$s轮）</string>
+ <string name="toolreg_spawn_subagents_parallel_desc">并行创建多个子代理同时执行不同任务</string>
 </resources>

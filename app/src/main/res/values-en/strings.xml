@@ -7669,4 +7669,6 @@
     <string name="mention_selector_files_section">Files</string>
     <string name="mention_selector_files_idle">Enter name or path to search workspace items</string>
     <string name="mention_selector_files_empty">No matching files or folders</string>
+ <string name="toolreg_spawn_subagent_desc">Create sub-agent to execute task '%1$s' (max %2$s rounds)</string>
+ <string name="toolreg_spawn_subagents_parallel_desc">Create multiple sub-agents to execute different tasks in parallel</string>
 </resources>

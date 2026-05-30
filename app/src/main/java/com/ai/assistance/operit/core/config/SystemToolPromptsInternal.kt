@@ -2932,6 +2932,57 @@ object SystemToolPromptsInternal {
                                 )
                         )
                     )
+            ),
+            SystemToolPromptCategory(
+                categoryName = "Sub-Agent Tools",
+                tools =
+                    listOf(
+                        ToolPrompt(
+                            name = "spawn_subagent",
+                            description = "Create a sub-agent to independently execute a specified task. The sub-agent has its own conversation history and tool set, and will return the result upon completion. Suitable for complex sub-tasks that need independent execution such as file analysis, code review, information gathering, etc.",
+                            parametersStructured =
+                                listOf(
+                                    ToolParameterSchema(
+                                        name = "task",
+                                        type = "string",
+                                        description = "The task description for the sub-agent to complete. Should be specific and clear.",
+                                        required = true
+                                    ),
+                                    ToolParameterSchema(
+                                        name = "tools_whitelist",
+                                        type = "string",
+                                        description = "JSON array of allowed tool names for the sub-agent. Omit for default safe tools (read-only + terminal). Pass \"all\" to allow all tools.",
+                                        required = false
+                                    ),
+                                    ToolParameterSchema(
+                                        name = "max_rounds",
+                                        type = "integer",
+                                        description = "Maximum tool call rounds, default 10. Complex tasks may need more.",
+                                        required = false,
+                                        default = "10"
+                                    ),
+                                    ToolParameterSchema(
+                                        name = "model_config_id",
+                                        type = "string",
+                                        description = "Model config ID. Omit to inherit from main agent. Can be used to specify a lighter model to save cost.",
+                                        required = false
+                                    )
+                                )
+                        ),
+                        ToolPrompt(
+                            name = "spawn_subagents_parallel",
+                            description = "Create multiple sub-agents to execute different tasks in parallel. All sub-agents will complete before results are returned. Significantly reduces total execution time for independent tasks.",
+                            parametersStructured =
+                                listOf(
+                                    ToolParameterSchema(
+                                        name = "tasks",
+                                        type = "string",
+                                        description = "JSON array of task objects. Each object has: task (required string), tools_whitelist (optional JSON array), max_rounds (optional int), model_config_id (optional string). Example: [{\"task\":\"analyze architecture\",\"max_rounds\":5},{\"task\":\"scan dependencies\"}]",
+                                        required = true
+                                    )
+                                )
+                        )
+                    )
             )
         )
 
@@ -5857,6 +5908,57 @@ object SystemToolPromptsInternal {
                                         type = "string",
                                         description = "可选，H.264 编码请使用 h264",
                                         required = false
+                                    )
+                                )
+                        )
+                    )
+            ),
+            SystemToolPromptCategory(
+                categoryName = "子代理工具",
+                tools =
+                    listOf(
+                        ToolPrompt(
+                            name = "spawn_subagent",
+                            description = "创建一个子代理来独立执行指定任务。子代理拥有自己的对话历史和工具集，完成后将结果返回给你。适用于需要独立执行的复杂子任务，如文件分析、代码审查、信息收集等。",
+                            parametersStructured =
+                                listOf(
+                                    ToolParameterSchema(
+                                        name = "task",
+                                        type = "string",
+                                        description = "要让子代理完成的任务描述，应足够具体和明确",
+                                        required = true
+                                    ),
+                                    ToolParameterSchema(
+                                        name = "tools_whitelist",
+                                        type = "string",
+                                        description = "子代理可用的工具列表（JSON数组）。不传则使用默认安全工具集。传 \"all\" 允许使用所有工具",
+                                        required = false
+                                    ),
+                                    ToolParameterSchema(
+                                        name = "max_rounds",
+                                        type = "integer",
+                                        description = "最大工具调用轮次，默认10。复杂任务可适当增大",
+                                        required = false,
+                                        default = "10"
+                                    ),
+                                    ToolParameterSchema(
+                                        name = "model_config_id",
+                                        type = "string",
+                                        description = "模型配置ID，不传则继承主代理配置。可用于为子代理指定更轻量的模型以节省成本",
+                                        required = false
+                                    )
+                                )
+                        ),
+                        ToolPrompt(
+                            name = "spawn_subagents_parallel",
+                            description = "并行创建多个子代理同时执行不同任务。所有子代理完成后返回结果。适用于可以独立并行的多个子任务，显著缩短总执行时间。",
+                            parametersStructured =
+                                listOf(
+                                    ToolParameterSchema(
+                                        name = "tasks",
+                                        type = "string",
+                                        description = "任务列表，JSON数组，每个元素包含 task(必填)、tools_whitelist、max_rounds、model_config_id 可选字段。示例: [{\"task\":\"分析架构\",\"max_rounds\":5},{\"task\":\"扫描依赖\"}]",
+                                        required = true
                                     )
                                 )
                         )
