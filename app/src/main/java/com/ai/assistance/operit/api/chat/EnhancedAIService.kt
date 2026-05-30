@@ -1998,6 +1998,11 @@ class EnhancedAIService private constructor(private val context: Context) {
     ) {
         val startTime = messageTimingNow()
 
+        // 设置 SubAgentManager 工具执行上下文（让 spawn_subagent 工具能获取 chatId 和消息时间戳）
+        val resolvedChatId = chatId ?: "default"
+        com.ai.assistance.operit.api.chat.subagent.SubAgentManager.getInstance(this@EnhancedAIService.context)
+            .setToolExecutionContext(resolvedChatId, System.currentTimeMillis())
+
         toolInvocations.forEach { invocation ->
             onToolInvocation?.invoke(invocation.tool.name)
         }
@@ -2081,6 +2086,9 @@ class EnhancedAIService private constructor(private val context: Context) {
             processToolJob.join()
         } finally {
             toolExecutionJobs.remove(invocationId)
+            // 清理 SubAgentManager 工具执行上下文
+            com.ai.assistance.operit.api.chat.subagent.SubAgentManager.getInstance(this@EnhancedAIService.context)
+                .clearToolExecutionContext()
         }
     }
 

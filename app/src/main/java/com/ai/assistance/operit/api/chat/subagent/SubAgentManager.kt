@@ -48,6 +48,35 @@ class SubAgentManager(private val context: Context) {
     // 内存中的会话列表（全部会话，永久保留直到应用进程结束）
     private val allSessions = mutableListOf<SubAgentSession>()
 
+    // ─── 工具执行上下文（ThreadLocal，用于传递 chatId 给工具） ───
+
+    data class ToolExecutionContext(
+        val parentChatId: String,
+        val parentMessageTimestamp: Long
+    )
+
+    private val currentToolContext = ThreadLocal<ToolExecutionContext?>()
+
+    /**
+     * 在 EnhancedAIService.handleToolInvocation 中调用，
+     * 设置当前工具执行的上下文信息
+     */
+    fun setToolExecutionContext(parentChatId: String, parentMessageTimestamp: Long) {
+        currentToolContext.set(ToolExecutionContext(parentChatId, parentMessageTimestamp))
+    }
+
+    /**
+     * 获取当前工具执行的上下文（由 StandardSubAgentTools 调用）
+     */
+    fun getToolExecutionContext(): ToolExecutionContext? = currentToolContext.get()
+
+    /**
+     * 清除工具执行上下文
+     */
+    fun clearToolExecutionContext() {
+        currentToolContext.remove()
+    }
+
     // ─── 持久化（JSON 文件） ──────────────────────────────────
 
     private val storeDir: File by lazy {

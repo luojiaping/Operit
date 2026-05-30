@@ -449,12 +449,21 @@ fun ChatArea(
                     }
                 }
 
-                // 子代理面板：在 AI 消息下方显示（当该消息关联了子代理时）
-                val relatedGens = remember(subAgentGenerations, message.timestamp, message.sender) {
+                // 子代理面板：在 AI 消息下方显示
+                // 规则：有正在运行/等待的子代理时，显示在最后一条 AI 消息下方
+                //       已完成的子代理，显示在匹配的消息下方
+                val isLastAiMessage = remember(message, message.sender, chatHistory) {
+                    message.sender == "ai" && chatHistory.indexOfLast { it.sender == "ai" } == chatHistory.indexOf(message)
+                }
+                val relatedGens = remember(subAgentGenerations, message.timestamp, message.sender, isLastAiMessage) {
                     if (message.sender == "ai") {
                         subAgentGenerations.filter { gen ->
-                            gen.agents.any { it.status == com.ai.assistance.operit.data.model.SubAgentStatus.RUNNING ||
-                                it.status == com.ai.assistance.operit.data.model.SubAgentStatus.PENDING } ||
+                            // 正在运行/等待的子代理：显示在最后一条 AI 消息下方
+                            (isLastAiMessage && gen.agents.any {
+                                it.status == com.ai.assistance.operit.data.model.SubAgentStatus.RUNNING ||
+                                it.status == com.ai.assistance.operit.data.model.SubAgentStatus.PENDING
+                            }) ||
+                            // 已完成的子代理，显示在匹配的消息下方
                             gen.parentMessageTimestamp == message.timestamp
                         }
                     } else emptyList()

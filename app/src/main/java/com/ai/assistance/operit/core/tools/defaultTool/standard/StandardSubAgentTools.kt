@@ -35,10 +35,10 @@ class StandardSubAgentTools(private val context: Context) {
         val maxRounds = tool.parameters.find { it.name == "max_rounds" }?.value?.toIntOrNull() ?: 10
         val modelConfigId = tool.parameters.find { it.name == "model_config_id" }?.value
 
-        // 需要从工具参数或上下文获取 parentChatId 和 parentMessageTimestamp
-        val parentChatId = tool.parameters.find { it.name == "__operit_package_chat_id" }?.value
-            ?: "default"
-        val parentMessageTimestamp = System.currentTimeMillis()
+        // 从 SubAgentManager 工具执行上下文获取 parentChatId 和 parentMessageTimestamp
+        val toolContext = SubAgentManager.getInstance(context).getToolExecutionContext()
+        val parentChatId = toolContext?.parentChatId ?: "default"
+        val parentMessageTimestamp = toolContext?.parentMessageTimestamp ?: System.currentTimeMillis()
         val generationId = subAgentManager.getNextGenerationId(parentChatId)
 
         AppLogger.i(TAG, "spawn_subagent: task='$task', gen=$generationId, maxRounds=$maxRounds")
@@ -85,9 +85,9 @@ class StandardSubAgentTools(private val context: Context) {
             return buildError(tool, "tasks array is empty")
         }
 
-        val parentChatId = tool.parameters.find { it.name == "__operit_package_chat_id" }?.value
-            ?: "default"
-        val parentMessageTimestamp = System.currentTimeMillis()
+        val toolContext = SubAgentManager.getInstance(context).getToolExecutionContext()
+        val parentChatId = toolContext?.parentChatId ?: "default"
+        val parentMessageTimestamp = toolContext?.parentMessageTimestamp ?: System.currentTimeMillis()
         val generationId = subAgentManager.getNextGenerationId(parentChatId)
 
         AppLogger.i(TAG, "spawn_subagents_parallel: ${tasks.size} tasks, gen=$generationId")

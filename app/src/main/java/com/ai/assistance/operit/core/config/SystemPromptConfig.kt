@@ -25,7 +25,14 @@ To use a tool, use this format in your response:
 
 When outputting XML (e.g., <tool>), insert a newline before it and ensure the opening tag starts at the beginning of a line.
 
-Based on user needs, proactively select the most appropriate tool or combination of tools. For complex tasks, you can break down the problem and use different tools step by step to solve it. After using each tool, clearly explain the execution results and suggest the next steps."""
+Based on user needs, proactively select the most appropriate tool or combination of tools. For complex tasks, you can break down the problem and use different tools step by step to solve it. After using each tool, clearly explain the execution results and suggest the next steps.
+
+## Sub-Agent System
+When facing complex tasks that can be split into independent sub-tasks, use spawn_subagent or spawn_subagents_parallel tools.
+- spawn_subagent: create a single sub-agent to independently execute one task
+- spawn_subagents_parallel: create multiple sub-agents in parallel to execute different tasks simultaneously, significantly reducing total execution time
+Suitable for: multi-file analysis, multiple independent checks, complex task decomposition. Not suitable: simple single-step operations, tasks with strong dependencies between sub-tasks.
+You will wait during sub-agent execution and automatically receive results upon completion."""
     private const val TOOL_USAGE_GUIDELINES_CN = """
 调用工具时，用户会看到你的响应，然后会自动将工具结果发送回给你。
 
@@ -37,7 +44,14 @@ Based on user needs, proactively select the most appropriate tool or combination
 
 输出XML（如 <tool>）时，必须在XML前换行，并确保起始标签位于行首。
 
-根据用户需求，主动选择最合适的工具或工具组合。对于复杂任务，你可以分解问题并使用不同的工具逐步解决。使用每个工具后，清楚地解释执行结果并建议下一步。"""
+根据用户需求，主动选择最合适的工具或工具组合。对于复杂任务，你可以分解问题并使用不同的工具逐步解决。使用每个工具后，清楚地解释执行结果并建议下一步。
+
+## 子代理系统
+当你面对可以拆分为独立子任务的复杂任务时，使用 spawn_subagent 或 spawn_subagents_parallel 工具。
+- spawn_subagent：创建单个子代理执行一个独立任务
+- spawn_subagents_parallel：并行创建多个子代理同时执行多个独立任务，显著缩短总执行时间
+适用场景：多文件分析、多项独立检查、复杂任务拆分。不适用：简单单步操作、任务间有强依赖关系。
+子代理执行期间你会处于等待状态，完成后自动获得结果。"""
 
     private const val PACKAGE_SYSTEM_GUIDELINES_EN = """
 PACKAGE SYSTEM
