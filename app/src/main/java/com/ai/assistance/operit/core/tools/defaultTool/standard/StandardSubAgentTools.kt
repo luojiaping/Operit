@@ -7,7 +7,6 @@ import com.ai.assistance.operit.core.tools.StringResultData
 import com.ai.assistance.operit.data.model.AITool
 import com.ai.assistance.operit.data.model.ToolResult
 import com.ai.assistance.operit.util.AppLogger
-import kotlinx.serialization.json.Json
 import org.json.JSONArray
 
 /**
@@ -17,7 +16,6 @@ class StandardSubAgentTools(private val context: Context) {
 
     companion object {
         private const val TAG = "StandardSubAgentTools"
-        private val json = Json { ignoreUnknownKeys = true }
     }
 
     private val subAgentManager = SubAgentManager.getInstance(context)

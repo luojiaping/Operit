@@ -341,6 +341,10 @@ class SubAgentManager(private val context: Context) {
             appendLine("2. 完成后在回复的最后用 <result_summary> 标签包裹结果摘要")
             appendLine("3. 如果遇到无法解决的问题，用 <result_summary> 说明原因")
             appendLine("4. 结果摘要要简洁明确，2-3句话概括关键发现/完成的工作")
+            appendLine("5. 禁止调用 spawn_subagent 和 spawn_subagents_parallel 工具，你不具备创建子代理的权限")
+            if (!toolsWhitelist.isNullOrEmpty()) {
+                appendLine("6. 你只能使用以下工具：${toolsWhitelist.joinToString("、")}。其他工具不可用，不要尝试调用。")
+            }
             appendLine()
             appendLine("## 结果摘要格式（必须在回复末尾包含）")
             appendLine("<result_summary>")
