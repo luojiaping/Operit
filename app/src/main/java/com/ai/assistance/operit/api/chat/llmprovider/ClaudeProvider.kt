@@ -1037,21 +1037,24 @@ class ClaudeProvider(
             val format = getThinkingFormat()
             when (format) {
                 ThinkingFormat.ADAPTIVE -> {
-                    // adaptive thinking: thinking.type=adaptive + output_config.effort
+                    // adaptive thinking: thinking.type=adaptive
                     // Opus 4.8/4.7/Mythos default display to "omitted" (empty thinking),
                     // must explicitly set "summarized" to receive thinking content.
+                    val effort = resolveClaudeThinkingEffort(context)
                     val thinkingObject = JSONObject()
                     thinkingObject.put("type", "adaptive")
                     thinkingObject.put("display", "summarized")
+                    // effort 放在 thinking 对象内（标准 Anthropic API 格式）
+                    // 同时兼容放在 output_config 中（AWS Bedrock 格式）
+                    thinkingObject.put("effort", effort)
                     jsonObject.put("thinking", thinkingObject)
 
-                    // effort 参数放在独立的 output_config 对象中（Anthropic API规范）
-                    val effort = resolveClaudeThinkingEffort(context)
+                    // 兼容 Bedrock 格式：output_config.effort
                     val outputConfig = JSONObject()
                     outputConfig.put("effort", effort)
                     jsonObject.put("output_config", outputConfig)
 
-                    AppLogger.d("AIService", "启用Claude adaptive thinking, effort=$effort")
+                    AppLogger.d("AIService", "启用Claude adaptive thinking, display=summarized, effort=$effort")
                 }
                 ThinkingFormat.ENABLED -> {
                     // enabled thinking: thinking.type=enabled + budget_tokens
