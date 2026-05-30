@@ -5,18 +5,17 @@ import com.ai.assistance.operit.api.chat.EnhancedAIService
 import com.ai.assistance.operit.api.chat.EnhancedAIService.SendMessageOptions
 import com.ai.assistance.operit.data.model.SubAgentSession
 import com.ai.assistance.operit.data.model.SubAgentStatus
-import com.ai.assistance.operit.data.db.ObjectBoxManager
 import com.ai.assistance.operit.util.AppLogger
-import io.objectbox.Box
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import org.json.JSONArray
+import org.json.JSONObject
+import java.io.File
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
@@ -46,16 +45,92 @@ class SubAgentManager(private val context: Context) {
     // 子代理启动时间追踪（agentId -> 启动时间戳）
     private val agentStartTimes = ConcurrentHashMap<String, Long>()
 
-    // ─── 持久化 ────────────────────────────────────────────────
+    // 内存中的会话列表（全部会话，永久保留直到应用进程结束）
+    private val allSessions = mutableListOf<SubAgentSession>()
 
-    private fun getSessionBox(): Box<SubAgentSession> {
-        return ObjectBoxManager.get(context, "default").boxFor(SubAgentSession::class.java)
+    // ─── 持久化（JSON 文件） ──────────────────────────────────
+
+    private val storeDir: File by lazy {
+        File(context.filesDir, "subagent_sessions").also { it.mkdirs() }
     }
 
-    private fun saveSession(session: SubAgentSession): SubAgentSession {
-        val box = getSessionBox()
-        box.put(session)
-        return session
+    private fun saveSession(session: SubAgentSession) {
+        synchronized(allSessions) {
+            val existing = allSessions.indexOfFirst { it.agentId == session.agentId }
+            if (existing >= 0) allSessions[existing] = session else allSessions.add(session)
+        }
+        // 异步写入文件（不阻塞主线程）
+        try {
+            val file = File(storeDir, "${session.agentId}.json")
+            file.writeText(sessionToJson(session).toString())
+        } catch (e: Exception) {
+            AppLogger.w(TAG, "保存子代理会话文件失败: ${session.agentId}", e)
+        }
+    }
+
+    private fun loadSessionsFromDisk(): List<SubAgentSession> {
+        val sessions = mutableListOf<SubAgentSession>()
+        try {
+            storeDir.listFiles()?.forEach { file ->
+                if (file.extension == "json") {
+                    try {
+                        sessions.add(jsonToSession(JSONObject(file.readText())))
+                    } catch (e: Exception) {
+                        AppLogger.w(TAG, "读取子代理会话文件失败: ${file.name}", e)
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            AppLogger.w(TAG, "加载子代理会话目录失败", e)
+        }
+        return sessions
+    }
+
+    private fun sessionToJson(s: SubAgentSession): JSONObject = JSONObject().apply {
+        put("agentId", s.agentId)
+        put("parentChatId", s.parentChatId)
+        put("parentMessageTimestamp", s.parentMessageTimestamp)
+        put("generationId", s.generationId)
+        put("name", s.name)
+        put("task", s.task)
+        put("status", s.status)
+        put("createdAt", s.createdAt)
+        put("completedAt", s.completedAt)
+        put("resultSummary", s.resultSummary)
+        put("errorMessage", s.errorMessage)
+        put("toolsWhitelist", s.toolsWhitelist)
+        put("modelConfigId", s.modelConfigId)
+        put("maxRounds", s.maxRounds)
+        put("roundsUsed", s.roundsUsed)
+        put("subChatId", s.subChatId)
+    }
+
+    private fun jsonToSession(j: JSONObject): SubAgentSession = SubAgentSession(
+        agentId = j.optString("agentId", ""),
+        parentChatId = j.optString("parentChatId", ""),
+        parentMessageTimestamp = j.optLong("parentMessageTimestamp", 0),
+        generationId = j.optInt("generationId", 0),
+        name = j.optString("name", ""),
+        task = j.optString("task", ""),
+        status = j.optString("status", SubAgentStatus.PENDING),
+        createdAt = j.optLong("createdAt", 0),
+        completedAt = j.optLong("completedAt", 0),
+        resultSummary = j.optString("resultSummary", ""),
+        errorMessage = j.optString("errorMessage", ""),
+        toolsWhitelist = j.optString("toolsWhitelist", ""),
+        modelConfigId = j.optString("modelConfigId", ""),
+        maxRounds = j.optInt("maxRounds", 10),
+        roundsUsed = j.optInt("roundsUsed", 0),
+        subChatId = j.optString("subChatId", ""),
+    )
+
+    init {
+        // 启动时从磁盘加载历史会话
+        val loaded = loadSessionsFromDisk()
+        if (loaded.isNotEmpty()) {
+            synchronized(allSessions) { allSessions.addAll(loaded) }
+            AppLogger.i(TAG, "从磁盘加载了 ${loaded.size} 个子代理会话")
+        }
     }
 
     // ─── 查询 ──────────────────────────────────────────────────
@@ -64,24 +139,20 @@ class SubAgentManager(private val context: Context) {
      * 按 parentChatId 获取所有子代理，按 generationId 分组返回
      */
     fun getGenerationsForChat(parentChatId: String): List<SubAgentGeneration> {
-        val sessions = getSessionBox().query()
-            .equal(SubAgentSession_.parentChatId, parentChatId)
-            .orderDesc(SubAgentSession_.generationId)
-            .build()
-            .find()
-
-        // 实时状态优先（覆盖持久化状态），因为 RUNNING 状态可能还未持久化
+        val sessions = synchronized(allSessions) {
+            allSessions.filter { it.parentChatId == parentChatId }
+                .sortedByDescending { it.generationId }
+        }
         val liveStates = _activeStates.value
-
         return sessions
             .groupBy { it.generationId }
-            .map { (genId, genSessions) ->
+            .map { (_, genSessions) ->
                 SubAgentGeneration(
-                    generationId = genId,
+                    generationId = genSessions.first().generationId,
                     parentChatId = parentChatId,
-                    parentMessageTimestamp = genSessions.firstOrNull()?.parentMessageTimestamp ?: 0L,
-                    agents = genSessions.map { session ->
-                        liveStates[session.agentId] ?: sessionToCardState(session)
+                    parentMessageTimestamp = genSessions.first().parentMessageTimestamp,
+                    agents = genSessions.map { s ->
+                        liveStates[s.agentId] ?: sessionToCardState(s)
                     }
                 )
             }
@@ -368,11 +439,10 @@ class SubAgentManager(private val context: Context) {
      * 获取下一个 generationId（用于主代理确定新一批子代理的代号）
      */
     fun getNextGenerationId(parentChatId: String): Int {
-        val sessions = getSessionBox().query()
-            .equal(SubAgentSession_.parentChatId, parentChatId)
-            .orderDesc(SubAgentSession_.generationId)
-            .build()
-            .find()
-        return (sessions.firstOrNull()?.generationId ?: 0) + 1
+        val maxGenId = synchronized(allSessions) {
+            allSessions.filter { it.parentChatId == parentChatId }
+                .maxOfOrNull { it.generationId } ?: 0
+        }
+        return maxGenId + 1
     }
 }
