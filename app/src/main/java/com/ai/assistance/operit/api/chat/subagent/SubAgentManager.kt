@@ -3,7 +3,6 @@ package com.ai.assistance.operit.api.chat.subagent
 import android.content.Context
 import com.ai.assistance.operit.api.chat.EnhancedAIService
 import com.ai.assistance.operit.api.chat.EnhancedAIService.SendMessageOptions
-import com.ai.assistance.operit.data.model.FunctionType
 import com.ai.assistance.operit.data.model.SubAgentSession
 import com.ai.assistance.operit.data.model.SubAgentStatus
 import com.ai.assistance.operit.data.db.ObjectBoxManager
@@ -18,8 +17,8 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.withContext
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * 子代理管理器
@@ -44,7 +43,8 @@ class SubAgentManager(private val context: Context) {
     private val _activeStates = MutableStateFlow<Map<String, SubAgentCardState>>(emptyMap())
     val activeStates: StateFlow<Map<String, SubAgentCardState>> = _activeStates.asStateFlow()
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    // 子代理启动时间追踪（agentId -> 启动时间戳）
+    private val agentStartTimes = ConcurrentHashMap<String, Long>()
 
     // ─── 持久化 ────────────────────────────────────────────────
 
@@ -148,6 +148,9 @@ class SubAgentManager(private val context: Context) {
         var roundsUsed = 0
 
         try {
+            // 记录启动时间
+            agentStartTimes[agentId] = System.currentTimeMillis()
+
             // 更新状态为 RUNNING
             updateCardStatus(agentId, SubAgentStatus.RUNNING, currentStep = "启动中...")
 
@@ -291,14 +294,14 @@ class SubAgentManager(private val context: Context) {
         resultSummary: String? = null
     ) {
         val current = _activeStates.value[agentId] ?: return
+        val startTime = agentStartTimes[agentId] ?: System.currentTimeMillis()
         updateCardState(
             agentId,
             current.copy(
                 status = status,
                 currentStep = currentStep ?: current.currentStep,
                 resultSummary = resultSummary ?: current.resultSummary,
-                elapsedTimeMs = System.currentTimeMillis() - (current.elapsedTimeMs.takeIf { it > 0 }
-                    ?: System.currentTimeMillis())
+                elapsedTimeMs = System.currentTimeMillis() - startTime
             )
         )
     }

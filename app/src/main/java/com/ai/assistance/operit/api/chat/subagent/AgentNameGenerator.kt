@@ -1,6 +1,6 @@
 package com.ai.assistance.operit.api.chat.subagent
 
-import com.ai.assistance.operit.api.chat.enhance.MultiServiceManager
+import android.content.Context
 import com.ai.assistance.operit.data.model.FunctionType
 import com.ai.assistance.operit.util.AppLogger
 import kotlinx.coroutines.Dispatchers
@@ -69,12 +69,12 @@ object AgentNameGenerator {
      * 通过 SUMMARY 功能类型的 AIService，用一句话概括任务
      *
      * @param task 任务描述
-     * @param multiServiceManager 服务管理器
+     * @param context Android Context
      * @return 智能名称，失败时回退到快速提取
      */
     suspend fun generateSmartName(
         task: String,
-        multiServiceManager: MultiServiceManager
+        context: Context
     ): String {
         // 先用规则提取作为兜底
         val fallback = extractQuickName(task) ?: "子任务"
@@ -83,7 +83,8 @@ object AgentNameGenerator {
             // 尝试用 LLM 生成（限时 5 秒）
             val llmResult = withTimeoutOrNull(5000L) {
                 withContext(Dispatchers.IO) {
-                    val service = multiServiceManager.getServiceForFunction(FunctionType.SUMMARY)
+                    val service = com.ai.assistance.operit.api.chat.EnhancedAIService
+                        .getAIServiceForFunction(context, FunctionType.SUMMARY)
                     val prompt = buildString {
                         appendLine("请用1-4个中文字概括以下任务的核心目标。")
                         appendLine("只输出名称，不要标点符号，不要解释。")
@@ -92,7 +93,7 @@ object AgentNameGenerator {
                     }
                     val result = StringBuilder()
                     service.sendMessage(
-                        context = null, // 不需要 context
+                        context = context,
                         chatHistory = listOf(
                             com.ai.assistance.operit.core.chat.hooks.PromptTurn(
                                 kind = com.ai.assistance.operit.core.chat.hooks.PromptTurnKind.USER,

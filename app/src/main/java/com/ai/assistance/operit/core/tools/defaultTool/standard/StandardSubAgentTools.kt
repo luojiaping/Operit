@@ -2,16 +2,13 @@ package com.ai.assistance.operit.core.tools.defaultTool.standard
 
 import android.content.Context
 import com.ai.assistance.operit.api.chat.subagent.SubAgentManager
-import com.ai.assistance.operit.api.chat.subagent.SubAgentResultData
 import com.ai.assistance.operit.api.chat.subagent.SubAgentTask
-import com.ai.assistance.operit.api.chat.subagent.SubAgentsParallelResultData
-import com.ai.assistance.operit.core.tools.ToolResultData
 import com.ai.assistance.operit.core.tools.StringResultData
 import com.ai.assistance.operit.data.model.AITool
 import com.ai.assistance.operit.data.model.ToolResult
 import com.ai.assistance.operit.util.AppLogger
+import kotlinx.serialization.json.Json
 import org.json.JSONArray
-import org.json.JSONObject
 
 /**
  * 子代理工具实现
@@ -20,6 +17,7 @@ class StandardSubAgentTools(private val context: Context) {
 
     companion object {
         private const val TAG = "StandardSubAgentTools"
+        private val json = Json { ignoreUnknownKeys = true }
     }
 
     private val subAgentManager = SubAgentManager.getInstance(context)
@@ -61,7 +59,7 @@ class StandardSubAgentTools(private val context: Context) {
             ToolResult(
                 toolName = tool.name,
                 success = result.success,
-                result = result,
+                result = StringResultData(result.toDisplayString()),
                 error = if (!result.success) result.errorMessage else ""
             )
         } catch (e: Exception) {
@@ -105,21 +103,22 @@ class StandardSubAgentTools(private val context: Context) {
                 tasks = tasks,
             )
             val totalElapsed = System.currentTimeMillis() - startTime
+            val successCount = results.count { it.success }
+            val failedCount = results.count { !it.success }
 
-            val parallelResult = SubAgentsParallelResultData(
-                results = results,
-                totalCount = results.size,
-                successCount = results.count { it.success },
-                failedCount = results.count { !it.success },
-                totalElapsedMs = totalElapsed,
-            )
+            val displayString = buildString {
+                appendLine("并行子代理执行完成: $successCount/${results.size} 成功 (耗时${totalElapsed}ms)")
+                results.forEach { r ->
+                    val status = if (r.success) "✅" else "❌"
+                    appendLine("  $status ${r.agentName}: ${r.resultSummary.take(80)}")
+                }
+            }
 
             ToolResult(
                 toolName = tool.name,
-                success = parallelResult.failedCount == 0,
-                result = parallelResult,
-                error = if (parallelResult.failedCount > 0)
-                    "${parallelResult.failedCount}/${parallelResult.totalCount} 个子代理失败" else ""
+                success = failedCount == 0,
+                result = StringResultData(displayString),
+                error = if (failedCount > 0) "$failedCount/${results.size} 个子代理失败" else ""
             )
         } catch (e: Exception) {
             AppLogger.e(TAG, "spawn_subagents_parallel 失败", e)

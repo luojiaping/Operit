@@ -1,10 +1,12 @@
 package com.ai.assistance.operit.api.chat.subagent
 
-import com.ai.assistance.operit.core.tools.ToolResultData
 import kotlinx.serialization.Serializable
 
 /**
  * 子代理工具的返回值数据类
+ * 注意：由于 ToolResultData 是 sealed class，子类必须在同包。
+ *       这里用独立的 @Serializable data class，由 StandardSubAgentTools 在 ToolResult 中
+ *       通过 StringResultData 包装返回。
  */
 @Serializable
 data class SubAgentResultData(
@@ -17,8 +19,8 @@ data class SubAgentResultData(
     val elapsedTimeMs: Long = 0,
     val roundsUsed: Int = 0,
     val subChatId: String = "",
-) : ToolResultData() {
-    override fun toString(): String {
+) {
+    fun toDisplayString(): String {
         return if (success) {
             "[$agentName] 完成: $resultSummary (耗时${elapsedTimeMs}ms, ${roundsUsed}轮)"
         } else {
@@ -37,8 +39,8 @@ data class SubAgentsParallelResultData(
     val successCount: Int,
     val failedCount: Int,
     val totalElapsedMs: Long,
-) : ToolResultData() {
-    override fun toString(): String {
+) {
+    fun toDisplayString(): String {
         return buildString {
             appendLine("并行子代理执行完成: $successCount/$totalCount 成功")
             results.forEach { r ->
