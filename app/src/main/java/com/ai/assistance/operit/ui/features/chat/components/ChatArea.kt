@@ -103,6 +103,11 @@ import java.util.Date
 import java.util.Locale
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
+import com.ai.assistance.operit.api.chat.subagent.SubAgentCardState
+import com.ai.assistance.operit.api.chat.subagent.SubAgentGeneration
+import com.ai.assistance.operit.api.chat.subagent.SubAgentManager
+import com.ai.assistance.operit.ui.features.chat.components.subagent.SubAgentPanelView
+import com.ai.assistance.operit.ui.features.chat.components.subagent.SubAgentDetailSheet
 
 /**
  * 清理消息中的XML标签，保留Markdown格式和纯文本内容
@@ -217,6 +222,14 @@ fun ChatArea(
     val density = LocalDensity.current
     val coroutineScope = rememberCoroutineScope()
     val preferencesManager = remember { UserPreferencesManager.getInstance(context) }
+
+    // ─── 子代理状态 ────────────────────────────────────────
+    val subAgentManager = remember { SubAgentManager.getInstance(context) }
+    val activeSubAgentStates by subAgentManager.activeStates.collectAsState()
+    val subAgentGenerations = remember(activeSubAgentStates, currentChatId) {
+        subAgentManager.getGenerationsForChat(currentChatId)
+    }
+    var selectedSubAgent by remember { mutableStateOf<SubAgentCardState?>(null) }
     val showMessageTokenStats by
         preferencesManager.showMessageTokenStats.collectAsState(initial = false)
     val showMessageTimingStats by
@@ -436,6 +449,24 @@ fun ChatArea(
                     }
                 }
 
+                // 子代理面板：在 AI 消息下方显示（当该消息关联了子代理时）
+                val relatedGens = remember(subAgentGenerations, message.timestamp, message.sender) {
+                    if (message.sender == "ai") {
+                        subAgentGenerations.filter { gen ->
+                            gen.agents.any { it.status == com.ai.assistance.operit.data.model.SubAgentStatus.RUNNING ||
+                                it.status == com.ai.assistance.operit.data.model.SubAgentStatus.PENDING } ||
+                            gen.parentMessageTimestamp == message.timestamp
+                        }
+                    } else emptyList()
+                }
+                if (relatedGens.isNotEmpty()) {
+                    SubAgentPanelView(
+                        generations = relatedGens,
+                        onAgentClick = { agent -> selectedSubAgent = agent },
+                        modifier = Modifier.padding(horizontal = 8.dp)
+                    )
+                }
+
                 Spacer(modifier = Modifier.height(8.dp))
             }
 
@@ -544,6 +575,15 @@ fun ChatArea(
                     .align(Alignment.CenterEnd)
                     .offset(y = (-56).dp)
                     .padding(end = 10.dp),
+        )
+    }
+
+    // ─── 子代理详情弹窗 ────────────────────────────────────
+    selectedSubAgent?.let { agent ->
+        SubAgentDetailSheet(
+            agentState = agent,
+            chatHistory = emptyList(), // TODO: 从 ObjectBox 加载子代理对话历史
+            onDismiss = { selectedSubAgent = null }
         )
     }
 }
