@@ -367,7 +367,7 @@ fun ChatArea(
                 val isLastAiMessage = actualIndex == messagesCount - 1 && message.sender == "ai"
                 val shouldHide = shouldHideLastAiMessage && isLastAiMessage
 
-                key("${actualIndex}_${message.timestamp}") {
+                key(message.timestamp) {
                     Box(
                         modifier =
                             Modifier.onGloballyPositioned { coordinates ->
