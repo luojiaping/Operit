@@ -1405,6 +1405,8 @@
     <string name="speech_error_init_failed">Failed to initialize speech recognition engine</string>
     <string name="speech_error_not_initialized">Speech recognition engine not initialized</string>
     <string name="title_activity_crash_report">Application Error</string>
+    <string name="title_activity_data_recovery">数据救援</string>
+    <string name="shortcut_data_recovery">数据救援</string>
 
     <!-- Crash Report Screen -->
     <string name="crash_report_header">应用遇到了一个无法恢复的错误，需要重启。</string>
@@ -5087,6 +5089,11 @@
     <string name="content_label">内容</string>
     <string name="tag_example">例如: code, image, bold</string>
     <string name="attributes_example">例如: id="example" class="test"</string>
+    <string name="xml_tag_menu_title">可用标签</string>
+    <string name="xml_tag_menu_content_description">选择可用标签</string>
+    <string name="xml_tag_desc_font">文字样式</string>
+    <string name="xml_tag_desc_details">可折叠内容</string>
+    <string name="xml_tag_desc_meta">元信息</string>
     <string name="new_tag">新建标签</string>
     <string name="create_new_xml_tag">创建一个新的XML标签</string>
     <string name="modify_xml_tag_content">修改XML标签内容</string>
@@ -5308,6 +5315,8 @@
     <string name="keep_screen_on_description">保持屏幕常亮，防止在对话时自动锁屏</string>
     <string name="enable_navigation_animation">新版导航动画</string>
     <string name="enable_navigation_animation_description">开启后，同时启用手机侧边栏与页面切换的增强动画效果。关闭后使用简洁的导航过渡。</string>
+    <string name="start_with_new_chat">启动时新建空白聊天</string>
+    <string name="start_with_new_chat_description">开启后，每次启动应用都会进入一个新的空白聊天界面，不再自动打开上一次聊天。</string>
     <string name="software_identity_title">软件标识</string>
     <string name="software_identity_description">更改侧边栏顶部显示的软件标识。</string>
     <string name="software_identity_option_operit">Operit AI</string>

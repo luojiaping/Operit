@@ -22,6 +22,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.core.app.NotificationCompat
 import androidx.lifecycle.Lifecycle
 import com.ai.assistance.operit.core.application.ForegroundServiceCompat
+import com.ai.assistance.operit.core.application.OperitApplication
 import com.ai.assistance.operit.R
 import com.ai.assistance.operit.api.chat.AIForegroundService
 import com.ai.assistance.operit.api.chat.ChatRuntimeHolder
@@ -198,6 +199,7 @@ class FloatingChatService : Service(), FloatingWindowCallback {
 
     override fun onCreate() {
         super.onCreate()
+        (application as OperitApplication).initializeMainApplication()
         AppLogger.d(TAG, "onCreate")
 
         instance = this

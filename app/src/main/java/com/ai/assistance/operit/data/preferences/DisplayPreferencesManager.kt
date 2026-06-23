@@ -47,6 +47,8 @@ class DisplayPreferencesManager private constructor(private val context: Context
         private val KEY_ENABLE_ENTER_TO_SEND = booleanPreferencesKey("enable_enter_to_send")
         private val KEY_ENABLE_NAVIGATION_ANIMATION =
             booleanPreferencesKey("enable_navigation_animation")
+        private val KEY_START_WITH_NEW_CHAT =
+            booleanPreferencesKey("start_with_new_chat")
 
         // 全局用户资料的 Key
         private val KEY_GLOBAL_USER_AVATAR_URI = stringPreferencesKey("global_user_avatar_uri")
@@ -127,6 +129,15 @@ class DisplayPreferencesManager private constructor(private val context: Context
         }
 
     /**
+     * 是否每次启动应用时新建空白聊天
+     * 默认值：false
+     */
+    val startWithNewChat: Flow<Boolean> =
+        context.displayPreferencesDataStore.data.map { preferences ->
+            preferences[KEY_START_WITH_NEW_CHAT] ?: false
+        }
+
+    /**
      * 全局用户头像URI
      */
     val globalUserAvatarUri: Flow<String?> =
@@ -197,6 +208,7 @@ class DisplayPreferencesManager private constructor(private val context: Context
         enableReplyNotificationVibration: Boolean? = null,
         enableEnterToSend: Boolean? = null,
         enableNavigationAnimation: Boolean? = null,
+        startWithNewChat: Boolean? = null,
         globalUserAvatarUri: String? = null,
         globalUserName: String? = null,
         enableBackgroundKeepAlive: Boolean? = null,
@@ -221,6 +233,9 @@ class DisplayPreferencesManager private constructor(private val context: Context
             enableEnterToSend?.let { preferences[KEY_ENABLE_ENTER_TO_SEND] = it }
             enableNavigationAnimation?.let {
                 preferences[KEY_ENABLE_NAVIGATION_ANIMATION] = it
+            }
+            startWithNewChat?.let {
+                preferences[KEY_START_WITH_NEW_CHAT] = it
             }
             globalUserAvatarUri?.let { preferences[KEY_GLOBAL_USER_AVATAR_URI] = it }
             globalUserName?.let { preferences[KEY_GLOBAL_USER_NAME] = it }
@@ -289,6 +304,7 @@ class DisplayPreferencesManager private constructor(private val context: Context
             preferences[KEY_ENABLE_REPLY_NOTIFICATION_VIBRATION] = false
             preferences[KEY_ENABLE_ENTER_TO_SEND] = false
             preferences.remove(KEY_ENABLE_NAVIGATION_ANIMATION)
+            preferences[KEY_START_WITH_NEW_CHAT] = false
             preferences.remove(KEY_GLOBAL_USER_AVATAR_URI)
             preferences.remove(KEY_GLOBAL_USER_NAME)
             preferences[KEY_ENABLE_BACKGROUND_KEEP_ALIVE] = false

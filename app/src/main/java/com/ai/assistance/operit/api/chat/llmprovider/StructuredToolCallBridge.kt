@@ -432,7 +432,7 @@ internal object StructuredToolCallBridge {
             }.getOrNull()
 
             val toolTagName = ChatMarkupRegex.generateRandomToolTagName()
-            xml.append("<")
+            xml.append("\n<")
                 .append(toolTagName)
                 .append(" name=\"")
                 .append(name)
@@ -460,7 +460,7 @@ internal object StructuredToolCallBridge {
                 .append(">\n")
         }
 
-        return xml.toString().trim()
+        return xml.toString().trimEnd()
     }
 
     private fun parsePossibleToolCallsFromText(content: String): JSONArray? {

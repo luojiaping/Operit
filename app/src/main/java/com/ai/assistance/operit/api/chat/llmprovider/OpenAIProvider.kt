@@ -1218,7 +1218,7 @@ open class OpenAIProvider(
 
             // 构建XML格式
             val toolTagName = ChatMarkupRegex.generateRandomToolTagName()
-            xml.append("<$toolTagName name=\"$name\">")
+            xml.append("\n<$toolTagName name=\"$name\">")
 
             // 添加所有参数
             val keys = params.keys()
@@ -2411,7 +2411,7 @@ open class OpenAIProvider(
                                     if (parsed.toolCalls.length() > 0 && enableToolCall) {
                                         val xmlToolCalls = convertToolCallsToXml(parsed.toolCalls)
                                         if (xmlToolCalls.isNotEmpty()) {
-                                            emitter.emitContent("\n" + xmlToolCalls)
+                                            emitter.emitContent(xmlToolCalls)
                                             AppLogger.d(
                                                 "AIService",
                                                 "Tool Call转XML (Responses非流式): $xmlToolCalls"
@@ -2431,7 +2431,7 @@ open class OpenAIProvider(
                                             if (toolCalls != null && toolCalls.length() > 0 && enableToolCall) {
                                                 val xmlToolCalls = convertToolCallsToXml(toolCalls)
                                                 if (xmlToolCalls.isNotEmpty()) {
-                                                    emitter.emitContent("\n" + xmlToolCalls)
+                                                    emitter.emitContent(xmlToolCalls)
                                                     AppLogger.d(
                                                         "AIService",
                                                         "Tool Call转XML (非流式): $xmlToolCalls"

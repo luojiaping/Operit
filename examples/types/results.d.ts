@@ -628,7 +628,7 @@ export interface TerminalCommandResultData {
     /** ID of the terminal session used for execution */
     sessionId: string;
 
-    /** Whether this execution ended due to timeout. Timeout still resolves normally. */
+    /** Whether this execution ended due to timeout. On timeout, the current command is cancelled and the terminal session is kept. */
     timedOut?: boolean;
 
     /** Returns a formatted string representation of the terminal execution result */
@@ -677,7 +677,7 @@ export interface HiddenTerminalCommandResultData {
     /** Hidden executor key used for execution */
     executorKey: string;
 
-    /** Whether this execution ended due to timeout. Timeout still resolves normally. */
+    /** Whether this execution ended due to timeout. On timeout, the current command is cancelled and the terminal session is kept. */
     timedOut?: boolean;
 
     /** Returns a formatted string representation of the hidden terminal execution result */
@@ -756,8 +756,6 @@ export interface TerminalSessionScreenResultData {
     cols: number;
     /** Current visible screen text content */
     content: string;
-    /** Whether the current session has a tool-managed command still executing */
-    commandRunning?: boolean;
     /** Returns a formatted string representation */
     toString(): string;
 }

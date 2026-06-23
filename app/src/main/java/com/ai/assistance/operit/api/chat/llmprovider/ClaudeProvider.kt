@@ -54,6 +54,7 @@ class ClaudeProvider(
     private val ANTHROPIC_VERSION = "2023-06-01" // Claude API版本
     private val PROMPT_CACHE_CONTROL_TYPE = "ephemeral"
     private val DEFAULT_MAX_TOKENS = 4096
+    private val EMPTY_MESSAGE_TEXT = "[Empty]"
 
     // 当前活跃的Call对象，用于取消流式传输
     private var activeCall: Call? = null
@@ -439,7 +440,22 @@ class ClaudeProvider(
     /**
      * 构建包含文本和图片的content数组
      */
-    private fun buildContentArray(text: String): JSONArray {
+    private fun appendTextContentBlock(target: JSONArray, text: String): Boolean {
+        if (text.isBlank()) {
+            return false
+        }
+        target.put(JSONObject().apply {
+            put("type", "text")
+            put("text", text)
+        })
+        return true
+    }
+
+    private fun nonEmptyContentText(text: String): String {
+        return if (text.isBlank()) EMPTY_MESSAGE_TEXT else text
+    }
+
+    private fun buildContentArray(text: String, allowEmptyArray: Boolean = false): JSONArray {
         val contentArray = JSONArray()
 
         val textAfterMediaRemoval = if (MediaLinkParser.hasMediaLinks(text)) {
@@ -467,18 +483,15 @@ class ClaudeProvider(
             }
             
             // 添加文本（如果有）
-            if (textWithoutLinks.isNotEmpty()) {
-                contentArray.put(JSONObject().apply {
-                    put("type", "text")
-                    put("text", textWithoutLinks)
-                })
-            }
+            appendTextContentBlock(contentArray, textWithoutLinks)
         } else {
             // 纯文本消息
-            contentArray.put(JSONObject().apply {
-                put("type", "text")
-                put("text", textAfterMediaRemoval)
-            })
+            appendTextContentBlock(contentArray, textAfterMediaRemoval)
+        }
+
+        if (!allowEmptyArray && contentArray.length() == 0) {
+            AppLogger.d("AIService", "发现空的Claude消息，填充为[空消息]")
+            appendTextContentBlock(contentArray, EMPTY_MESSAGE_TEXT)
         }
         
         return contentArray
@@ -662,7 +675,7 @@ class ClaudeProvider(
                 ?.joinToString("\n\n") { it.content }
         val systemBlocks =
             systemPrompt
-                ?.takeIf { it.isNotEmpty() }
+                ?.takeIf { it.isNotBlank() }
                 ?.let { prompt ->
                     JSONArray().put(
                         JSONObject().apply {
@@ -808,7 +821,13 @@ class ClaudeProvider(
                     PromptTurnKind.SUMMARY -> {
                         val contentArray = JSONArray()
                         appendCancelledOpenToolUses(contentArray, "user_boundary")
-                        appendContentBlocks(contentArray, buildContentArray(content))
+                        appendContentBlocks(
+                            contentArray,
+                            buildContentArray(
+                                content,
+                                allowEmptyArray = contentArray.length() > 0
+                            )
+                        )
                         messagesArray.put(
                             JSONObject().apply {
                                 put("role", "user")
@@ -832,7 +851,7 @@ class ClaudeProvider(
                                     JSONObject().apply {
                                         put("type", "tool_result")
                                         put("tool_use_id", openToolUseIds[index])
-                                        put("content", resultContent)
+                                        put("content", nonEmptyContentText(resultContent))
                                     }
                                 )
                                 AppLogger.d(
@@ -871,7 +890,8 @@ class ClaudeProvider(
                                     when {
                                         textContent.isNotEmpty() -> textContent
                                         else -> content
-                                    }
+                                    },
+                                    allowEmptyArray = contentArray.length() > 0
                                 )
                             )
                             messagesArray.put(

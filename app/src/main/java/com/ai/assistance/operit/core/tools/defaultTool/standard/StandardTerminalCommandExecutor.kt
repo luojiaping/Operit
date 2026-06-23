@@ -11,6 +11,7 @@ import com.ai.assistance.operit.terminal.provider.type.HiddenExecResult
 import com.ai.assistance.operit.terminal.view.domain.ansi.TerminalChar
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import java.util.concurrent.ConcurrentHashMap
 
@@ -22,6 +23,7 @@ class StandardTerminalCommandExecutor(private val context: Context) {
     companion object {
         // 用于将会话名称映射到会话ID
         private val sessionNameToIdMap = ConcurrentHashMap<String, String>()
+        private const val COMMAND_CANCEL_SETTLE_TIMEOUT_MS = 3_000L
     }
 
 
@@ -144,6 +146,7 @@ class StandardTerminalCommandExecutor(private val context: Context) {
                         }
                     } catch (e: TimeoutCancellationException) {
                         AppLogger.w(TAG, "Command execution timed out after ${timeout}ms")
+                        cancelTimedOutCommand(terminal, sessionId)
                         hasCompleted = true
                         exitCode = -1
                         didTimeout = true
@@ -293,6 +296,7 @@ class StandardTerminalCommandExecutor(private val context: Context) {
                 }
             } catch (e: TimeoutCancellationException) {
                 AppLogger.w(TAG, "Command execution timed out after ${timeout}ms")
+                cancelTimedOutCommand(terminal, sessionId)
                 hasCompleted = true
                 exitCode = -1
                 didTimeout = true
@@ -561,7 +565,6 @@ class StandardTerminalCommandExecutor(private val context: Context) {
                 val content = renderSingleScreen(screen)
                 val rows = screen.size
                 val cols = if (rows > 0) screen[0].size else 0
-                val commandRunning = session.currentExecutingCommand?.isExecuting == true
 
                 ToolResult(
                     toolName = tool.name,
@@ -570,8 +573,7 @@ class StandardTerminalCommandExecutor(private val context: Context) {
                         sessionId = sessionId,
                         rows = rows,
                         cols = cols,
-                        content = content,
-                        commandRunning = commandRunning
+                        content = content
                     )
                 )
             } catch (e: Exception) {
@@ -598,6 +600,20 @@ class StandardTerminalCommandExecutor(private val context: Context) {
         }
 
         return lines.joinToString("\n")
+    }
+
+    private suspend fun cancelTimedOutCommand(terminal: Terminal, sessionId: String) {
+        terminal.sendInterruptSignal(sessionId)
+        val settled =
+            withTimeoutOrNull(COMMAND_CANCEL_SETTLE_TIMEOUT_MS) {
+                terminal.terminalState.first { state ->
+                    val session = state.sessions.find { it.id == sessionId }
+                    session?.currentExecutingCommand?.isExecuting != true
+                }
+            }
+        if (settled == null) {
+            AppLogger.w(TAG, "Timed-out command cancellation did not settle within ${COMMAND_CANCEL_SETTLE_TIMEOUT_MS}ms")
+        }
     }
 
     private fun extractHiddenExecOutput(result: HiddenExecResult): String {

@@ -36,6 +36,7 @@ import com.ai.assistance.operit.data.model.PromptFunctionType
 import com.ai.assistance.operit.data.model.ToolInvocation
 import com.ai.assistance.operit.data.model.ToolResult
 import com.ai.assistance.operit.data.model.ModelConfigData
+import com.ai.assistance.operit.data.model.ModelParameter
 import com.ai.assistance.operit.data.model.AITool
 import com.ai.assistance.operit.data.preferences.ApiPreferences
 import com.ai.assistance.operit.data.preferences.ExternalHttpApiPreferences
@@ -59,6 +60,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.coroutineScope
@@ -410,6 +412,17 @@ class EnhancedAIService private constructor(private val context: Context) {
     private val characterCardToolAccessResolver = CharacterCardToolAccessResolver.getInstance(context)
 
     // Execution context for a single sendMessage call to achieve concurrency
+    private data class ModelExecutionSnapshot(
+        val lease: MultiServiceManager.ServiceLease
+    ) {
+        val service: AIService
+            get() = lease.service
+        val config: ModelConfigData
+            get() = lease.modelConfig
+        val modelParameters: List<ModelParameter<*>>
+            get() = lease.modelParameters
+    }
+
     private data class MessageExecutionContext(
         val executionId: Int,
         val streamBuffer: StringBuilder = StringBuilder(),
@@ -417,6 +430,7 @@ class EnhancedAIService private constructor(private val context: Context) {
         val isConversationActive: AtomicBoolean = AtomicBoolean(true),
         val conversationHistory: MutableList<PromptTurn>,
         val eventChannel: MutableSharedStream<TextStreamEvent>,
+        var modelExecutionSnapshot: ModelExecutionSnapshot? = null
     )
 
     private val activeExecutionContexts = ConcurrentHashMap<Int, MessageExecutionContext>()
@@ -445,6 +459,35 @@ class EnhancedAIService private constructor(private val context: Context) {
     private fun isExecutionContextActive(context: MessageExecutionContext): Boolean {
         return context.isConversationActive.get() &&
             activeExecutionContexts[context.executionId] === context
+    }
+
+    private suspend fun getModelExecutionSnapshot(
+        context: MessageExecutionContext,
+        functionType: FunctionType,
+        chatModelConfigIdOverride: String?,
+        chatModelIndexOverride: Int?
+    ): ModelExecutionSnapshot {
+        context.modelExecutionSnapshot?.let { return it }
+        ensureInitialized()
+        val overrideConfigId = chatModelConfigIdOverride?.takeIf { it.isNotBlank() }
+        val lease =
+            if (functionType == FunctionType.CHAT && overrideConfigId != null) {
+                multiServiceManager.acquireServiceForConfig(
+                    configId = overrideConfigId,
+                    modelIndex = (chatModelIndexOverride ?: 0).coerceAtLeast(0)
+                )
+            } else {
+                multiServiceManager.acquireServiceForFunction(functionType)
+            }
+        val snapshot = ModelExecutionSnapshot(lease)
+        context.modelExecutionSnapshot = snapshot
+        return snapshot
+    }
+
+    private suspend fun releaseModelExecutionSnapshot(context: MessageExecutionContext) {
+        val snapshot = context.modelExecutionSnapshot ?: return
+        context.modelExecutionSnapshot = null
+        snapshot.lease.close()
     }
 
     private suspend fun startAssistantResponseRound(context: MessageExecutionContext) {
@@ -697,6 +740,12 @@ class EnhancedAIService private constructor(private val context: Context) {
         stream: Boolean = true,
         publishEstimate: Boolean = true
     ): Int {
+        val modelConfig =
+            getModelConfigForFunction(
+                functionType = functionType,
+                chatModelConfigIdOverride = chatModelConfigIdOverride,
+                chatModelIndexOverride = chatModelIndexOverride
+            )
         val preparedHistory =
             prepareConversationHistory(
                 chatHistory = chatHistory,
@@ -712,8 +761,7 @@ class EnhancedAIService private constructor(private val context: Context) {
                 proxySenderName = proxySenderName,
                 isSubTask = isSubTask,
                 functionType = functionType,
-                chatModelConfigIdOverride = chatModelConfigIdOverride,
-                chatModelIndexOverride = chatModelIndexOverride,
+                modelConfig = modelConfig,
                 preferenceProfileIdOverride = preferenceProfileIdOverride,
                 dispatchHistoryHooks = PromptHookRegistry::dispatchPromptEstimateHistoryHooks,
                 dispatchSystemPromptComposeHooks = ::bypassPromptHooks,
@@ -738,8 +786,7 @@ class EnhancedAIService private constructor(private val context: Context) {
                 chatId = chatId,
                 promptFunctionType = promptFunctionType,
                 roleCardId = roleCardId,
-                chatModelConfigIdOverride = chatModelConfigIdOverride,
-                chatModelIndexOverride = chatModelIndexOverride
+                modelConfig = modelConfig
             )
 
         var finalProcessedInput = message
@@ -892,6 +939,13 @@ class EnhancedAIService private constructor(private val context: Context) {
                     }
 
                     val startTime = messageTimingNow()
+                    val modelSnapshot =
+                        getModelExecutionSnapshot(
+                            execContext,
+                            functionType,
+                            chatModelConfigIdOverride,
+                            chatModelIndexOverride
+                        )
 
                     // Prepare conversation history with system prompt
                     val preparedHistory =
@@ -909,8 +963,7 @@ class EnhancedAIService private constructor(private val context: Context) {
                                     proxySenderName,
                                     isSubTask,
                                     functionType,
-                                    chatModelConfigIdOverride,
-                                    chatModelIndexOverride,
+                                    modelSnapshot.config,
                                     preferenceProfileIdOverride
                             )
                     val tAfterPrepareHistory = messageTimingNow()
@@ -928,20 +981,12 @@ class EnhancedAIService private constructor(private val context: Context) {
                     }
 
                     // Get all model parameters from preferences (with enabled state)
-                    val modelParameters = getModelParametersForFunction(
-                        functionType = functionType,
-                        chatModelConfigIdOverride = chatModelConfigIdOverride,
-                        chatModelIndexOverride = chatModelIndexOverride
-                    )
+                    val modelParameters = modelSnapshot.modelParameters
                     val tAfterModelParams = messageTimingNow()
                     AppLogger.d(TAG, "sendMessage本地耗时: getModelParametersForFunction=${tAfterModelParams - tAfterPrepareHistory}ms")
 
                     // 获取对应功能类型的AIService实例
-                    val serviceForFunction = getAIServiceForFunction(
-                        functionType = functionType,
-                        chatModelConfigIdOverride = chatModelConfigIdOverride,
-                        chatModelIndexOverride = chatModelIndexOverride
-                    )
+                    val serviceForFunction = modelSnapshot.service
                     val tAfterGetService = messageTimingNow()
                     AppLogger.d(TAG, "sendMessage本地耗时: getAIServiceForFunction=${tAfterGetService - tAfterModelParams}ms")
 
@@ -957,8 +1002,7 @@ class EnhancedAIService private constructor(private val context: Context) {
                         chatId = chatId,
                         promptFunctionType = promptFunctionType,
                         roleCardId = roleCardId,
-                        chatModelConfigIdOverride = chatModelConfigIdOverride,
-                        chatModelIndexOverride = chatModelIndexOverride
+                        modelConfig = modelSnapshot.config
                     )
                     val tAfterGetTools = messageTimingNow()
                     AppLogger.d(TAG, "sendMessage本地耗时: getAvailableToolsForFunction=${tAfterGetTools - tAfterGetService}ms")
@@ -1222,6 +1266,9 @@ class EnhancedAIService private constructor(private val context: Context) {
                     }
                 } finally {
                     unregisterExecutionContext(execContext)
+                    withContext(NonCancellable) {
+                        releaseModelExecutionSnapshot(execContext)
+                    }
                 }
             }
         }
@@ -2010,11 +2057,13 @@ class EnhancedAIService private constructor(private val context: Context) {
         }
 
         val processToolJob = toolProcessingScope.launch {
-            val config = getModelConfigForFunction(
-                functionType = functionType,
-                chatModelConfigIdOverride = chatModelConfigIdOverride,
-                chatModelIndexOverride = chatModelIndexOverride
+            val modelSnapshot = getModelExecutionSnapshot(
+                context,
+                functionType,
+                chatModelConfigIdOverride,
+                chatModelIndexOverride
             )
+            val config = modelSnapshot.config
             val allToolResults = ToolExecutionManager.executeInvocations(
                 invocations = toolInvocations,
                 context = this@EnhancedAIService.context,
@@ -2187,18 +2236,16 @@ class EnhancedAIService private constructor(private val context: Context) {
         delay(300)
 
         // Get all model parameters from preferences (with enabled state)
-        val modelParameters = getModelParametersForFunction(
-            functionType = functionType,
-            chatModelConfigIdOverride = chatModelConfigIdOverride,
-            chatModelIndexOverride = chatModelIndexOverride
+        val modelSnapshot = getModelExecutionSnapshot(
+            context,
+            functionType,
+            chatModelConfigIdOverride,
+            chatModelIndexOverride
         )
+        val modelParameters = modelSnapshot.modelParameters
 
         // 获取对应功能类型的AIService实例
-        val serviceForFunction = getAIServiceForFunction(
-            functionType = functionType,
-            chatModelConfigIdOverride = chatModelConfigIdOverride,
-            chatModelIndexOverride = chatModelIndexOverride
-        )
+        val serviceForFunction = modelSnapshot.service
         
         // 获取工具列表（如果启用Tool Call）- 提前获取，以便在token计算中使用
         val availableTools = getAvailableToolsForFunction(
@@ -2206,8 +2253,7 @@ class EnhancedAIService private constructor(private val context: Context) {
             chatId = chatId,
             promptFunctionType = promptFunctionType,
             roleCardId = roleCardId,
-            chatModelConfigIdOverride = chatModelConfigIdOverride,
-            chatModelIndexOverride = chatModelIndexOverride
+            modelConfig = modelSnapshot.config
         )
  
         val currentTokens = estimatePreparedRequestWindow(
@@ -2556,8 +2602,7 @@ class EnhancedAIService private constructor(private val context: Context) {
             proxySenderName: String? = null,
             isSubTask: Boolean = false,
             functionType: FunctionType = FunctionType.CHAT,
-            chatModelConfigIdOverride: String? = null,
-            chatModelIndexOverride: Int? = null,
+            modelConfig: ModelConfigData,
             preferenceProfileIdOverride: String? = null,
             dispatchHistoryHooks: (PromptHookContext) -> PromptHookContext =
                 PromptHookRegistry::dispatchPromptHistoryHooks,
@@ -2573,11 +2618,7 @@ class EnhancedAIService private constructor(private val context: Context) {
         val hasVideoRecognition = if (isSubTask) false else multiServiceManager.hasVideoRecognitionConfigured()
 
         // 获取当前功能类型（通常是聊天模型）的模型配置，用于判断聊天模型是否自带识图能力
-        val config = getModelConfigForFunction(
-            functionType = functionType,
-            chatModelConfigIdOverride = chatModelConfigIdOverride,
-            chatModelIndexOverride = chatModelIndexOverride
-        )
+        val config = modelConfig
         val useToolCallApi = config.enableToolCall
         val chatModelHasDirectImage = config.enableDirectImageProcessing
         val chatModelHasDirectAudio = config.enableDirectAudioProcessing
@@ -2774,8 +2815,7 @@ class EnhancedAIService private constructor(private val context: Context) {
         chatId: String? = null,
         promptFunctionType: PromptFunctionType? = null,
         roleCardId: String? = null,
-        chatModelConfigIdOverride: String? = null,
-        chatModelIndexOverride: Int? = null
+        modelConfig: ModelConfigData
     ): List<ToolPrompt>? {
         return try {
             AppLogger.d(
@@ -2799,11 +2839,7 @@ class EnhancedAIService private constructor(private val context: Context) {
             }
 
             // 获取对应功能类型的模型配置
-            val config = getModelConfigForFunction(
-                functionType = functionType,
-                chatModelConfigIdOverride = chatModelConfigIdOverride,
-                chatModelIndexOverride = chatModelIndexOverride
-            )
+            val config = modelConfig
             
             // 检查是否启用Tool Call
             if (!config.enableToolCall) {

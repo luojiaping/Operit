@@ -52,6 +52,7 @@ fun GlobalDisplaySettingsScreen(
     val enableReplyNotificationVibration by displayPreferencesManager.enableReplyNotificationVibration.collectAsState(initial = false)
     val enableEnterToSend by displayPreferencesManager.enableEnterToSend.collectAsState(initial = false)
     val enableNavigationAnimation by displayPreferencesManager.enableNavigationAnimation.collectAsState(initial = true)
+    val startWithNewChat by displayPreferencesManager.startWithNewChat.collectAsState(initial = false)
     val enableBackgroundKeepAlive by displayPreferencesManager.enableBackgroundKeepAlive.collectAsState(initial = false)
     val enableExperimentalVirtualDisplay by displayPreferencesManager.enableExperimentalVirtualDisplay.collectAsState(initial = true)
     val hideRuntimeTaskView by displayPreferencesManager.hideRuntimeTaskView.collectAsState(initial = false)
@@ -347,6 +348,18 @@ fun GlobalDisplaySettingsScreen(
                         displayPreferencesManager.saveDisplaySettings(
                             enableNavigationAnimation = it
                         )
+                    }
+                },
+                backgroundColor = componentBackgroundColor
+            )
+
+            DisplayToggleItem(
+                title = stringResource(R.string.start_with_new_chat),
+                subtitle = stringResource(R.string.start_with_new_chat_description),
+                checked = startWithNewChat,
+                onCheckedChange = {
+                    scope.launch {
+                        displayPreferencesManager.saveDisplaySettings(startWithNewChat = it)
                     }
                 },
                 backgroundColor = componentBackgroundColor

@@ -662,7 +662,7 @@ class ChatHistoryDelegate(
 
     private suspend fun syncOpeningStatementIfNoUserMessage(chatId: String) {
         AppLogger.d(TAG, "开始同步开场白，聊天ID: $chatId")
-        
+
         historyUpdateMutex.withLock {
             val chatMeta = _chatHistories.value.firstOrNull { it.id == chatId }
             if (!chatMeta?.characterGroupId.isNullOrBlank()) {

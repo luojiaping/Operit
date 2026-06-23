@@ -2960,6 +2960,11 @@ private constructor(private val context: Context, private val aiToolHandler: AIT
         val virtualDisplayCapable = adbOrHigher && experimentalEnabled && (level != AndroidPermissionLevel.DEBUGGER || shizukuAvailable)
 
         return mapOf(
+            "platform.name" to "android",
+            "platform.windows" to false,
+            "platform.linux" to false,
+            "platform.android" to true,
+            "platform.macos" to false,
             "ui.virtual_display" to virtualDisplayCapable,
             "android.permission_level" to level,
             "android.shizuku_available" to shizukuAvailable,

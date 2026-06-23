@@ -645,11 +645,12 @@ class ChatHistoryManager private constructor(private val context: Context) {
     }
 
     private suspend fun persistMessageLocked(chatId: String, messageToPersist: ChatMessage): ChatMessage {
+        val nextOrderIndex = (messageDao.getMaxOrderIndex(chatId) ?: -1) + 1
         val messageEntity =
             MessageEntity.fromChatMessage(
                 chatId = chatId,
                 message = messageToPersist,
-                orderIndex = 0
+                orderIndex = nextOrderIndex,
             )
         messageDao.insertMessage(messageEntity)
 
@@ -1140,10 +1141,11 @@ class ChatHistoryManager private constructor(private val context: Context) {
                     }
                 } else {
                     // 如果找不到现有消息，则插入新消息（避免在同一互斥锁下递归调用 addMessage）
+                    val nextOrderIndex = (messageDao.getMaxOrderIndex(chatId) ?: -1) + 1
                     val messageEntity = MessageEntity.fromChatMessage(
                         chatId = chatId,
                         message = message,
-                        orderIndex = 0
+                        orderIndex = nextOrderIndex,
                     )
                     messageDao.insertMessage(messageEntity)
 

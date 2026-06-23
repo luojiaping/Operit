@@ -11,6 +11,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import com.ai.assistance.operit.util.AppLogger
+import com.ai.assistance.operit.util.CrashRecoveryState
 import com.ai.assistance.operit.util.ThrowableTextFormatter
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -34,16 +35,15 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import com.ai.assistance.operit.ui.components.CustomScaffold
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.ai.assistance.operit.R
+import com.ai.assistance.operit.ui.common.OperitUtilityTheme
 import com.ai.assistance.operit.ui.features.toolbox.screens.logcat.LogcatExportHelper
 import com.ai.assistance.operit.ui.main.MainActivity
-import com.ai.assistance.operit.ui.theme.OperitTheme
 import kotlinx.coroutines.launch
 import java.io.File
 import java.io.FileOutputStream
@@ -61,13 +61,14 @@ class CrashReportActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        CrashRecoveryState.consumePendingCrashReportLaunch(this)
         val stackTrace = ThrowableTextFormatter.truncateText(
             intent.getStringExtra(EXTRA_STACK_TRACE) ?: "No stack trace available.",
             MAX_CRASH_REPORT_CHARS
         )
 
         AppLogger.e("CrashReportActivity", "Displaying crash report, chars=${stackTrace.length}")
-        setContent { OperitTheme { CrashReportScreen(stackTrace = stackTrace) } }
+        setContent { OperitUtilityTheme { CrashReportScreen(stackTrace = stackTrace) } }
     }
 }
 
@@ -80,7 +81,7 @@ fun CrashReportScreen(stackTrace: String) {
     var logExportMessage by remember { mutableStateOf<String?>(null) }
     var logExportSuccess by remember { mutableStateOf<Boolean?>(null) }
 
-    CustomScaffold(
+    Scaffold(
             topBar = {
                 TopAppBar(
                         title = { Text(stringResource(id = R.string.title_activity_crash_report)) },

@@ -95,6 +95,9 @@ class MessageProcessingDelegate(
 
     private val _userMessage = MutableStateFlow(TextFieldValue(""))
     val userMessage: StateFlow<TextFieldValue> = _userMessage.asStateFlow()
+    private val userMessageDraftsByChatId = ConcurrentHashMap<String, TextFieldValue>()
+    @Volatile
+    private var activeDraftChatId: String? = null
 
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
@@ -448,12 +451,68 @@ class MessageProcessingDelegate(
         AppLogger.d(TAG, "MessageProcessingDelegate初始化: 创建滚动事件流")
     }
 
+    fun setActiveDraftChat(chatId: String?) {
+        val previousChatId = activeDraftChatId
+        if (previousChatId == chatId) {
+            return
+        }
+
+        val currentValue = _userMessage.value
+        if (previousChatId != null) {
+            saveUserMessageDraft(previousChatId, currentValue)
+        }
+
+        activeDraftChatId = chatId
+        if (chatId == null) {
+            _userMessage.value = TextFieldValue("")
+            return
+        }
+
+        val savedDraft = userMessageDraftsByChatId[chatId]
+        if (savedDraft != null) {
+            _userMessage.value = savedDraft
+            return
+        }
+
+        if (previousChatId == null && currentValue.text.isNotEmpty()) {
+            saveUserMessageDraft(chatId, currentValue)
+            _userMessage.value = currentValue
+            return
+        }
+
+        _userMessage.value = TextFieldValue("")
+    }
+
     fun updateUserMessage(message: String) {
-        _userMessage.value = TextFieldValue(message)
+        setUserMessageDraft(TextFieldValue(message))
     }
 
     fun updateUserMessage(value: TextFieldValue) {
+        setUserMessageDraft(value)
+    }
+
+    private fun setUserMessageDraft(value: TextFieldValue) {
         _userMessage.value = value
+        val chatId = activeDraftChatId
+        if (chatId != null) {
+            saveUserMessageDraft(chatId, value)
+        }
+    }
+
+    private fun saveUserMessageDraft(chatId: String, value: TextFieldValue) {
+        if (value.text.isEmpty()) {
+            userMessageDraftsByChatId.remove(chatId)
+            return
+        }
+
+        userMessageDraftsByChatId[chatId] = value
+    }
+
+    private fun clearUserMessageDraft(chatId: String) {
+        userMessageDraftsByChatId.remove(chatId)
+        if (activeDraftChatId == chatId) {
+            _userMessage.value = TextFieldValue("")
+        }
     }
 
     fun scrollToBottom() {
@@ -536,7 +595,7 @@ class MessageProcessingDelegate(
         var messageText = originalMessageText
         
         if (messageTextOverride == null) {
-            _userMessage.value = TextFieldValue("")
+            clearUserMessageDraft(chatId)
         }
         resetCurrentTurnToolInvocationCount(chatId)
         chatRuntime.responseStream = null

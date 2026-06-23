@@ -394,12 +394,6 @@ class ChatViewModel(private val context: Context) : ViewModel() {
     val webViewRefreshCounter: StateFlow<Int> = _webViewRefreshCounter
 
     // 控制 @ mention 建议面板的可见性
-    // 插入总结对话框状态
-    private val _showInsertSummaryDialog = MutableStateFlow(false)
-    val showInsertSummaryDialog: StateFlow<Boolean> = _showInsertSummaryDialog.asStateFlow()
-    private val _pendingInsertSummaryMessage = MutableStateFlow<ChatMessage?>(null)
-    val pendingInsertSummaryMessage: StateFlow<ChatMessage?> = _pendingInsertSummaryMessage.asStateFlow()
-
     private val _showMentionSuggestionPanel = MutableStateFlow(false)
     val showMentionSuggestionPanel: StateFlow<Boolean> = _showMentionSuggestionPanel.asStateFlow()
 
@@ -814,27 +808,12 @@ class ChatViewModel(private val context: Context) : ViewModel() {
         uiStateDelegate.showToast(context.getString(R.string.chat_branch_created))
     }
 
-    /** 弹出自定义总结规则对话框，确认后再执行插入总结 */
+    /** 插入总结 */
     fun insertSummary(message: ChatMessage) {
-        _pendingInsertSummaryMessage.value = message
-        _showInsertSummaryDialog.value = true
+        performInsertSummary(message)
     }
 
-    /** 取消插入总结对话框 */
-    fun cancelInsertSummary() {
-        _showInsertSummaryDialog.value = false
-        _pendingInsertSummaryMessage.value = null
-    }
-
-    /** 确认插入总结（携带自定义规则） */
-    fun confirmInsertSummary(customRules: String?) {
-        val message = _pendingInsertSummaryMessage.value ?: return
-        _showInsertSummaryDialog.value = false
-        _pendingInsertSummaryMessage.value = null
-        performInsertSummary(message, customRules)
-    }
-
-    private fun performInsertSummary(message: ChatMessage, customRules: String?) {
+    private fun performInsertSummary(message: ChatMessage) {
         viewModelScope.launch {
             try {
                 // 获取当前会话ID并绑定
@@ -883,13 +862,14 @@ class ChatViewModel(private val context: Context) : ViewModel() {
                 // 检查是否是群聊
                 val currentChat = chatHistoryDelegate.chatHistories.value.firstOrNull { it.id == currentChatId }
                 val isGroupChat = currentChat?.characterGroupId != null
+                val summaryCustomRules = messageCoordinationDelegate.readSummaryCustomRules()
 
                 val summaryMessage = AIMessageManager.summarizeMemory(
                     enhancedAiService!!,
                     messagesToSummarize,
                     autoContinue = false,
                     isGroupChat = isGroupChat,
-                    summaryCustomRules = customRules?.takeIf { it.isNotBlank() }
+                    summaryCustomRules = summaryCustomRules
                 )
 
                 if (summaryMessage != null) {

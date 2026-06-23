@@ -100,6 +100,9 @@ class OperitApplication : Application(), ImageLoaderFactory, WorkConfiguration.P
     // 应用级协程作用域
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var memoryAutoSaveScheduler: MemoryAutoSaveScheduler? = null
+    private val mainInitializationLock = Any()
+    @Volatile
+    private var mainApplicationInitialized = false
 
     // 懒加载数据库实例
     private val database by lazy { AppDatabase.getDatabase(this) }
@@ -121,6 +124,33 @@ class OperitApplication : Application(), ImageLoaderFactory, WorkConfiguration.P
         instance = this
 
         configureOpenMpEnvironment()
+        Thread.setDefaultUncaughtExceptionHandler(GlobalExceptionHandler(this))
+
+        json = Json {
+            serializersModule = SerializationSetup.module
+            ignoreUnknownKeys = true
+            isLenient = true
+            prettyPrint = false
+            encodeDefaults = true
+        }
+
+        globalImageLoader = ImageLoader.Builder(this).build()
+    }
+
+    fun initializeMainApplication() {
+        synchronized(mainInitializationLock) {
+            if (mainApplicationInitialized) {
+                return
+            }
+            initializeMainApplicationLocked()
+            mainApplicationInitialized = true
+        }
+    }
+
+    private fun initializeMainApplicationLocked() {
+        val startTime = System.currentTimeMillis()
+
+        configureOpenMpEnvironment()
 
         // 每次应用冷启动时重置上一轮日志，避免日志无限增长
         val isCrashReportRecoveryStartup = CrashRecoveryState.consumePendingCrashReportLaunch(this)
@@ -139,6 +169,17 @@ class OperitApplication : Application(), ImageLoaderFactory, WorkConfiguration.P
 
         launchCleanOnExitCleanup()
         AppLogger.d(TAG, "【启动计时】cleanOnExit 清理任务已提交（异步IO） - ${System.currentTimeMillis() - startTime}ms")
+
+        val defaultProfileName = applicationContext.getString(R.string.default_profile)
+        initUserPreferencesManager(applicationContext, defaultProfileName)
+        AppLogger.d(TAG, "【启动计时】用户偏好管理器初始化完成 - ${System.currentTimeMillis() - startTime}ms")
+
+        initAndroidPermissionPreferences(applicationContext)
+        AppLogger.d(TAG, "【启动计时】Android权限偏好管理器初始化完成 - ${System.currentTimeMillis() - startTime}ms")
+
+        // 在最早时机初始化并应用语言设置（必须在获取字符串资源之前）
+        initializeAppLanguage()
+        AppLogger.d(TAG, "【启动计时】语言设置初始化完成 - ${System.currentTimeMillis() - startTime}ms")
 
         // Initialize ActivityLifecycleManager to track the current activity
         ActivityLifecycleManager.initialize(this)
@@ -165,36 +206,13 @@ class OperitApplication : Application(), ImageLoaderFactory, WorkConfiguration.P
         // Initialize ANR monitor
         // AnrMonitor.start()
 
-        // 在所有其他初始化之前设置全局异常处理器
-        Thread.setDefaultUncaughtExceptionHandler(GlobalExceptionHandler(this))
         AppLogger.d(TAG, "【启动计时】全局异常处理器设置完成 - ${System.currentTimeMillis() - startTime}ms")
 
-        // Initialize the JSON serializer with our custom module
-        json = Json {
-            serializersModule = SerializationSetup.module
-            ignoreUnknownKeys = true
-            isLenient = true
-            prettyPrint = false
-            encodeDefaults = true
-        }
         AppLogger.d(TAG, "【启动计时】JSON序列化器初始化完成 - ${System.currentTimeMillis() - startTime}ms")
-
-        // 在最早时机初始化并应用语言设置（必须在获取字符串资源之前）
-        initializeAppLanguage()
-        AppLogger.d(TAG, "【启动计时】语言设置初始化完成 - ${System.currentTimeMillis() - startTime}ms")
-
-        // 初始化用户偏好管理器
-        val defaultProfileName = applicationContext.getString(R.string.default_profile)
-        initUserPreferencesManager(applicationContext, defaultProfileName)
-        AppLogger.d(TAG, "【启动计时】用户偏好管理器初始化完成 - ${System.currentTimeMillis() - startTime}ms")
 
         memoryAutoSaveScheduler = MemoryAutoSaveScheduler(applicationContext, applicationScope)
             .also { it.start() }
         AppLogger.d(TAG, "【启动计时】长期记忆自动保存轮询器启动完成 - ${System.currentTimeMillis() - startTime}ms")
-
-        // 初始化Android权限偏好管理器
-        initAndroidPermissionPreferences(applicationContext)
-        AppLogger.d(TAG, "【启动计时】Android权限偏好管理器初始化完成 - ${System.currentTimeMillis() - startTime}ms")
 
         // 初始化功能提示词管理器
         applicationScope.launch {
@@ -576,6 +594,9 @@ class OperitApplication : Application(), ImageLoaderFactory, WorkConfiguration.P
 
     override fun onTerminate() {
         super.onTerminate()
+        if (!mainApplicationInitialized) {
+            return
+        }
 
         AppLifecycleHookPluginRegistry.dispatchAsync(
             event = AppLifecycleEvent.APPLICATION_TERMINATE,
@@ -628,6 +649,9 @@ class OperitApplication : Application(), ImageLoaderFactory, WorkConfiguration.P
 
     override fun onLowMemory() {
         super.onLowMemory()
+        if (!mainApplicationInitialized) {
+            return
+        }
         AppLifecycleHookPluginRegistry.dispatchAsync(
             event = AppLifecycleEvent.APPLICATION_LOW_MEMORY,
             params = AppLifecycleHookParams(applicationContext)
@@ -636,6 +660,9 @@ class OperitApplication : Application(), ImageLoaderFactory, WorkConfiguration.P
 
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
+        if (!mainApplicationInitialized) {
+            return
+        }
         AppLifecycleHookPluginRegistry.dispatchAsync(
             event = AppLifecycleEvent.APPLICATION_TRIM_MEMORY,
             params =

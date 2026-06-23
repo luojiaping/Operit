@@ -1,5 +1,6 @@
 package com.ai.assistance.operit.ui.features.chat.components
 
+import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -51,6 +52,26 @@ import com.ai.assistance.operit.R
  */
 data class ParsedMessagePart(val type: PartType, val content: String, val tag: String? = null, val attributes: String? = null)
 enum class PartType { TEXT, XML }
+
+private data class XmlTagSuggestion(
+    val name: String,
+    @StringRes val descriptionRes: Int,
+)
+
+private val XmlTagSuggestions = listOf(
+    XmlTagSuggestion("think", R.string.thinking_process_block),
+    XmlTagSuggestion("thinking", R.string.thinking_process_block),
+    XmlTagSuggestion("search", R.string.search_content_block),
+    XmlTagSuggestion("tool", R.string.tool_call_block),
+    XmlTagSuggestion("tool_result", R.string.tool_result_block),
+    XmlTagSuggestion("status", R.string.status_info_block),
+    XmlTagSuggestion("html", R.string.html_content_block),
+    XmlTagSuggestion("mood", R.string.mood_tag_block),
+    XmlTagSuggestion("font", R.string.xml_tag_desc_font),
+    XmlTagSuggestion("details", R.string.xml_tag_desc_details),
+    XmlTagSuggestion("detail", R.string.xml_tag_desc_details),
+    XmlTagSuggestion("meta", R.string.xml_tag_desc_meta),
+)
 
 fun parseMessageContentForEditor(content: String): List<ParsedMessagePart> {
     val parts = mutableListOf<ParsedMessagePart>()
@@ -571,6 +592,7 @@ private fun TagEditorDialog(
     var tagName by remember { mutableStateOf(part?.tag ?: "") }
     var attributes by remember { mutableStateOf(part?.attributes ?: "") }
     var content by remember { mutableStateOf(part?.content ?: "") }
+    var tagMenuExpanded by remember { mutableStateOf(false) }
     val isNewTag = part == null
 
     Dialog(onDismissRequest = onDismiss) {
@@ -628,6 +650,58 @@ private fun TagEditorDialog(
                     onValueChange = { tagName = it },
                     label = { Text(context.getString(R.string.tag_name), style=MaterialTheme.typography.bodySmall) },
                     placeholder = { Text(context.getString(R.string.tag_example)) },
+                    trailingIcon = {
+                        Box {
+                            IconButton(onClick = { tagMenuExpanded = true }) {
+                                Icon(
+                                    Icons.Default.KeyboardArrowDown,
+                                    contentDescription = context.getString(R.string.xml_tag_menu_content_description),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+
+                            DropdownMenu(
+                                expanded = tagMenuExpanded,
+                                onDismissRequest = { tagMenuExpanded = false },
+                                modifier = Modifier
+                                    .width(260.dp)
+                                    .heightIn(max = 360.dp)
+                            ) {
+                                Text(
+                                    text = context.getString(R.string.xml_tag_menu_title),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                                )
+                                HorizontalDivider()
+                                XmlTagSuggestions.forEach { suggestion ->
+                                    DropdownMenuItem(
+                                        text = {
+                                            Column {
+                                                Text(
+                                                    text = suggestion.name,
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    fontFamily = FontFamily.Monospace,
+                                                    fontWeight = FontWeight.SemiBold
+                                                )
+                                                Text(
+                                                    text = context.getString(suggestion.descriptionRes),
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                            }
+                                        },
+                                        onClick = {
+                                            tagName = suggestion.name
+                                            tagMenuExpanded = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
                     textStyle = MaterialTheme.typography.bodyMedium,

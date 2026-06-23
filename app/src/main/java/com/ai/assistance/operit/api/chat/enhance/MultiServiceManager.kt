@@ -9,6 +9,7 @@ import com.ai.assistance.operit.api.chat.llmprovider.RateLimiterRegistry
 import com.ai.assistance.operit.api.chat.llmprovider.RequestConcurrencyRegistry
 import com.ai.assistance.operit.data.model.FunctionType
 import com.ai.assistance.operit.data.model.ModelConfigData
+import com.ai.assistance.operit.data.model.ModelParameter
 import com.ai.assistance.operit.data.model.getModelByIndex
 import com.ai.assistance.operit.data.model.getValidModelIndex
 import com.ai.assistance.operit.data.preferences.FunctionalConfigManager
@@ -16,6 +17,7 @@ import com.ai.assistance.operit.data.preferences.ModelConfigManager
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import java.util.concurrent.atomic.AtomicBoolean
 
 /** 管理多个AIService实例，根据功能类型提供不同的服务配置 */
 class MultiServiceManager(private val context: Context) {
@@ -23,20 +25,44 @@ class MultiServiceManager(private val context: Context) {
         private const val TAG = "MultiServiceManager"
     }
 
+    class ServiceLease internal constructor(
+        private val closeAction: suspend () -> Unit,
+        val service: AIService,
+        val modelConfig: ModelConfigData,
+        val modelParameters: List<ModelParameter<*>>
+    ) {
+        private val closed = AtomicBoolean(false)
+
+        suspend fun close() {
+            if (closed.compareAndSet(false, true)) {
+                closeAction()
+            }
+        }
+    }
+
+    private class ManagedService(
+        val service: AIService,
+        val modelConfig: ModelConfigData,
+        var activeLeases: Int = 0,
+        var retired: Boolean = false,
+        var released: Boolean = false
+    )
+
     // 配置管理器
     private val functionalConfigManager = FunctionalConfigManager(context)
     private val modelConfigManager = ModelConfigManager(context)
 
     // 服务实例缓存
-    private val serviceInstances = mutableMapOf<FunctionType, AIService>()
-    private val customServiceInstances = mutableMapOf<String, AIService>()
+    private val serviceInstances = mutableMapOf<FunctionType, ManagedService>()
+    private val customServiceInstances = mutableMapOf<String, ManagedService>()
+    private val retiredServices = mutableSetOf<ManagedService>()
     private val serviceMutex = Mutex()
 
     private val initMutex = Mutex()
     @Volatile private var isInitialized = false
 
     // 默认AIService，用于兼容现有代码
-    private var defaultService: AIService? = null
+    private var defaultService: ManagedService? = null
 
     /** 初始化服务管理器，确保配置已经准备好 */
     suspend fun initialize() {
@@ -56,25 +82,7 @@ class MultiServiceManager(private val context: Context) {
     suspend fun getServiceForFunction(functionType: FunctionType): AIService {
         ensureInitialized()
         return serviceMutex.withLock {
-            // 如果缓存中已有该服务实例，直接返回
-            serviceInstances[functionType]?.let {
-                return@withLock it
-            }
-
-            // 否则，创建新的服务实例
-            val configMapping = functionalConfigManager.getConfigMappingForFunction(functionType)
-            val config = modelConfigManager.getModelConfigFlow(configMapping.configId).first()
-
-            val service = createServiceFromConfig(config, configMapping.modelIndex)
-            serviceInstances[functionType] = service
-
-            // 如果是CHAT功能类型，也设置为默认服务
-            if (functionType == FunctionType.CHAT) {
-                defaultService = service
-            }
-
-            AppLogger.d(TAG, "已为功能${functionType}创建服务实例，使用配置${config.name}，模型索引${configMapping.modelIndex}")
-            service
+            getOrCreateServiceForFunctionLocked(functionType).service
         }
     }
 
@@ -82,33 +90,97 @@ class MultiServiceManager(private val context: Context) {
     suspend fun getServiceForConfig(configId: String, modelIndex: Int): AIService {
         ensureInitialized()
         return serviceMutex.withLock {
-            val normalizedIndex = modelIndex.coerceAtLeast(0)
-            val cacheKey = "$configId#$normalizedIndex"
-            customServiceInstances[cacheKey]?.let { return@withLock it }
-
-            val config = modelConfigManager.getModelConfigFlow(configId).first()
-            val service = createServiceFromConfig(config, normalizedIndex)
-            customServiceInstances[cacheKey] = service
-
-            AppLogger.d(TAG, "已为自定义配置创建服务实例，配置=$configId，模型索引=$normalizedIndex")
-            service
+            getOrCreateServiceForConfigLocked(configId, modelIndex).service
         }
+    }
+
+    suspend fun acquireServiceForFunction(functionType: FunctionType): ServiceLease {
+        ensureInitialized()
+        val managedService =
+            serviceMutex.withLock {
+                getOrCreateServiceForFunctionLocked(functionType).also { it.activeLeases += 1 }
+            }
+        val modelParameters =
+            modelConfigManager.getModelParametersForConfig(managedService.modelConfig.id)
+        return ServiceLease(
+            closeAction = { releaseLease(managedService) },
+            service = managedService.service,
+            modelConfig = managedService.modelConfig,
+            modelParameters = modelParameters
+        )
+    }
+
+    suspend fun acquireServiceForConfig(configId: String, modelIndex: Int): ServiceLease {
+        ensureInitialized()
+        val managedService =
+            serviceMutex.withLock {
+                getOrCreateServiceForConfigLocked(configId, modelIndex).also { it.activeLeases += 1 }
+            }
+        val modelParameters =
+            modelConfigManager.getModelParametersForConfig(managedService.modelConfig.id)
+        return ServiceLease(
+            closeAction = { releaseLease(managedService) },
+            service = managedService.service,
+            modelConfig = managedService.modelConfig,
+            modelParameters = modelParameters
+        )
+    }
+
+    private suspend fun getOrCreateServiceForFunctionLocked(functionType: FunctionType): ManagedService {
+        serviceInstances[functionType]?.let {
+            return it
+        }
+
+        val configMapping = functionalConfigManager.getConfigMappingForFunction(functionType)
+        val config = modelConfigManager.getModelConfigFlow(configMapping.configId).first()
+
+        val service = createServiceFromConfig(config, configMapping.modelIndex)
+        val managedService = ManagedService(
+            service = service,
+            modelConfig = config
+        )
+        serviceInstances[functionType] = managedService
+
+        if (functionType == FunctionType.CHAT) {
+            defaultService = managedService
+        }
+
+        AppLogger.d(TAG, "已为功能${functionType}创建服务实例，使用配置${config.name}，模型索引${configMapping.modelIndex}")
+        return managedService
+    }
+
+    private suspend fun getOrCreateServiceForConfigLocked(configId: String, modelIndex: Int): ManagedService {
+        val normalizedIndex = modelIndex.coerceAtLeast(0)
+        val cacheKey = "$configId#$normalizedIndex"
+        customServiceInstances[cacheKey]?.let { return it }
+
+        val config = modelConfigManager.getModelConfigFlow(configId).first()
+        val service = createServiceFromConfig(config, normalizedIndex)
+        val managedService = ManagedService(
+            service = service,
+            modelConfig = config
+        )
+        customServiceInstances[cacheKey] = managedService
+
+        AppLogger.d(TAG, "已为自定义配置创建服务实例，配置=$configId，模型索引=$normalizedIndex")
+        return managedService
     }
 
     /** 获取默认服务（通常是CHAT功能的服务） */
     suspend fun getDefaultService(): AIService {
         ensureInitialized()
         return serviceMutex.withLock {
-            defaultService ?: getServiceForFunction(FunctionType.CHAT).also { defaultService = it }
+            (defaultService ?: getOrCreateServiceForFunctionLocked(FunctionType.CHAT)).service
         }
     }
 
     suspend fun cancelAllStreaming() {
         serviceMutex.withLock {
             val services = mutableSetOf<AIService>()
-            services.addAll(serviceInstances.values)
-            services.addAll(customServiceInstances.values)
-            defaultService?.let { services.add(it) }
+            services.addAll(serviceInstances.values.map { it.service })
+            services.addAll(customServiceInstances.values.map { it.service })
+            services.addAll(retiredServices.map { it.service })
+            defaultService?.let { services.add(it.service) }
 
             services.forEach { service ->
                 try {
@@ -123,9 +195,10 @@ class MultiServiceManager(private val context: Context) {
     suspend fun resetAllTokenCounters() {
         serviceMutex.withLock {
             val services = mutableSetOf<AIService>()
-            services.addAll(serviceInstances.values)
-            services.addAll(customServiceInstances.values)
-            defaultService?.let { services.add(it) }
+            services.addAll(serviceInstances.values.map { it.service })
+            services.addAll(customServiceInstances.values.map { it.service })
+            services.addAll(retiredServices.map { it.service })
+            defaultService?.let { services.add(it.service) }
 
             services.forEach { service ->
                 try {
@@ -150,35 +223,17 @@ class MultiServiceManager(private val context: Context) {
     suspend fun refreshServiceForFunction(functionType: FunctionType) {
         ensureInitialized()
         serviceMutex.withLock {
-            // 释放旧实例的资源（对于本地模型如MNN，这很重要）
-            serviceInstances[functionType]?.let { oldService ->
-                try {
-                    oldService.cancelStreaming()
-                    oldService.release()
-                    AppLogger.d(TAG, "已释放功能${functionType}的服务资源")
-                } catch (e: Exception) {
-                    AppLogger.e(TAG, "释放服务资源时出错", e)
-                }
-            }
+            serviceInstances.remove(functionType)?.let { retireManagedServiceLocked(it) }
 
-            // 移除旧实例
-            serviceInstances.remove(functionType)
-
-            // 如果是默认服务，也清除默认服务缓存
             if (functionType == FunctionType.CHAT) {
                 defaultService = null
-                customServiceInstances.values.forEach { service ->
-                    try {
-                        service.cancelStreaming()
-                        service.release()
-                    } catch (e: Exception) {
-                        AppLogger.e(TAG, "释放自定义CHAT服务资源时出错", e)
-                    }
-                }
+                val customServices = customServiceInstances.values.toList()
                 customServiceInstances.clear()
+                customServices.forEach { service ->
+                    retireManagedServiceLocked(service)
+                }
             }
 
-            // 不立即创建新实例，而是等到需要时再创建
             AppLogger.d(TAG, "已移除功能${functionType}的服务实例缓存")
         }
     }
@@ -187,28 +242,56 @@ class MultiServiceManager(private val context: Context) {
     suspend fun refreshAllServices() {
         ensureInitialized()
         serviceMutex.withLock {
-            // 释放所有服务实例的资源
-            serviceInstances.values.forEach { service ->
-                try {
-                    service.cancelStreaming()
-                    service.release()
-                } catch (e: Exception) {
-                    AppLogger.e(TAG, "释放服务资源时出错", e)
-                }
-            }
-            customServiceInstances.values.forEach { service ->
-                try {
-                    service.cancelStreaming()
-                    service.release()
-                } catch (e: Exception) {
-                    AppLogger.e(TAG, "释放自定义服务资源时出错", e)
-                }
-            }
+            val services = mutableSetOf<ManagedService>()
+            services.addAll(serviceInstances.values)
+            services.addAll(customServiceInstances.values)
+            services.addAll(retiredServices)
+            defaultService?.let { services.add(it) }
 
             serviceInstances.clear()
             customServiceInstances.clear()
+            retiredServices.clear()
             defaultService = null
+            services.forEach { service ->
+                closeManagedServiceLocked(service, cancelStreaming = true)
+            }
             AppLogger.d(TAG, "已清除所有服务实例缓存并释放资源")
+        }
+    }
+
+    private suspend fun releaseLease(managedService: ManagedService) {
+        serviceMutex.withLock {
+            managedService.activeLeases = (managedService.activeLeases - 1).coerceAtLeast(0)
+            closeRetiredServiceLocked(managedService)
+        }
+    }
+
+    private fun retireManagedServiceLocked(managedService: ManagedService) {
+        managedService.retired = true
+        retiredServices.add(managedService)
+        closeRetiredServiceLocked(managedService)
+    }
+
+    private fun closeRetiredServiceLocked(managedService: ManagedService) {
+        if (managedService.retired && managedService.activeLeases == 0) {
+            closeManagedServiceLocked(managedService, cancelStreaming = false)
+        }
+    }
+
+    private fun closeManagedServiceLocked(managedService: ManagedService, cancelStreaming: Boolean) {
+        if (managedService.released) {
+            return
+        }
+        managedService.released = true
+        retiredServices.remove(managedService)
+        try {
+            if (cancelStreaming) {
+                managedService.service.cancelStreaming()
+            }
+            managedService.service.release()
+            AppLogger.d(TAG, "已释放服务资源: providerModel=${managedService.service.providerModel}")
+        } catch (e: Exception) {
+            AppLogger.e(TAG, "释放服务资源时出错", e)
         }
     }
 

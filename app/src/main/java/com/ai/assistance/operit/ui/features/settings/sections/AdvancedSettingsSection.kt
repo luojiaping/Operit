@@ -85,6 +85,7 @@ fun AdvancedSettingsSection(
                 useMultipleApiKeys = useApiKeyPool,
                 apiKeyPool = apiKeyPool
             )
+            EnhancedAIService.refreshAllServices(configManager.appContext)
             showNotification(context.getString(R.string.advanced_settings_saved))
         }
     }

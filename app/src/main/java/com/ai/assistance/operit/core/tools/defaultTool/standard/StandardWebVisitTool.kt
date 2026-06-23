@@ -1002,7 +1002,7 @@ class StandardWebVisitTool(private val context: Context) : ToolExecutor {
         // 修改LaunchedEffect部分，使滚动和倒计时同时进行
         LaunchedEffect(autoCountdownActive.value, isCaptchaVerification.value) {
             if (autoCountdownActive.value) {
-                val countdownDuration = if (isCaptchaVerification.value) 60 else visitWebWaitSeconds
+                val countdownDuration = if (isCaptchaVerification.value) 10 else visitWebWaitSeconds
                 autoCountdownSeconds.value = countdownDuration
 
                 for (i in countdownDuration downTo 1) {
@@ -1227,7 +1227,7 @@ class StandardWebVisitTool(private val context: Context) : ToolExecutor {
                                                             if (isCaptcha && !isCaptchaVerification.value) {
                                                                 isCaptchaVerification.value = true
                                                                 autoModeEnabled.value = false // 需要手动验证，禁用自动模式
-                                                                autoCountdownActive.value = true // 开始60秒倒计时
+                                                                autoCountdownActive.value = true // 开始10秒倒计时
                                                             } else if (!isCaptcha && isCaptchaVerification.value) {
                                                                 // 用户完成了验证
                                                                 isCaptchaVerification.value = false

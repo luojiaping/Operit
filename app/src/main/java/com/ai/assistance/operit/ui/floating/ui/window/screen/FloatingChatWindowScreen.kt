@@ -769,9 +769,9 @@ private fun ChatMessagesView(
         ) {
             itemsIndexed(
                 items = renderItems,
-                key = { _, item ->
+                key = { renderIndex, item ->
                     when (item) {
-                        is com.ai.assistance.operit.data.model.ChatMessage -> item.timestamp
+                        is com.ai.assistance.operit.data.model.ChatMessage -> "${renderIndex}_${item.timestamp}"
                         FloatingLoadOlderItem -> "floating_load_older_history"
                         FloatingLoadNewerItem -> "floating_load_newer_history"
                         FloatingLoadingItem -> "floating_loading_indicator"

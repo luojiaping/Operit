@@ -22,4 +22,15 @@
             android:targetPackage="com.ai.assistance.operit"
             android:targetClass="com.ai.assistance.operit.ui.main.MainActivity" />
     </shortcut>
+    <shortcut
+        android:shortcutId="data_recovery"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_settings"
+        android:shortcutShortLabel="@string/shortcut_data_recovery"
+        android:shortcutLongLabel="@string/shortcut_data_recovery">
+        <intent
+            android:action="com.ai.assistance.operit.action.OPEN_DATA_RECOVERY"
+            android:targetPackage="com.ai.assistance.operit"
+            android:targetClass="com.ai.assistance.operit.ui.recovery.DataRecoveryActivity" />
+    </shortcut>
 </shortcuts>

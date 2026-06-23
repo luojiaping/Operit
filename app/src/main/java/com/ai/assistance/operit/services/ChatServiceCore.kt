@@ -129,6 +129,9 @@ class ChatServiceCore(
         coroutineScope.launch {
             chatHistoryDelegate.currentChatId.collect { chatId ->
                 tokenStatisticsDelegate.setActiveChatId(chatId)
+                if (::messageProcessingDelegate.isInitialized) {
+                    messageProcessingDelegate.setActiveDraftChat(chatId)
+                }
                 if (chatId != null) {
                     tokenStatisticsDelegate.bindChatService(
                         chatId,
@@ -207,6 +210,7 @@ class ChatServiceCore(
                 )
             }
         )
+        messageProcessingDelegate.setActiveDraftChat(chatHistoryDelegate.currentChatId.value)
 
         // 初始化消息协调委托
         messageCoordinationDelegate = MessageCoordinationDelegate(

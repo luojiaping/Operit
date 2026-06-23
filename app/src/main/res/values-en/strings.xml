@@ -1423,6 +1423,8 @@
     <string name="speech_error_init_failed">Failed to initialize speech recognition engine</string>
     <string name="speech_error_not_initialized">Speech recognition engine not initialized</string>
     <string name="title_activity_crash_report">Application Error</string>
+    <string name="title_activity_data_recovery">Data Recovery</string>
+    <string name="shortcut_data_recovery">Data Recovery</string>
 
     <!-- Crash Report Screen -->
     <string name="crash_report_header">The application has encountered an unrecoverable error and needs to restart.</string>
@@ -4979,6 +4981,8 @@
     <string name="keep_screen_on_description">Keep screen awake to prevent auto-lock during conversations</string>
     <string name="enable_navigation_animation">New Navigation Animation</string>
     <string name="enable_navigation_animation_description">Turns on the enhanced animation set for both the phone sidebar and page transitions. Turn it off to use simpler navigation motion.</string>
+    <string name="start_with_new_chat">Start with New Blank Chat</string>
+    <string name="start_with_new_chat_description">When enabled, each app launch opens a new blank chat instead of reopening the previous conversation.</string>
     <string name="software_identity_title">Software Identity</string>
     <string name="software_identity_description">Change the software identity shown at the top of the sidebar.</string>
     <string name="software_identity_option_operit">Operit AI</string>

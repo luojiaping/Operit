@@ -42,21 +42,13 @@ import com.ai.assistance.operit.data.model.ChatMessage
 import com.ai.assistance.operit.data.model.ActivePrompt
 
 import com.ai.assistance.operit.data.preferences.UserPreferencesManager
-import com.ai.assistance.operit.data.preferences.ModelConfigManager
 import com.ai.assistance.operit.ui.features.chat.viewmodel.ChatViewModel
 import com.ai.assistance.operit.ui.features.chat.viewmodel.ChatHistoryDisplayMode
 import com.ai.assistance.operit.ui.features.chat.components.style.bubble.BubbleImageStyleConfig
-import com.ai.assistance.operit.data.model.ModelConfigData
-import com.ai.assistance.operit.data.preferences.FunctionalConfigManager
-import com.ai.assistance.operit.ui.components.CustomScaffold
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.ui.platform.LocalFocusManager
 import com.ai.assistance.operit.ui.features.chat.webview.workspace.WorkspaceBackupManager
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.flow.first
 import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
@@ -66,7 +58,6 @@ import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Share
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.TextFieldDefaults
@@ -749,65 +740,6 @@ fun ChatScreenContent(
                 },
                 dismissButton = {
                     TextButton(onClick = { showDeleteSelectedConfirmDialog = false }) {
-                        Text(stringResource(R.string.common_cancel))
-                    }
-                }
-            )
-        }
-
-        // 插入总结自定义规则对话框
-        val insertSummaryDialogVisible by actualViewModel.showInsertSummaryDialog.collectAsState()
-        val pendingMessage by actualViewModel.pendingInsertSummaryMessage.collectAsState()
-        if (insertSummaryDialogVisible && pendingMessage != null) {
-            val context = LocalContext.current
-            val functionalConfigManager = remember { FunctionalConfigManager(context) }
-            val modelConfigManager = remember { ModelConfigManager(context) }
-            var savedCustomRules by remember { mutableStateOf("") }
-            var customRulesInput by remember { mutableStateOf("") }
-
-            LaunchedEffect(Unit) {
-                functionalConfigManager.initializeIfNeeded()
-                modelConfigManager.initializeIfNeeded()
-                val functionMappings = functionalConfigManager.functionConfigMappingWithIndexFlow.first()
-                val chatMapping = functionMappings[com.ai.assistance.operit.data.model.FunctionType.CHAT] ?: com.ai.assistance.operit.data.preferences.FunctionConfigMapping()
-                if (chatMapping.configId.isNotBlank()) {
-                    modelConfigManager.getModelConfigFlow(chatMapping.configId).first().let { config ->
-                        savedCustomRules = config.summaryCustomRules
-                        customRulesInput = config.summaryCustomRules
-                    }
-                }
-            }
-
-            AlertDialog(
-                onDismissRequest = { actualViewModel.cancelInsertSummary() },
-                title = { Text(stringResource(R.string.settings_summary_custom_rules)) },
-                text = {
-                    Column {
-                        Text(
-                            text = stringResource(R.string.settings_summary_custom_rules_desc),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        OutlinedTextField(
-                            value = customRulesInput,
-                            onValueChange = { customRulesInput = it },
-                            modifier = Modifier.fillMaxWidth().heightIn(min = 100.dp),
-                            placeholder = { Text(stringResource(R.string.settings_summary_custom_rules_desc)) },
-                            textStyle = MaterialTheme.typography.bodySmall,
-                            keyboardOptions = KeyboardOptions.Default
-                        )
-                    }
-                },
-                confirmButton = {
-                    TextButton(onClick = {
-                        actualViewModel.confirmInsertSummary(customRulesInput)
-                    }) {
-                        Text(stringResource(android.R.string.ok))
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { actualViewModel.cancelInsertSummary() }) {
                         Text(stringResource(R.string.common_cancel))
                     }
                 }

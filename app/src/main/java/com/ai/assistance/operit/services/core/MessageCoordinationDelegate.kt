@@ -1944,7 +1944,7 @@ class MessageCoordinationDelegate(
     }
 
     /** 从当前聊天绑定的模型配置中读取自定义总结规则 */
-    private suspend fun readSummaryCustomRules(): String? {
+    suspend fun readSummaryCustomRules(): String? {
         return try {
             val functionalConfigManager = FunctionalConfigManager(context)
             val modelConfigManager = ModelConfigManager(context)

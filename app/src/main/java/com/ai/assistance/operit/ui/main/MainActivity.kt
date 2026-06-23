@@ -16,7 +16,9 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -31,14 +33,18 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Alignment
 import androidx.lifecycle.Observer
 import androidx.lifecycle.lifecycleScope
 import com.ai.assistance.operit.R
 import com.ai.assistance.operit.api.chat.AIForegroundService
+import com.ai.assistance.operit.core.application.OperitApplication
 import com.ai.assistance.operit.core.tools.AIToolHandler
 import com.ai.assistance.operit.data.preferences.AgreementPreferences
+import com.ai.assistance.operit.data.preferences.DisplayPreferencesManager
 import com.ai.assistance.operit.data.preferences.UserPreferencesManager
 import com.ai.assistance.operit.data.preferences.androidPermissionPreferences
+import com.ai.assistance.operit.data.repository.ChatHistoryManager
 import com.ai.assistance.operit.data.updates.UpdateManager
 import com.ai.assistance.operit.data.updates.UpdateStatus
 import com.ai.assistance.operit.ui.common.NavItem
@@ -54,6 +60,7 @@ import com.ai.assistance.operit.util.AnrMonitor
 import com.ai.assistance.operit.util.LocaleUtils
 import java.util.*
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import com.ai.assistance.operit.data.mcp.MCPRepository
 import android.content.Intent
@@ -194,6 +201,16 @@ class MainActivity : ComponentActivity() {
         // Set window background to solid color to prevent system theme leaking through
         window.setBackgroundDrawableResource(android.R.color.black)
 
+        setAppContent()
+        lifecycleScope.launch {
+            delay(16)
+            completeStartup(savedInstanceState)
+        }
+    }
+
+    private fun completeStartup(savedInstanceState: Bundle?) {
+        (application as OperitApplication).initializeMainApplication()
+
         // Handle the intent that started the activity
         handleIntent(intent)
         restoreRuntimeTaskViewVisibilityIfNeeded()
@@ -215,8 +232,6 @@ class MainActivity : ComponentActivity() {
             Toast.makeText(this, getString(R.string.plugin_loading_skipped), Toast.LENGTH_SHORT).show()
         }
 
-        // 设置初始界面 - 显示加载占位符
-        setAppContent()
         processPendingGitHubAuth()
 
         // 初始化并设置更新管理器
@@ -378,6 +393,25 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private suspend fun prepareStartupChatIfNeeded() {
+        try {
+            val displayPreferencesManager =
+                DisplayPreferencesManager.getInstance(this@MainActivity)
+            if (!displayPreferencesManager.startWithNewChat.first()) {
+                return
+            }
+
+            val chatHistoryManager = ChatHistoryManager.getInstance(this@MainActivity)
+            val newChat = chatHistoryManager.createNewChat(
+                setAsCurrentChat = false
+            )
+            chatHistoryManager.setCurrentChatId(newChat.id)
+            AppLogger.d(TAG, "启动时已创建新的空白聊天")
+        } catch (e: Exception) {
+            AppLogger.e(TAG, "启动时创建空白聊天失败", e)
+        }
+    }
+
     private fun parseRouteArgsJson(raw: String?): Map<String, Any?> {
         val text = raw?.trim().orEmpty()
         if (text.isBlank()) {
@@ -409,6 +443,8 @@ class MainActivity : ComponentActivity() {
 
             // 2. 检查权限级别设置
             checkPermissionLevelSet()
+
+            prepareStartupChatIfNeeded()
 
             // 3. 在协议已接受且无需权限引导时，启动插件加载
             if (!showPermissionGuide && agreementPreferences.isAgreementAccepted()) {
@@ -667,8 +703,12 @@ class MainActivity : ComponentActivity() {
                 Box {
                     // 如果初始化检查未完成，则显示一个占位符，避免在检查完成前显示不完整的界面
                     if (!initialChecksDone) {
-                        // 在这里可以放置一个加载指示器，或者一个空白屏幕
-                        // 为了简单起见，我们暂时留空，因为检查过程很快
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator()
+                        }
                     } else {
                         // 检查是否需要显示用户协议
                         if (!agreementPreferences.isAgreementAccepted()) {

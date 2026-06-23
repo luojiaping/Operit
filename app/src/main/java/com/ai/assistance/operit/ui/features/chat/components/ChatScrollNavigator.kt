@@ -882,7 +882,7 @@ private fun ChatMessageLocatorDialog(
                     ) {
                         itemsIndexed(
                             items = filteredEntries,
-                            key = { _, entry -> "${entry.preview.timestamp}_${entry.index}" },
+                            key = { index, entry -> "${index}_${entry.preview.timestamp}_${entry.index}" },
                         ) { _, entry ->
                             ChatMessageLocatorRow(
                                 index = entry.index,
