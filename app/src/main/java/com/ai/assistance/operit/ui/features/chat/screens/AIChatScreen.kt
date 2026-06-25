@@ -398,7 +398,7 @@ val actualViewModel: ChatViewModel = viewModel ?: viewModel { ChatViewModel(cont
                     TextButton(onClick = {
                         showModelSuggestionDialog = false
                         // 如果用户已输入token，直接保存配置
-                        actualViewModel.updateApiKey(ApiPreferences.DEFAULT_API_KEY)
+                        actualViewModel.updateApiKey("")
                         actualViewModel.updateApiEndpoint(ApiPreferences.DEFAULT_API_ENDPOINT)
                         actualViewModel.updateModelName(ApiPreferences.DEFAULT_MODEL_NAME)
                         actualViewModel.updateApiProviderType(ApiProviderType.DEEPSEEK)
@@ -581,9 +581,7 @@ val actualViewModel: ChatViewModel = viewModel ?: viewModel { ChatViewModel(cont
         // 只有当apiKey有效值时才执行逻辑，防止初始化阶段的不正确判断
         if (apiKey.isNotBlank()) {
             // 如果使用的是自定义配置，标记为已确认，不显示配置界面
-            if (apiKey != ApiPreferences.DEFAULT_API_KEY) {
-                ConfigurationStateHolder.hasConfirmedDefaultInSession = true
-            }
+            ConfigurationStateHolder.hasConfirmedDefaultInSession = true
         }
     }
 

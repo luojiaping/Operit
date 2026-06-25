@@ -198,18 +198,6 @@ class ApiPreferences private constructor(private val context: Context) {
         // API 配置默认值
         const val DEFAULT_API_ENDPOINT = "https://api.deepseek.com/v1/chat/completions"
         const val DEFAULT_MODEL_NAME = "deepseek-v4-flash"
-        private const val ENCODED_API_KEY = "c2stNmI4NTYyMjUzNmFjNDhjMDgwYzUwNDhhYjVmNWQxYmQ="
-        val DEFAULT_API_KEY: String by lazy { decodeApiKey(ENCODED_API_KEY) }
-
-        private fun decodeApiKey(encodedKey: String): String {
-            return try {
-                android.util.Base64.decode(encodedKey, android.util.Base64.NO_WRAP)
-                    .toString(Charsets.UTF_8)
-            } catch (e: Exception) {
-                com.ai.assistance.operit.util.AppLogger.e("ApiPreferences", "Failed to decode API key", e)
-                ""
-            }
-        }
     }
 
     @Serializable

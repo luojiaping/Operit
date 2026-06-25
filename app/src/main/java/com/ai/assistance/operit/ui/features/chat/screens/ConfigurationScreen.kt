@@ -58,14 +58,12 @@ fun ConfigurationScreen(
         val isUsingDefaultApiKey by
                 remember(apiKeyInput) {
                         derivedStateOf {
-                                apiKeyInput == ApiPreferences.DEFAULT_API_KEY ||
-                                        (apiKeyInput.isBlank() && isUsingDefault)
+                                apiKeyInput.isBlank() && isUsingDefault
                         }
                 }
 
         // 检测用户是否输入了自己的token
-        val hasEnteredToken =
-                apiKeyInput.isNotBlank() && apiKeyInput != ApiPreferences.DEFAULT_API_KEY
+        val hasEnteredToken = apiKeyInput.isNotBlank()
 
         // 导航处理
         LaunchedEffect(isUsingDefault) {

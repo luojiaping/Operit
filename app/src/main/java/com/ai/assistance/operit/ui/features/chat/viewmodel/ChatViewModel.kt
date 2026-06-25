@@ -30,7 +30,6 @@ import com.ai.assistance.operit.data.model.ChatHistory
 import com.ai.assistance.operit.data.model.ChatMessage
 import com.ai.assistance.operit.data.model.ChatMessageLocatorPreview
 import com.ai.assistance.operit.data.model.FunctionType
-import com.ai.assistance.operit.data.preferences.ApiPreferences
 import com.ai.assistance.operit.data.model.PromptFunctionType
 import com.ai.assistance.operit.data.model.ToolParameter
 import com.ai.assistance.operit.R
@@ -437,7 +436,7 @@ class ChatViewModel(private val context: Context) : ViewModel() {
                         currentProviderType,
                         currentApiEndpoint
                     ) &&
-                    currentApiKey == ApiPreferences.DEFAULT_API_KEY
+                    currentApiKey.isBlank()
             }.collect { shouldShow ->
                 _shouldShowConfigDialog.value = shouldShow
             }
