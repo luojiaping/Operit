@@ -52,7 +52,6 @@ import com.ai.assistance.operit.data.collects.ApiProviderConfigs
 import com.ai.assistance.operit.data.model.ApiProviderType
 import com.ai.assistance.operit.data.model.ModelConfigData
 import com.ai.assistance.operit.data.model.ModelOption
-import com.ai.assistance.operit.data.preferences.ApiPreferences
 import com.ai.assistance.operit.data.preferences.ModelConfigManager
 import com.ai.assistance.operit.plugins.toolpkg.ToolPkgAiProviderRegistry
 import com.ai.assistance.operit.ui.common.input.bringIntoViewOnImeFocus
@@ -339,8 +338,8 @@ fun ModelApiSettingsSection(
     var modelLoadError by remember { mutableStateOf<String?>(null) }
     var showEndpointDialog by remember(config.id) { mutableStateOf(false) }
 
-    // 检查是否使用默认API密钥（仅用于UI显示）
-    val isUsingDefaultApiKey = apiKeyInput == ApiPreferences.DEFAULT_API_KEY
+    // 检查是否未填写API密钥（仅用于UI显示）
+    val isUsingDefaultApiKey = apiKeyInput.isBlank()
     val providerRequiresApiKey =
         ApiProviderConfigs.requiresApiKey(selectedProviderTypeId, apiEndpointInput)
     val isMnnProvider = selectedApiProvider == ApiProviderType.MNN
