@@ -66,6 +66,7 @@ fun MarketManageScaffold(
     emptyTitle: String,
     emptyDescription: String,
     emptyActionLabel: String? = null,
+    topContent: @Composable ColumnScope.() -> Unit = {},
     content: @Composable BoxScope.() -> Unit
 ) {
     CustomScaffold(
@@ -81,38 +82,46 @@ fun MarketManageScaffold(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(16.dp)
         ) {
-            if (!isLoggedIn) {
-                MarketManageLoginRequiredCard(
-                    description = loginDescription,
-                    onLogin = onLogin
-                )
-            }
+            topContent()
 
-            errorMessage?.let { message ->
-                MarketManageErrorCard(message = message)
-            }
-
-            Box(
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f, fill = true),
-                contentAlignment = Alignment.Center
+                    .weight(1f, fill = true)
+                    .padding(16.dp)
             ) {
-                when {
-                    isLoading -> MarketManageLoadingState(message = loadingMessage)
-                    isLoggedIn && isEmpty -> {
-                        MarketManageEmptyState(
-                            icon = emptyIcon,
-                            title = emptyTitle,
-                            description = emptyDescription,
-                            actionLabel = emptyActionLabel,
-                            onAction = onPublish
-                        )
-                    }
+                if (!isLoggedIn) {
+                    MarketManageLoginRequiredCard(
+                        description = loginDescription,
+                        onLogin = onLogin
+                    )
+                }
 
-                    isLoggedIn -> content()
+                errorMessage?.let { message ->
+                    MarketManageErrorCard(message = message)
+                }
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f, fill = true),
+                    contentAlignment = Alignment.Center
+                ) {
+                    when {
+                        isLoading -> MarketManageLoadingState(message = loadingMessage)
+                        isLoggedIn && isEmpty -> {
+                            MarketManageEmptyState(
+                                icon = emptyIcon,
+                                title = emptyTitle,
+                                description = emptyDescription,
+                                actionLabel = emptyActionLabel,
+                                onAction = onPublish
+                            )
+                        }
+
+                        isLoggedIn -> content()
+                    }
                 }
             }
         }
@@ -123,7 +132,7 @@ fun MarketManageScaffold(
 fun MarketManageItemCard(
     title: String,
     description: String,
-    issueNumber: Int,
+    entryId: String,
     isOpen: Boolean,
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
@@ -173,7 +182,7 @@ fun MarketManageItemCard(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     MarketManagePublicationStatus(isOpen = isOpen)
-                    MarketManageIssueNumberChip(issueNumber = issueNumber)
+                    MarketManageEntryIdChip(entryId = entryId)
                 }
             }
 
@@ -232,24 +241,6 @@ fun MarketManageLabelChip(
     }
 }
 
-@Composable
-fun MarketManageGitHubLabelChip(
-    text: String,
-    colorHex: String,
-    modifier: Modifier = Modifier
-) {
-    val parsedColor =
-        runCatching {
-            Color(android.graphics.Color.parseColor("#${colorHex.removePrefix("#")}"))
-        }.getOrDefault(MaterialTheme.colorScheme.surfaceVariant)
-
-    MarketManageLabelChip(
-        text = text,
-        containerColor = parsedColor.copy(alpha = 0.18f),
-        contentColor = MaterialTheme.colorScheme.onSurface,
-        modifier = modifier
-    )
-}
 
 @Composable
 fun MarketManageReviewStatusChip(
@@ -520,16 +511,17 @@ private fun MarketManagePublicationStatus(isOpen: Boolean) {
 }
 
 @Composable
-private fun MarketManageIssueNumberChip(issueNumber: Int) {
+private fun MarketManageEntryIdChip(entryId: String) {
     Surface(
         color = MaterialTheme.colorScheme.secondaryContainer,
         shape = MaterialTheme.shapes.small
     ) {
         Text(
-            text = "#$issueNumber",
+            text = "#${entryId.take(8)}",
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSecondaryContainer
         )
     }
 }
+

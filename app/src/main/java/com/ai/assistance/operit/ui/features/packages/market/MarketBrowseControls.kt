@@ -29,6 +29,7 @@ fun MarketBrowseControls(
     sortOption: MarketSortOption,
     onSortOptionChanged: (MarketSortOption) -> Unit,
     @StringRes searchPlaceholderRes: Int,
+    sortOptions: List<MarketSortOption> = MarketSortOption.entries,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -46,7 +47,7 @@ fun MarketBrowseControls(
             fontWeight = FontWeight.Medium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        MarketSortOption.entries.forEach { option ->
+        sortOptions.forEach { option ->
             FilterChip(
                 selected = sortOption == option,
                 onClick = { onSortOptionChanged(option) },

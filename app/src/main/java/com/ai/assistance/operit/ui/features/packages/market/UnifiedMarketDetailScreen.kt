@@ -1,10 +1,10 @@
 package com.ai.assistance.operit.ui.features.packages.market
 
-import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -32,10 +33,12 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -69,7 +72,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.rememberAsyncImagePainter
 import com.ai.assistance.operit.R
-import com.ai.assistance.operit.data.api.GitHubComment
+import com.ai.assistance.operit.data.api.MarketV2Comment
+import com.ai.assistance.operit.ui.common.displays.MarkdownTextComposable
 import com.ai.assistance.operit.ui.main.LocalTopBarTitleContent
 import com.ai.assistance.operit.ui.main.TopBarTitleContent
 import com.ai.assistance.operit.ui.main.components.LocalAppBarContentColor
@@ -104,7 +108,15 @@ data class UnifiedMarketDetailAction(
     val onClick: () -> Unit,
     val enabled: Boolean = true,
     val isLoading: Boolean = false,
+    val loadingLabel: String? = null,
     val icon: ImageVector? = null
+)
+
+data class UnifiedMarketDetailIconAction(
+    val contentDescription: String,
+    val onClick: () -> Unit,
+    val enabled: Boolean = true,
+    val icon: ImageVector
 )
 
 data class UnifiedMarketDetailBanner(
@@ -149,14 +161,17 @@ data class UnifiedMarketDetailReactionsState(
 
 data class UnifiedMarketDetailCommentsState(
     val title: String,
-    val comments: List<GitHubComment>,
+    val comments: List<MarketV2Comment>,
     val isLoading: Boolean,
     val isPosting: Boolean,
     val canPost: Boolean,
     val postHint: String? = null,
+    val currentUserLogin: String? = null,
     val onRefresh: () -> Unit,
     val onRequestPost: () -> Unit,
-    val onReplyToComment: (GitHubComment) -> Unit = {}
+    val onReplyToComment: (MarketV2Comment) -> Unit = {},
+    val onEditComment: (MarketV2Comment) -> Unit = {},
+    val onDeleteComment: (MarketV2Comment) -> Unit = {}
 )
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
@@ -169,6 +184,7 @@ fun UnifiedMarketDetailScreen(
     banner: UnifiedMarketDetailBanner? = null,
     sections: List<UnifiedMarketDetailSection> = emptyList(),
     overviewExtraContent: (@Composable () -> Unit)? = null,
+    trailingAction: UnifiedMarketDetailIconAction? = null,
     metadataTitle: String,
     metadataRows: List<UnifiedMarketDetailInfoRow>,
     reactions: UnifiedMarketDetailReactionsState?,
@@ -249,7 +265,11 @@ fun UnifiedMarketDetailScreen(
                     items(comments.comments, key = { it.id }) { comment ->
                         UnifiedMarketDetailCommentCard(
                             comment = comment,
-                            onReply = { comments.onReplyToComment(comment) }
+                            isReply = comment.parentId != null,
+                            onReply = { comments.onReplyToComment(comment) },
+                            onEdit = { comments.onEditComment(comment) },
+                            onDelete = { comments.onDeleteComment(comment) },
+                            currentUserLogin = comments.currentUserLogin
                         )
                     }
                 }
@@ -267,7 +287,8 @@ fun UnifiedMarketDetailScreen(
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
                 UnifiedMarketDetailActionRow(
                     primaryAction = primaryAction,
-                    secondaryAction = secondaryAction
+                    secondaryAction = secondaryAction,
+                    trailingAction = trailingAction
                 )
             }
         }
@@ -560,11 +581,13 @@ private fun UnifiedMarketDetailMetricsRow(
 private fun UnifiedMarketDetailActionRow(
     primaryAction: UnifiedMarketDetailAction,
     secondaryAction: UnifiedMarketDetailAction?,
+    trailingAction: UnifiedMarketDetailIconAction?,
     compact: Boolean = false
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 10.dp)
+        horizontalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 10.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
         UnifiedMarketDetailPrimaryButton(
             action = primaryAction,
@@ -578,6 +601,20 @@ private fun UnifiedMarketDetailActionRow(
                 modifier = Modifier.weight(1f),
                 compact = compact
             )
+        }
+
+        if (trailingAction != null) {
+            IconButton(
+                onClick = trailingAction.onClick,
+                enabled = trailingAction.enabled,
+                modifier = Modifier.size(if (compact) 36.dp else 42.dp)
+            ) {
+                Icon(
+                    imageVector = trailingAction.icon,
+                    contentDescription = trailingAction.contentDescription,
+                    modifier = Modifier.size(if (compact) 18.dp else 20.dp)
+                )
+            }
         }
     }
 }
@@ -617,7 +654,7 @@ private fun UnifiedMarketDetailPrimaryButton(
 
         Spacer(modifier = Modifier.size(if (compact) 6.dp else 8.dp))
         Text(
-            text = action.label,
+            text = if (action.isLoading) action.loadingLabel ?: action.label else action.label,
             style = if (compact) MaterialTheme.typography.labelMedium else MaterialTheme.typography.bodyMedium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
@@ -659,7 +696,7 @@ private fun UnifiedMarketDetailSecondaryButton(
 
         Spacer(modifier = Modifier.size(if (compact) 6.dp else 8.dp))
         Text(
-            text = action.label,
+            text = if (action.isLoading) action.loadingLabel ?: action.label else action.label,
             style = if (compact) MaterialTheme.typography.labelMedium else MaterialTheme.typography.bodyMedium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
@@ -754,10 +791,10 @@ private fun UnifiedMarketDetailSectionCard(
                 )
             }
         } else {
-            Text(
+            MarkdownTextComposable(
                 text = section.body,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                textColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.fillMaxWidth()
             )
         }
 
@@ -825,81 +862,7 @@ private fun UnifiedMarketDetailMetadataRow(
 }
 
 @Composable
-private fun UnifiedMarketDetailReactionsCard(
-    state: UnifiedMarketDetailReactionsState
-) {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = state.title,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
-            if (state.isLoading) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(18.dp),
-                    strokeWidth = 2.dp
-                )
-            }
-        }
-
-        if (!state.helperText.isNullOrBlank()) {
-            Text(
-                text = state.helperText,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            state.options.forEach { option ->
-                val buttonColors =
-                    if (option.isSelected) {
-                        androidx.compose.material3.ButtonDefaults.filledTonalButtonColors(
-                            containerColor = option.tint.copy(alpha = 0.14f),
-                            contentColor = option.tint
-                        )
-                    } else {
-                        androidx.compose.material3.ButtonDefaults.filledTonalButtonColors()
-                    }
-
-                FilledTonalButton(
-                    onClick = option.onClick,
-                    enabled = option.enabled && !option.isSelected && !state.isMutating,
-                    modifier = Modifier.weight(1f),
-                    colors = buttonColors,
-                    shape = RoundedCornerShape(14.dp)
-                ) {
-                    Icon(
-                        imageVector = option.icon,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.size(6.dp))
-                    Text(
-                        text = "${option.label} ${option.count}",
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
-        }
-
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
-    }
-}
-
-@Composable
+@OptIn(ExperimentalMaterial3Api::class)
 private fun UnifiedMarketDetailCommentsSectionHeader(
     state: UnifiedMarketDetailCommentsState,
     reactions: UnifiedMarketDetailReactionsState?
@@ -908,22 +871,57 @@ private fun UnifiedMarketDetailCommentsSectionHeader(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        if (reactions != null) {
-            UnifiedMarketDetailReactionsCard(state = reactions)
-        }
-
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = stringResource(R.string.mcp_plugin_user_comments),
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = reactions?.title ?: stringResource(R.string.mcp_plugin_community_feedback),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                if (reactions != null) {
+                    reactions.options.forEach { option ->
+                        Surface(
+                            onClick = option.onClick,
+                            enabled = option.enabled && !option.isSelected && !reactions.isMutating,
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (option.isSelected) option.tint.copy(alpha = 0.14f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                            modifier = Modifier.height(28.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(3.dp),
+                                modifier = Modifier.padding(horizontal = 8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = option.icon,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(14.dp),
+                                    tint = if (option.isSelected) option.tint else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = "${option.count}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (option.isSelected) option.tint else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                    if (reactions.isLoading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(14.dp),
+                            strokeWidth = 2.dp
+                        )
+                    }
+                }
+            }
             Row(
                 modifier =
                     Modifier.clickable(enabled = state.canPost && !state.isPosting) {
@@ -960,6 +958,27 @@ private fun UnifiedMarketDetailCommentsSectionHeader(
                         }
                 )
             }
+        }
+
+        if (reactions != null && !reactions.helperText.isNullOrBlank()) {
+            Text(
+                text = reactions.helperText,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = stringResource(R.string.mcp_plugin_user_comments),
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
 
         if (!state.postHint.isNullOrBlank()) {
@@ -1003,110 +1022,127 @@ private fun UnifiedMarketDetailEmptyCommentsCard() {
 }
 
 @Composable
+@OptIn(ExperimentalFoundationApi::class)
 private fun UnifiedMarketDetailCommentCard(
-    comment: GitHubComment,
-    onReply: () -> Unit
+    comment: MarketV2Comment,
+    isReply: Boolean,
+    onReply: () -> Unit,
+    onEdit: () -> Unit = {},
+    onDelete: () -> Unit = {},
+    currentUserLogin: String? = null
 ) {
-    val parsedComment = remember(comment.id, comment.body) {
-        parseMarketCommentBody(comment.body)
-    }
+    val body = comment.body.trim()
     var bodyExpanded by remember(comment.id) { mutableStateOf(false) }
     var bodyOverflowed by remember(comment.id) { mutableStateOf(false) }
+    var menuExpanded by remember(comment.id) { mutableStateOf(false) }
+    val canEditComment = currentUserLogin != null && comment.author.login.equals(currentUserLogin, ignoreCase = true)
 
     Column(
-        modifier = Modifier.fillMaxWidth(),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(start = if (isReply) 24.dp else 0.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Row(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Image(
-                painter = rememberAsyncImagePainter(comment.user.avatarUrl),
-                contentDescription = null,
+        Box(modifier = Modifier.fillMaxWidth()) {
+            Row(
                 modifier =
                     Modifier
-                        .size(42.dp)
-                        .clip(CircleShape),
-                contentScale = ContentScale.Crop
-            )
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
+                        .fillMaxWidth()
+                        .combinedClickable(
+                            onClick = {},
+                            onLongClick = { menuExpanded = true }
+                        )
+                        .padding(vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                Image(
+                    painter = rememberAsyncImagePainter(comment.author.avatarUrl.orEmpty().ifBlank { comment.author.avatar.orEmpty() }),
+                    contentDescription = null,
+                    modifier =
+                        Modifier
+                            .size(32.dp)
+                            .clip(CircleShape),
+                    contentScale = ContentScale.Crop
+                )
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Text(
-                        text = comment.user.login,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = formatMarketDetailDate(comment.updated_at),
+                        text = comment.author.login,
                         style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    if (body.isNotBlank()) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(
+                                text = body,
+                                style = MaterialTheme.typography.bodyMedium,
+                                maxLines =
+                                    if (bodyExpanded) {
+                                        Int.MAX_VALUE
+                                    } else {
+                                        MARKET_COMMENT_BODY_COLLAPSED_LINES
+                                    },
+                                overflow = TextOverflow.Ellipsis,
+                                onTextLayout = { result ->
+                                    bodyOverflowed = result.hasVisualOverflow
+                                }
+                            )
+                            if (bodyOverflowed || bodyExpanded) {
+                                Text(
+                                    text =
+                                        if (bodyExpanded) {
+                                            stringResource(R.string.common_collapse)
+                                        } else {
+                                            stringResource(R.string.common_expand)
+                                        },
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier =
+                                        Modifier.clickable { bodyExpanded = !bodyExpanded }
+                                )
+                            }
+                        }
+                    }
+
+                    Text(
+                        text = formatMarketDetailDate(comment.updatedAt),
+                        style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                parsedComment.quoteBlock?.let { quoteBlock ->
-                    UnifiedMarketDetailCommentQuoteBlock(quoteBlock = quoteBlock)
-                }
+            }
 
-                if (parsedComment.body.isNotBlank()) {
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Text(
-                            text = parsedComment.body,
-                            style = MaterialTheme.typography.bodySmall,
-                            maxLines =
-                                if (bodyExpanded) {
-                                    Int.MAX_VALUE
-                                } else {
-                                    MARKET_COMMENT_BODY_COLLAPSED_LINES
-                                },
-                            overflow = TextOverflow.Ellipsis,
-                            onTextLayout = { result ->
-                                bodyOverflowed = result.hasVisualOverflow
-                            }
-                        )
-                        if (bodyOverflowed || bodyExpanded) {
-                            Text(
-                                text =
-                                    if (bodyExpanded) {
-                                        stringResource(R.string.common_collapse)
-                                    } else {
-                                        stringResource(R.string.common_expand)
-                                    },
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier =
-                                    Modifier.clickable { bodyExpanded = !bodyExpanded }
-                            )
-                        }
+            DropdownMenu(
+                expanded = menuExpanded,
+                onDismissRequest = { menuExpanded = false }
+            ) {
+                DropdownMenuItem(
+                    text = { Text(text = stringResource(R.string.reply)) },
+                    onClick = {
+                        menuExpanded = false
+                        onReply()
                     }
-                } else if (parsedComment.quoteBlock == null) {
-                    Text(
-                        text = comment.body,
-                        style = MaterialTheme.typography.bodySmall
+                )
+                if (canEditComment) {
+                    DropdownMenuItem(
+                        text = { Text(text = stringResource(R.string.edit)) },
+                        onClick = {
+                            menuExpanded = false
+                            onEdit()
+                        }
                     )
-                }
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
-                ) {
-                    Text(
-                        text = stringResource(R.string.reply),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.clickable(onClick = onReply)
+                    DropdownMenuItem(
+                        text = { Text(text = stringResource(R.string.delete)) },
+                        onClick = {
+                            menuExpanded = false
+                            onDelete()
+                        }
                     )
                 }
             }
@@ -1116,100 +1152,6 @@ private fun UnifiedMarketDetailCommentCard(
     }
 }
 
-@Composable
-private fun UnifiedMarketDetailCommentQuoteBlock(
-    quoteBlock: MarketCommentQuoteBlock
-) {
-    var expanded by remember(quoteBlock) { mutableStateOf(false) }
-    val totalQuoteLines = quoteBlock.visibleLines.size + quoteBlock.hiddenLines.size
-    val hasHiddenFloor = quoteBlock.hiddenLines.isNotEmpty()
-    val shouldCollapse = totalQuoteLines > MARKET_COMMENT_QUOTE_COLLAPSED_LINES || hasHiddenFloor
-    val displayLines =
-        when {
-            expanded || !shouldCollapse -> quoteBlock.visibleLines + quoteBlock.hiddenLines
-            else -> quoteBlock.visibleLines.take(MARKET_COMMENT_QUOTE_COLLAPSED_LINES)
-        }
-
-    Card(
-        colors =
-            CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
-            ),
-        shape = RoundedCornerShape(14.dp),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .animateContentSize()
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            displayLines.forEach { quoteLine ->
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.Top
-                ) {
-                    Box(
-                        modifier =
-                            Modifier
-                                .padding(top = 2.dp)
-                                .size(width = 3.dp, height = 16.dp)
-                                .clip(RoundedCornerShape(999.dp))
-                                .background(
-                                    if (quoteLine.level == 1) {
-                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
-                                    } else {
-                                        MaterialTheme.colorScheme.outline.copy(alpha = 0.7f)
-                                    }
-                                )
-                    )
-                    Text(
-                        text = quoteLine.text,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(start = ((quoteLine.level - 1) * 10).dp)
-                    )
-                }
-            }
-
-            if (shouldCollapse) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    if (!expanded) {
-                        Text(
-                            text = "...",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    } else {
-                        Spacer(modifier = Modifier.weight(1f))
-                    }
-
-                    Text(
-                        text =
-                            if (expanded) {
-                                stringResource(R.string.common_collapse)
-                            } else if (hasHiddenFloor) {
-                                stringResource(R.string.mcp_plugin_comment_view_thread)
-                            } else {
-                                stringResource(R.string.common_expand)
-                            },
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier =
-                            Modifier.clickable { expanded = !expanded }
-                    )
-                }
-            }
-        }
-    }
-}
 
 @Composable
 fun UnifiedMarketDetailCommentDialog(
@@ -1294,7 +1236,6 @@ fun splitMarketTags(raw: String): List<String> {
         .distinct()
 }
 
-private const val MARKET_COMMENT_QUOTE_COLLAPSED_LINES = 3
 private const val MARKET_COMMENT_BODY_COLLAPSED_LINES = 8
 
 @Composable
@@ -1328,94 +1269,5 @@ private fun BindUnifiedMarketDetailTopBarTitle(
                 null
             }
         )
-    }
-}
-
-private data class MarketCommentBody(
-    val quoteBlock: MarketCommentQuoteBlock?,
-    val body: String
-)
-
-private data class MarketCommentQuoteLine(
-    val level: Int,
-    val text: String
-)
-
-private data class MarketCommentQuoteBlock(
-    val visibleLines: List<MarketCommentQuoteLine>,
-    val hiddenLines: List<MarketCommentQuoteLine>
-)
-
-private fun parseMarketCommentBody(raw: String): MarketCommentBody {
-    val lines = raw.replace("\r\n", "\n").split('\n')
-    val quoteLines = mutableListOf<MarketCommentQuoteLine>()
-    var quoteEnded = false
-    var bodyStartIndex = lines.size
-
-    for ((index, line) in lines.withIndex()) {
-        val parsedQuoteLine = parseMarketQuoteLine(line)
-        if (!quoteEnded && parsedQuoteLine != null) {
-            quoteLines += parsedQuoteLine
-            continue
-        }
-
-        if (quoteLines.isNotEmpty()) {
-            quoteEnded = true
-            bodyStartIndex = index
-            break
-        }
-    }
-
-    val body =
-        if (quoteLines.isEmpty()) {
-            raw.trim()
-        } else {
-            lines.drop(bodyStartIndex).joinToString("\n").trim()
-        }
-
-    if (quoteLines.isEmpty()) {
-        return MarketCommentBody(quoteBlock = null, body = body)
-    }
-
-    val visibleLines = quoteLines.filter { it.level <= 2 }
-    val hiddenLines = quoteLines.filter { it.level > 2 }
-    return MarketCommentBody(
-        quoteBlock = MarketCommentQuoteBlock(visibleLines = visibleLines, hiddenLines = hiddenLines),
-        body = body
-    )
-}
-
-private fun parseMarketQuoteLine(line: String): MarketCommentQuoteLine? {
-    val trimmedStart = line.trimStart()
-    if (!trimmedStart.startsWith(">")) {
-        return null
-    }
-
-    var depth = 0
-    while (depth < trimmedStart.length && trimmedStart[depth] == '>') {
-        depth++
-    }
-
-    val text = trimmedStart.drop(depth).trimStart().ifBlank { " " }
-    return MarketCommentQuoteLine(level = depth, text = text)
-}
-
-fun buildMarketCommentReplyDraft(comment: GitHubComment): String {
-    val quotedBody =
-        comment.body
-            .replace("\r\n", "\n")
-            .split('\n')
-            .joinToString("\n") { line -> "> ${line.trimEnd()}" }
-            .trimEnd()
-
-    return buildString {
-        if (quotedBody.isNotBlank()) {
-            append(quotedBody)
-            append("\n\n")
-        } else {
-            append("> @")
-            append(comment.user.login)
-            append("\n\n")
-        }
     }
 }

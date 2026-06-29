@@ -2,9 +2,8 @@ package com.ai.assistance.operit.ui.features.packages.market
 
 import android.content.Context
 import com.ai.assistance.operit.core.tools.packTool.PackageManager
-import com.ai.assistance.operit.data.api.ArtifactProjectNodeResponse
-import com.ai.assistance.operit.data.api.MarketStatsApiService
-import com.ai.assistance.operit.util.AppLogger
+import com.ai.assistance.operit.data.api.ArtifactProjectVersionResponse
+import com.ai.assistance.operit.data.api.MarketV2Entry
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
@@ -31,11 +30,85 @@ data class LocalArtifactInstallState(
     val snapshot: LocalInstalledArtifactSnapshot? = null
 )
 
-fun PackageManager.getInstalledArtifactSnapshots(): Map<String, LocalInstalledArtifactSnapshot> {
+enum class MarketLocalInstallStateKind {
+    NOT_INSTALLED,
+    INSTALLED,
+    UPDATE_AVAILABLE,
+    CONFLICT,
+    BLOCKED_CONFLICT
+}
+
+data class MarketLocalInstallState(
+    val entryId: String,
+    val kind: MarketLocalInstallStateKind
+)
+
+fun resolveMarketLocalInstallStates(
+    entries: List<MarketV2Entry>,
+    installedSnapshots: Map<String, LocalInstalledArtifactSnapshot>
+): Map<String, MarketLocalInstallState> {
+    return entries
+        .filter { entry -> entry.type.lowercase() == "script" || entry.type.lowercase() == "package" }
+        .associate { entry ->
+            entry.id to MarketLocalInstallState(
+                entryId = entry.id,
+                kind = resolveMarketLocalInstallState(entry, installedSnapshots)
+            )
+        }
+}
+
+fun artifactRuntimePackageIds(entries: List<MarketV2Entry>): Set<String> {
+    return entries
+        .filter { entry -> entry.type.lowercase() == "script" || entry.type.lowercase() == "package" }
+        .map { entry ->
+            val currentVersion = entry.latestVersion ?: error("Entry latestVersion is missing: ${entry.id}")
+            currentVersion.runtimePackageId.ifBlank { error("Artifact runtime package id not found for version: ${currentVersion.id}") }
+        }
+        .toSet()
+}
+
+fun resolveMarketLocalInstallState(
+    entry: MarketV2Entry,
+    installedSnapshots: Map<String, LocalInstalledArtifactSnapshot>
+): MarketLocalInstallStateKind {
+    entry.artifact ?: error("Entry is not artifact: ${entry.id}")
+    val currentVersion = entry.latestVersion ?: error("Entry latestVersion is missing: ${entry.id}")
+    val currentAsset =
+        entry.assets.firstOrNull { it.versionId == currentVersion.id }
+            ?: error("Artifact asset not found for version: ${currentVersion.id}")
+    val runtimePackageId = currentVersion.runtimePackageId.ifBlank { error("Artifact runtime package id not found for version: ${currentVersion.id}") }
+    val projectSha256s =
+        entry.assets
+            .filter { asset -> entry.versions.any { version -> version.id == asset.versionId } }
+            .map { it.sha256 }
+
+    return when (
+        resolveLocalArtifactInstallState(
+            installedSnapshots = installedSnapshots,
+            packageName = runtimePackageId,
+            targetSha256 = currentAsset.sha256,
+            projectNodeSha256s = projectSha256s
+        ).kind
+    ) {
+        LocalArtifactInstallStateKind.NOT_INSTALLED -> MarketLocalInstallStateKind.NOT_INSTALLED
+        LocalArtifactInstallStateKind.EXACT_INSTALLED -> MarketLocalInstallStateKind.INSTALLED
+        LocalArtifactInstallStateKind.SAME_PROJECT_VARIANT_INSTALLED -> MarketLocalInstallStateKind.UPDATE_AVAILABLE
+        LocalArtifactInstallStateKind.NAME_CONFLICT -> MarketLocalInstallStateKind.CONFLICT
+        LocalArtifactInstallStateKind.BUILT_IN_CONFLICT -> MarketLocalInstallStateKind.BLOCKED_CONFLICT
+    }
+}
+
+fun PackageManager.getInstalledArtifactSnapshots(
+    packageNames: Collection<String>? = null
+): Map<String, LocalInstalledArtifactSnapshot> {
+    val targetPackageNames = packageNames?.filter { it.isNotBlank() }?.toSet()
     val publishableSourcesByName =
         getPublishablePackageSources().associateBy { source -> source.packageName }
 
     return getTopLevelAvailablePackages()
+        .filterKeys { packageName ->
+            targetPackageNames == null || targetPackageNames.any { sameArtifactRuntimePackageId(packageName, it) }
+        }
         .mapValues { (packageName, toolPackage) ->
             val sourceFile =
                 publishableSourcesByName[packageName]
@@ -111,15 +184,14 @@ fun resolveLocalArtifactInstallState(
     }
 }
 
-suspend fun installArtifactProjectNode(
+suspend fun installArtifactProjectVersion(
     context: Context,
     packageManager: PackageManager,
-    marketStatsApiService: MarketStatsApiService,
-    projectId: String,
-    projectNodes: List<ArtifactProjectNodeResponse>,
-    node: ArtifactProjectNodeResponse,
-    logTag: String
+    projectVersions: List<ArtifactProjectVersionResponse>,
+    version: ArtifactProjectVersionResponse,
+    onProgress: MarketInstallProgressReporter = { _, _ -> }
 ) {
+    onProgress(MarketInstallStage.CHECKING_LOCAL, null)
     val installedSnapshots =
         withContext(Dispatchers.IO) {
             packageManager.getInstalledArtifactSnapshots()
@@ -127,12 +199,12 @@ suspend fun installArtifactProjectNode(
     val installState =
         resolveLocalArtifactInstallState(
             installedSnapshots = installedSnapshots,
-            packageName = node.runtimePackageId,
-            targetSha256 = node.sha256,
+            packageName = version.runtimePackageId,
+            targetSha256 = version.sha256,
             projectNodeSha256s =
-                projectNodes
+                projectVersions
                     .filter {
-                        sameArtifactRuntimePackageId(it.runtimePackageId, node.runtimePackageId)
+                        sameArtifactRuntimePackageId(it.runtimePackageId, version.runtimePackageId)
                     }
                     .map { it.sha256 }
         )
@@ -140,17 +212,20 @@ suspend fun installArtifactProjectNode(
     when (installState.kind) {
         LocalArtifactInstallStateKind.EXACT_INSTALLED -> return
         LocalArtifactInstallStateKind.BUILT_IN_CONFLICT ->
-            throw IllegalStateException("本地已安装同名内置插件 `${node.runtimePackageId}`，不能直接覆盖。")
-        LocalArtifactInstallStateKind.NAME_CONFLICT ->
-            throw IllegalStateException("本地已安装同名但不属于当前项目簇的插件 `${node.runtimePackageId}`，请先手动卸载后再安装。")
+            throw IllegalStateException("本地已安装同名内置插件 `${version.runtimePackageId}`，不能直接覆盖。")
+        LocalArtifactInstallStateKind.NAME_CONFLICT,
         LocalArtifactInstallStateKind.NOT_INSTALLED,
         LocalArtifactInstallStateKind.SAME_PROJECT_VARIANT_INSTALLED -> Unit
     }
 
-    val tempFile = withContext(Dispatchers.IO) { downloadArtifactProjectNodeToTempFile(context, node) }
+    val tempFile = withContext(Dispatchers.IO) { downloadArtifactProjectVersionToTempFile(context, version, onProgress) }
     try {
-        if (installState.kind == LocalArtifactInstallStateKind.SAME_PROJECT_VARIANT_INSTALLED) {
-            val installedPackageName = installState.snapshot?.packageName ?: node.runtimePackageId
+        onProgress(MarketInstallStage.INSTALLING, null)
+        if (
+            installState.kind == LocalArtifactInstallStateKind.SAME_PROJECT_VARIANT_INSTALLED ||
+            installState.kind == LocalArtifactInstallStateKind.NAME_CONFLICT
+        ) {
+            val installedPackageName = installState.snapshot?.packageName ?: version.runtimePackageId
             val deleted =
                 withContext(Dispatchers.IO) {
                     packageManager.deletePackage(installedPackageName)
@@ -166,12 +241,6 @@ suspend fun installArtifactProjectNode(
         if (!importResult.startsWith("Successfully imported", ignoreCase = true)) {
             throw IllegalStateException(importResult)
         }
-        trackArtifactProjectNodeDownload(
-            marketStatsApiService = marketStatsApiService,
-            projectId = projectId,
-            node = node,
-            logTag = logTag
-        )
     } finally {
         if (tempFile.exists()) {
             tempFile.delete()
@@ -179,64 +248,57 @@ suspend fun installArtifactProjectNode(
     }
 }
 
-private suspend fun trackArtifactProjectNodeDownload(
-    marketStatsApiService: MarketStatsApiService,
-    projectId: String,
-    node: ArtifactProjectNodeResponse,
-    logTag: String
-) {
-    val artifactType =
-        PublishArtifactType.fromWireValue(node.type)
-            ?: return
-    val targetUrl =
-        resolveMarketDownloadTarget(
-            preferredUrl = node.downloadUrl,
-            fallbackUrl = node.issue.html_url
-        )
-    marketStatsApiService.trackDownload(
-        type = artifactType.toMarketStatsType().wireValue,
-        id = projectId,
-        targetUrl = targetUrl
-    ).onFailure { error ->
-        AppLogger.w(logTag, "Failed to track artifact download for project=$projectId: ${error.message}")
-    }
-}
-
-private fun downloadArtifactProjectNodeToTempFile(
+private fun downloadArtifactProjectVersionToTempFile(
     context: Context,
-    node: ArtifactProjectNodeResponse
+    version: ArtifactProjectVersionResponse,
+    onProgress: MarketInstallProgressReporter
 ): File {
+    val downloadUrl = version.downloadUrl.trim().ifBlank { throw IllegalStateException("Missing v2 asset download URL") }
     val downloadDir = File(context.cacheDir, "market_downloads")
     if (!downloadDir.exists() && !downloadDir.mkdirs()) {
         throw IllegalStateException("Failed to create market download cache")
     }
 
-    val targetFile = File(downloadDir, node.assetName.ifBlank { "${node.runtimePackageId}.bin" })
-    val connection = URL(node.downloadUrl).openConnection() as HttpURLConnection
+    val targetFile = File(downloadDir, version.assetName.ifBlank { "${version.runtimePackageId}.bin" })
+    val connection = URL(downloadUrl).openConnection() as HttpURLConnection
     connection.instanceFollowRedirects = true
     connection.connectTimeout = 30_000
     connection.readTimeout = 60_000
     connection.requestMethod = "GET"
 
     try {
+        onProgress(MarketInstallStage.CONNECTING, null)
         connection.connect()
         val code = connection.responseCode
         if (code !in 200..299) {
             throw IllegalStateException("Download failed: HTTP $code")
         }
 
+        val totalBytes = connection.contentLengthLong
+        var downloadedBytes = 0L
         val inputStream = connection.inputStream ?: throw IllegalStateException("Empty download stream")
         inputStream.use { input ->
             targetFile.outputStream().use { output ->
-                input.copyTo(output)
+                val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                while (true) {
+                    val read = input.read(buffer)
+                    if (read <= 0) break
+                    output.write(buffer, 0, read)
+                    downloadedBytes += read
+                    onProgress(
+                        MarketInstallStage.DOWNLOADING,
+                        if (totalBytes > 0) downloadedBytes.toFloat() / totalBytes.toFloat() else null
+                    )
+                }
             }
         }
     } finally {
         connection.disconnect()
     }
 
+    onProgress(MarketInstallStage.VERIFYING, null)
     val actualSha256 = sha256Hex(targetFile)
-    if (!actualSha256.equals(node.sha256, ignoreCase = true)) {
+    if (!actualSha256.equals(version.sha256, ignoreCase = true)) {
         targetFile.delete()
         throw IllegalStateException("Downloaded file sha256 mismatch")
     }

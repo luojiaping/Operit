@@ -8,7 +8,8 @@ data class MarketBrowseSectionConfig(
     @StringRes val searchPlaceholderRes: Int,
     @StringRes val headerTitleRes: Int,
     @StringRes val emptySearchTitleRes: Int,
-    @StringRes val emptyDefaultTitleRes: Int
+    @StringRes val emptyDefaultTitleRes: Int,
+    val sortOptions: List<MarketSortOption> = MarketSortOption.entries
 )
 
 data class MarketBrowseEntry(
@@ -50,6 +51,7 @@ fun <T> MarketBrowseSection(
         headerTitleRes = config.headerTitleRes,
         emptySearchTitleRes = config.emptySearchTitleRes,
         emptyDefaultTitleRes = config.emptyDefaultTitleRes,
+        sortOptions = config.sortOptions,
         itemKey = itemKey,
         updatedAtSelector = updatedAtSelector,
         itemContent = { item ->

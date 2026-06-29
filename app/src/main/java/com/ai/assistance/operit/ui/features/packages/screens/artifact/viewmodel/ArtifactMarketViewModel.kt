@@ -12,37 +12,32 @@ import com.ai.assistance.operit.core.tools.AIToolHandler
 import com.ai.assistance.operit.core.tools.packTool.PackageManager
 import com.ai.assistance.operit.data.api.MarketStatsApiService
 import com.ai.assistance.operit.data.api.GitHubApiService
-import com.ai.assistance.operit.data.api.GitHubIssue
+import com.ai.assistance.operit.data.api.MarketV2EntryUpdateRequest
+import com.ai.assistance.operit.data.api.MarketV2Entry
 import com.ai.assistance.operit.data.preferences.GitHubAuthPreferences
 import com.ai.assistance.operit.ui.features.packages.market.ArtifactMarketScope
-import com.ai.assistance.operit.ui.features.packages.market.collectArtifactPredecessorPublisherLogins
 import com.ai.assistance.operit.ui.features.packages.market.ArtifactPublishClusterContext
 import com.ai.assistance.operit.ui.features.packages.market.ForgeRepoInfo
 import com.ai.assistance.operit.ui.features.packages.market.GitHubForgePublishService
-import com.ai.assistance.operit.ui.features.packages.market.GitHubIssueMarketService
-import com.ai.assistance.operit.ui.features.packages.market.inspectLocalArtifactAuthorDeclaration
 import com.ai.assistance.operit.ui.features.packages.market.LocalPublishableArtifact
 import com.ai.assistance.operit.ui.features.packages.market.MarketRegistrationPayload
 import com.ai.assistance.operit.ui.features.packages.market.PublishArtifactRequest
 import com.ai.assistance.operit.ui.features.packages.market.PublishArtifactType
 import com.ai.assistance.operit.ui.features.packages.market.PublishAttemptResult
 import com.ai.assistance.operit.ui.features.packages.market.PublishProgressStage
-import com.ai.assistance.operit.ui.features.packages.market.buildArtifactMarketIssueBody
 import com.ai.assistance.operit.ui.features.packages.market.formatSupportedAppVersions
 import com.ai.assistance.operit.ui.features.packages.market.normalizeMarketArtifactId
 import com.ai.assistance.operit.ui.features.packages.market.normalizeAppVersionOrNull
 import com.ai.assistance.operit.ui.features.packages.market.sameArtifactRuntimePackageId
+import com.ai.assistance.operit.ui.features.packages.market.toMarketStatsType
+import com.ai.assistance.operit.ui.features.packages.market.toRankMetric
 import com.ai.assistance.operit.ui.features.packages.market.validateStandaloneArtifactRuntimePackageId
 import com.ai.assistance.operit.ui.features.packages.market.validateSupportedAppVersions
-import com.ai.assistance.operit.ui.features.packages.utils.ArtifactIssueParser
 import com.ai.assistance.operit.ui.features.github.GitHubOAuthCoordinator
 import com.ai.assistance.operit.util.AppLogger
 import java.io.File
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -55,22 +50,12 @@ class ArtifactMarketViewModel(
     private val context: Context,
     private val scope: ArtifactMarketScope
 ) : ViewModel() {
-    data class MarketActionNotice(
-        val title: String,
-        val message: String
-    )
-
     private val githubApiService = GitHubApiService(context)
     private val marketStatsApiService = MarketStatsApiService()
     private val githubAuth = GitHubAuthPreferences.getInstance(context)
     private val forgePublishService = GitHubForgePublishService(context, githubApiService)
     private val packageManager =
         PackageManager.getInstance(context, AIToolHandler.getInstance(context))
-    private val marketServices =
-        PublishArtifactType.entries.associateWith { type ->
-            GitHubIssueMarketService(githubApiService, type.marketDefinition())
-        }
-
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
@@ -79,12 +64,6 @@ class ArtifactMarketViewModel(
 
     private val _publishableArtifacts = MutableStateFlow<List<LocalPublishableArtifact>>(emptyList())
     val publishableArtifacts: StateFlow<List<LocalPublishableArtifact>> = _publishableArtifacts.asStateFlow()
-
-    private val _userPublishedArtifacts = MutableStateFlow<List<GitHubIssue>>(emptyList())
-    val userPublishedArtifacts: StateFlow<List<GitHubIssue>> = _userPublishedArtifacts.asStateFlow()
-    private val _hasLoadedUserPublishedArtifacts = MutableStateFlow(false)
-    val hasLoadedUserPublishedArtifacts: StateFlow<Boolean> =
-        _hasLoadedUserPublishedArtifacts.asStateFlow()
 
     private val _publishProgressStage = MutableStateFlow(PublishProgressStage.IDLE)
     val publishProgressStage: StateFlow<PublishProgressStage> = _publishProgressStage.asStateFlow()
@@ -97,9 +76,6 @@ class ArtifactMarketViewModel(
 
     private val _publishSuccessMessage = MutableStateFlow<String?>(null)
     val publishSuccessMessage: StateFlow<String?> = _publishSuccessMessage.asStateFlow()
-
-    private val _marketActionNotice = MutableStateFlow<MarketActionNotice?>(null)
-    val marketActionNotice: StateFlow<MarketActionNotice?> = _marketActionNotice.asStateFlow()
 
     private val _requiresForgeInitialization = MutableStateFlow(false)
     val requiresForgeInitialization: StateFlow<Boolean> = _requiresForgeInitialization.asStateFlow()
@@ -156,15 +132,12 @@ class ArtifactMarketViewModel(
                         .mapNotNull { source ->
                             val type = inferArtifactType(source.isToolPkg, source.fileExtension) ?: return@mapNotNull null
                             if (type !in supportedTypes) return@mapNotNull null
-                            val authorDeclaration = inspectLocalArtifactAuthorDeclaration(source)
                             LocalPublishableArtifact(
                                 type = type,
                                 packageName = source.packageName,
                                 displayName = source.displayName,
                                 description = source.description,
                                 sourceFile = File(source.sourcePath),
-                                hasDeclaredAuthorField = authorDeclaration.hasAuthorField,
-                                declaredAuthorSlotCount = authorDeclaration.declaredAuthorSlotCount,
                                 inferredVersion = source.inferredVersion
                             )
                         }
@@ -174,111 +147,12 @@ class ArtifactMarketViewModel(
         }
     }
 
-    fun loadUserPublishedArtifacts() {
-        viewModelScope.launch {
-            if (!githubAuth.isLoggedIn()) {
-                _errorMessage.value = "GitHub login required"
-                return@launch
-            }
-
-            _isLoading.value = true
-            _errorMessage.value = null
-
-            try {
-                val userInfo = githubAuth.getCurrentUserInfo()
-                if (userInfo == null) {
-                    _errorMessage.value = "Unable to read GitHub user info"
-                    return@launch
-                }
-
-                aggregateResults { service ->
-                    service.getUserPublishedIssues(
-                        creator = userInfo.login
-                    )
-                }.fold(
-                    onSuccess = { issues ->
-                        _userPublishedArtifacts.value = issues.sortedByDescending { it.updated_at }
-                    },
-                    onFailure = { error ->
-                        _errorMessage.value = error.message ?: "Failed to load published artifacts"
-                    }
-                )
-            } catch (e: Exception) {
-                _errorMessage.value = e.message ?: "Failed to load published artifacts"
-                AppLogger.e(TAG, "Failed to load user published artifacts", e)
-            } finally {
-                _hasLoadedUserPublishedArtifacts.value = true
-                _isLoading.value = false
-            }
-        }
-    }
-
-    fun removeArtifactFromMarket(issue: GitHubIssue, title: String) {
-        updateArtifactIssueState(
-            issue = issue,
-            state = "closed",
-            successMessage = getText(R.string.artifact_market_remove_request_submitted_message, title)
-        )
-    }
-
-    fun reopenArtifactInMarket(issue: GitHubIssue, title: String) {
-        updateArtifactIssueState(
-            issue = issue,
-            state = "open",
-            successMessage = getText(R.string.artifact_market_reopen_request_submitted_message, title)
-        )
-    }
-
-    private fun updateArtifactIssueState(issue: GitHubIssue, state: String, successMessage: String) {
-        viewModelScope.launch {
-            if (!githubAuth.isLoggedIn()) {
-                _errorMessage.value = "GitHub login required"
-                return@launch
-            }
-
-            val type = ArtifactIssueParser.parseArtifactInfo(issue).type
-            if (type == null) {
-                _errorMessage.value = "Invalid artifact metadata"
-                return@launch
-            }
-
-            _isLoading.value = true
-            _errorMessage.value = null
-            try {
-                marketServices.getValue(type).updateIssueState(issue.number, state).fold(
-                    onSuccess = {
-                        _userPublishedArtifacts.value =
-                            _userPublishedArtifacts.value.map { existing ->
-                                if (existing.id == issue.id) existing.copy(state = state) else existing
-                            }
-                        _marketActionNotice.value =
-                            MarketActionNotice(
-                                title =
-                                    if (state == "closed") {
-                                        getText(R.string.artifact_market_remove_request_submitted_title)
-                                    } else {
-                                        getText(R.string.artifact_market_reopen_request_submitted_title)
-                                    },
-                                message = appendMarketScheduleNotice(successMessage)
-                            )
-                    },
-                    onFailure = { error ->
-                        _errorMessage.value = error.message ?: "Failed to update market entry"
-                    }
-                )
-            } catch (e: Exception) {
-                _errorMessage.value = e.message ?: "Failed to update market entry"
-                AppLogger.e(TAG, "Failed to update market entry state", e)
-            } finally {
-                _isLoading.value = false
-            }
-        }
-    }
-
     fun requestPublish(
         packageName: String,
         displayName: String,
         description: String,
+        detail: String,
+        categoryId: String,
         version: String,
         minSupportedAppVersion: String?,
         maxSupportedAppVersion: String?,
@@ -301,6 +175,8 @@ class ArtifactMarketViewModel(
                 localArtifact = localArtifact,
                 displayName = resolvedDisplayName,
                 description = description,
+                detail = detail,
+                categoryId = categoryId,
                 version = version,
                 minSupportedAppVersion = minSupportedAppVersion,
                 maxSupportedAppVersion = maxSupportedAppVersion,
@@ -310,9 +186,11 @@ class ArtifactMarketViewModel(
     }
 
     fun updatePublishedArtifact(
-        issue: GitHubIssue,
+        entry: com.ai.assistance.operit.data.api.MarketV2Entry,
         displayName: String,
         description: String,
+        detail: String,
+        categoryId: String,
         minSupportedAppVersion: String?,
         maxSupportedAppVersion: String?
     ) {
@@ -334,38 +212,38 @@ class ArtifactMarketViewModel(
                 )
 
                 val type =
-                    ArtifactIssueParser.parseArtifactInfo(issue).type
+                    PublishArtifactType.fromWireValue(entry.type)
                         ?: throw IllegalStateException("Invalid artifact metadata")
-                val payload =
-                    buildUpdatedMarketRegistrationPayload(
-                        issue = issue,
-                        type = type,
-                        displayName = displayName,
-                        description = description,
-                        minSupportedAppVersion = minSupportedAppVersion,
-                        maxSupportedAppVersion = maxSupportedAppVersion
-                    )
+                val payload = buildUpdatedMarketRegistrationPayload(
+                    entry = entry,
+                    type = type,
+                    displayName = displayName,
+                    description = description,
+                    detail = detail,
+                    minSupportedAppVersion = minSupportedAppVersion,
+                    maxSupportedAppVersion = maxSupportedAppVersion
+                )
                 ensureArtifactDisplayNameAvailable(
                     displayName = payload.displayName,
-                    currentIssueId = issue.id
+                    currentEntryId = entry.id
                 )
 
-                marketServices.getValue(type).updateIssueContent(
-                    issueNumber = issue.number,
-                    title = payload.displayName,
-                    body = buildArtifactMarketIssueBody(payload)
+                marketStatsApiService.updateEntry(
+                    entryId = entry.id,
+                    request = MarketV2EntryUpdateRequest(
+                        title = payload.displayName,
+                        description = payload.description,
+                        detail = payload.projectDescription,
+                        categoryId = categoryId
+                    )
                 ).fold(
-                    onSuccess = { updatedIssue ->
+                    onSuccess = {
                         _publishProgressStage.value = PublishProgressStage.COMPLETED
                         _publishMessage.value = null
                         _publishSuccessMessage.value =
                             appendMarketScheduleNotice(
                                 getText(R.string.artifact_publish_node_updated, payload.displayName)
                             )
-                        _userPublishedArtifacts.value =
-                            _userPublishedArtifacts.value.map { existing ->
-                                if (existing.id == updatedIssue.id) updatedIssue else existing
-                            }
                     },
                     onFailure = { error ->
                         _publishProgressStage.value = PublishProgressStage.IDLE
@@ -406,7 +284,6 @@ class ArtifactMarketViewModel(
                     _publishProgressStage.value = PublishProgressStage.COMPLETED
                     _publishSuccessMessage.value =
                         appendMarketScheduleNotice(getText(R.string.artifact_market_registration_completed))
-                    loadUserPublishedArtifacts()
                 },
                 onFailure = { error ->
                     _publishErrorMessage.value = error.message ?: "Failed to register market entry"
@@ -420,13 +297,6 @@ class ArtifactMarketViewModel(
         _errorMessage.value = null
     }
 
-    fun resetUserPublishedArtifactsState() {
-        _userPublishedArtifacts.value = emptyList()
-        _hasLoadedUserPublishedArtifacts.value = false
-        _errorMessage.value = null
-        _marketActionNotice.value = null
-    }
-
     fun clearPublishMessages() {
         _publishMessage.value = null
         _publishErrorMessage.value = null
@@ -434,10 +304,6 @@ class ArtifactMarketViewModel(
         if (_publishProgressStage.value == PublishProgressStage.COMPLETED) {
             _publishProgressStage.value = PublishProgressStage.IDLE
         }
-    }
-
-    fun clearMarketActionNotice() {
-        _marketActionNotice.value = null
     }
 
     private fun executePublish(request: PublishArtifactRequest, allowCreateForgeRepo: Boolean) {
@@ -470,7 +336,7 @@ class ArtifactMarketViewModel(
                         runtimePackageId = resolvedRequest.localArtifact.packageName
                     )
                 }
-                validateContinuationAuthorDeclaration(resolvedRequest)
+                validateContinuationVersion(resolvedRequest)
 
                 forgePublishService.publishArtifact(
                     request = resolvedRequest,
@@ -492,7 +358,6 @@ class ArtifactMarketViewModel(
                                 pendingPublishRequest = null
                                 _publishProgressStage.value = PublishProgressStage.COMPLETED
                                 _publishSuccessMessage.value = buildSuccessMessage(result.forgeRepo, result.payload)
-                                loadUserPublishedArtifacts()
                             }
 
                             is PublishAttemptResult.RegistrationRetryRequired -> {
@@ -522,46 +387,100 @@ class ArtifactMarketViewModel(
         }
     }
 
-    private suspend fun validateContinuationAuthorDeclaration(request: PublishArtifactRequest) {
+    private suspend fun validateContinuationVersion(request: PublishArtifactRequest) {
         val publishContext = request.publishContext ?: return
-        val parentNodeIds =
-            publishContext.parentNodeIds
-                .map(String::trim)
-                .filter(String::isNotBlank)
-        if (parentNodeIds.isEmpty()) {
-            return
-        }
-
-        if (!request.localArtifact.hasDeclaredAuthorField) {
-            return
-        }
-
+        val requestedVersion =
+            request.version
+                .trim()
+                .removePrefix("v")
+                .removePrefix("V")
+                .ifBlank { "1.0.0" }
         val projectDetail =
-            marketStatsApiService.getArtifactProject(publishContext.projectId).getOrElse { error ->
+            marketStatsApiService.getArtifactProject(publishContext.entryId).getOrElse { error ->
                 throw error
             }
-        val predecessorPublisherCount =
-            collectArtifactPredecessorPublisherLogins(
-                project = projectDetail,
-                parentNodeIds = parentNodeIds
-            ).size
-        if (predecessorPublisherCount <= 0) {
-            return
-        }
-
-        if (request.localArtifact.declaredAuthorSlotCount < predecessorPublisherCount) {
+        val currentHighestVersion =
+            projectDetail.versions
+                .map { it.version }
+                .filter(String::isNotBlank)
+                .maxWithOrNull(::comparePublishVersions)
+                ?: return
+        if (comparePublishVersions(requestedVersion, currentHighestVersion) <= 0) {
             throw IllegalStateException(
-                getText(
-                    R.string.artifact_publish_author_count_insufficient,
-                    predecessorPublisherCount,
-                    predecessorPublisherCount
-                )
+                "Version $requestedVersion must be greater than existing version $currentHighestVersion"
             )
         }
     }
 
-    private suspend fun searchOpenIssuesByExactTitle(title: String): Result<List<GitHubIssue>> {
-        return aggregateResults { service -> service.searchOpenIssuesByExactTitle(title, page = 1) }
+    private fun buildUpdatedMarketRegistrationPayload(
+        entry: com.ai.assistance.operit.data.api.MarketV2Entry,
+        type: PublishArtifactType,
+        displayName: String,
+        description: String,
+        detail: String,
+        minSupportedAppVersion: String?,
+        maxSupportedAppVersion: String?
+    ): MarketRegistrationPayload {
+        val versionValue = entry.latestVersion
+        val artifactValue = entry.artifact
+        val assetValue = entry.assets.firstOrNull { it.versionId == versionValue?.id }
+        val assetName = assetValue?.assetName.orEmpty().ifBlank { assetValue?.name.orEmpty() }
+        val versionId = versionValue?.id.orEmpty().ifBlank { entry.id }
+        val trimmedDisplayName = displayName.trim().ifBlank { entry.title }
+        val trimmedDescription = description.trim().ifBlank { entry.description }
+        val trimmedDetail = detail.trim().ifBlank { entry.detail.ifBlank { trimmedDescription } }
+        return MarketRegistrationPayload(
+            type = type,
+            entryId = entry.id,
+            projectId = artifactValue?.projectId.orEmpty().ifBlank { versionId },
+            projectDisplayName = entry.title.ifBlank { trimmedDisplayName },
+            projectDescription = trimmedDetail,
+            runtimePackageId = versionValue?.runtimePackageId.orEmpty(),
+            publisherLogin = entry.publisher?.login.orEmpty().ifBlank { entry.author?.login.orEmpty() },
+            forgeRepo = "",
+            releaseTag = "",
+            assetName = assetName,
+            downloadUrl = assetValue?.url.orEmpty(),
+            sha256 = assetValue?.sha256.orEmpty(),
+            version = versionValue?.version.orEmpty().trim().removePrefix("v").removePrefix("V").ifBlank { "1.0.0" },
+            displayName = trimmedDisplayName,
+            description = trimmedDescription,
+            categoryId = entry.categoryId,
+            sourceFileName = assetName,
+            minSupportedAppVersion = normalizeAppVersionOrNull(minSupportedAppVersion),
+            maxSupportedAppVersion = normalizeAppVersionOrNull(maxSupportedAppVersion)
+        )
+    }
+
+    private suspend fun ensureArtifactDisplayNameAvailable(
+        displayName: String,
+        currentEntryId: String? = null,
+        allowExistingOpenDuplicate: Boolean = false
+    ) {
+        if (allowExistingOpenDuplicate) return
+        val normalizedTitle = normalizePublishTitle(displayName)
+        val existing = searchOpenEntriesByExactTitle(displayName).getOrElse { error -> throw error }
+            .firstOrNull { entry ->
+                val entryNumber = entry.projectId.hashCode().let { if (it == Int.MIN_VALUE) 1 else kotlin.math.abs(it) }.toLong()
+                entry.projectId != currentEntryId && normalizePublishTitle(entry.projectDisplayName) == normalizedTitle
+            }
+        if (existing != null) {
+            throw IllegalStateException(getText(R.string.artifact_publish_display_name_taken_message, displayName))
+        }
+    }
+
+    private suspend fun searchOpenEntriesByExactTitle(title: String): Result<List<com.ai.assistance.operit.data.api.ArtifactProjectRankEntryResponse>> {
+        val normalizedTitle = normalizePublishTitle(title)
+        return marketStatsApiService.getArtifactRankPage(
+            type = supportedTypes.firstOrNull()?.toMarketStatsType()?.wireValue ?: PublishArtifactType.SCRIPT.wireValue,
+            metric = com.ai.assistance.operit.ui.features.packages.market.MarketSortOption.UPDATED.toRankMetric(),
+            page = 1
+        ).map { page ->
+            page.items.filter { entry ->
+                normalizePublishTitle(entry.projectDisplayName) == normalizedTitle &&
+                    entry.defaultVersion?.state == "open"
+            }
+        }
     }
 
     private suspend fun ensureFreshPublishIdentityAvailable(
@@ -572,79 +491,32 @@ class ArtifactMarketViewModel(
 
         val normalizedTitle = normalizePublishTitle(displayName)
         val normalizedRuntimePackageId = normalizeMarketArtifactId(runtimePackageId)
-        val titleMatches =
-            aggregateResults { service ->
-                service.searchIssuesByExactTitle(
-                    title = displayName,
-                    page = 1,
-                    openOnly = false
-                )
-            }.getOrElse { error ->
+        val entries = supportedTypes.flatMap { type ->
+            marketStatsApiService.getArtifactRankPage(
+                type = type.toMarketStatsType().wireValue,
+                metric = com.ai.assistance.operit.ui.features.packages.market.MarketSortOption.UPDATED.toRankMetric(),
+                page = 1
+            ).getOrElse { error ->
                 val searchError = error.message ?: getText(R.string.github_search_failed)
                 throw IllegalStateException(
                     getText(R.string.artifact_publish_check_name_duplicate_failed, searchError)
                 )
-            }
-        val titleConflict =
-            titleMatches.firstOrNull { existing ->
-                val existingTitle =
-                    ArtifactIssueParser.parseArtifactInfo(existing).title.ifBlank { existing.title }
-                normalizePublishTitle(existingTitle) == normalizedTitle
-            }
+            }.items
+        }
 
-        val runtimeIdMatches =
-            aggregateResults { service ->
-                service.searchIssues(
-                    rawQuery = "\"$runtimePackageId\"",
-                    page = 1,
-                    openOnly = false
-                )
-            }.getOrElse { error ->
-                val searchError = error.message ?: getText(R.string.github_search_failed)
-                throw IllegalStateException(
-                    getText(R.string.artifact_publish_check_runtime_id_duplicate_failed, searchError)
-                )
-            }
-        val runtimeIdConflict =
-            runtimeIdMatches.firstOrNull { existing ->
-                val parsed = ArtifactIssueParser.parseArtifactInfo(existing)
-                val existingRuntimePackageId =
-                    parsed.runtimePackageId.ifBlank { parsed.normalizedId }
-                existingRuntimePackageId.isNotBlank() &&
-                    sameArtifactRuntimePackageId(existingRuntimePackageId, runtimePackageId)
-            }
-
-        val normalizedIdConflict =
-            if (normalizedRuntimePackageId.equals(runtimePackageId.trim(), ignoreCase = true)) {
-                null
-            } else {
-                val normalizedIdMatches =
-                    aggregateResults { service ->
-                        service.searchIssues(
-                            rawQuery = "\"$normalizedRuntimePackageId\"",
-                            page = 1,
-                            openOnly = false
-                        )
-                    }.getOrElse { error ->
-                        val searchError = error.message ?: getText(R.string.github_search_failed)
-                        throw IllegalStateException(
-                            getText(
-                                R.string.artifact_publish_check_normalized_id_duplicate_failed,
-                                searchError
-                            )
-                        )
-                    }
-                normalizedIdMatches.firstOrNull { existing ->
-                    val parsed = ArtifactIssueParser.parseArtifactInfo(existing)
-                    val candidateIds =
-                        listOf(
-                            parsed.projectId,
-                            parsed.runtimePackageId,
-                            parsed.normalizedId
-                        ).map(String::trim).filter(String::isNotBlank)
-                    candidateIds.any { normalizeMarketArtifactId(it) == normalizedRuntimePackageId }
-                }
-            }
+        val titleConflict = entries.firstOrNull { entry ->
+            normalizePublishTitle(entry.projectDisplayName) == normalizedTitle
+        }
+        val runtimeIdConflict = entries.firstOrNull { entry ->
+            val candidate = entry.defaultVersion?.runtimePackageId.orEmpty()
+            candidate.isNotBlank() && sameArtifactRuntimePackageId(candidate, runtimePackageId)
+        }
+        val normalizedIdConflict = entries.firstOrNull { entry ->
+            val candidates = listOf(entry.projectId, entry.defaultVersion?.runtimePackageId.orEmpty())
+                .map(String::trim)
+                .filter(String::isNotBlank)
+            candidates.any { normalizeMarketArtifactId(it) == normalizedRuntimePackageId }
+        }
 
         if (titleConflict == null && runtimeIdConflict == null && normalizedIdConflict == null) {
             return
@@ -671,29 +543,19 @@ class ArtifactMarketViewModel(
             )
         )
     }
-
-    private suspend fun aggregateResults(
-        request: suspend (GitHubIssueMarketService) -> Result<List<GitHubIssue>>
-    ): Result<List<GitHubIssue>> {
-        val results =
-            coroutineScope {
-                supportedTypes.map { type ->
-                    async { request(marketServices.getValue(type)) }
-                }.awaitAll()
+    private fun resolvePublishDisplayName(request: PublishArtifactRequest): String {
+        val lockedDisplayName = request.publishContext?.lockedDisplayName?.trim().orEmpty()
+        if (request.publishContext != null) {
+            if (lockedDisplayName.isBlank()) {
+                throw IllegalStateException(getText(R.string.artifact_publish_locked_name_required))
             }
-
-        val aggregated = mutableListOf<GitHubIssue>()
-        results.forEach { result ->
-            result.fold(
-                onSuccess = { aggregated += it },
-                onFailure = { return Result.failure(it) }
-            )
+            return lockedDisplayName
         }
-        return Result.success(
-            aggregated
-                .distinctBy { it.id }
-                .sortedByDescending { it.updated_at }
-        )
+        return request.displayName.trim()
+    }
+
+    private fun normalizePublishTitle(title: String): String {
+        return title.trim().replace(Regex("\\s+"), " ").lowercase()
     }
 
     private fun stageMessage(stage: PublishProgressStage): String? {
@@ -710,121 +572,9 @@ class ArtifactMarketViewModel(
 
     private fun buildSuccessMessage(forgeRepo: ForgeRepoInfo, payload: MarketRegistrationPayload): String {
         return appendMarketScheduleNotice(
-            buildString {
-                append(getText(R.string.artifact_publish_success_header, payload.displayName, forgeRepo.repoName))
-                append(getText(R.string.artifact_publish_success_type, payload.type.wireValue))
-                append(getText(R.string.artifact_publish_success_project, payload.projectId))
-                append(getText(R.string.artifact_publish_success_node, payload.nodeId))
-                append(getText(R.string.artifact_publish_success_release_tag, payload.releaseTag))
-                append(getText(R.string.artifact_publish_success_asset, payload.assetName))
-                append(
-                    getText(
-                        R.string.artifact_publish_success_supported_versions,
-                        formatSupportedAppVersions(
-                            payload.minSupportedAppVersion,
-                            payload.maxSupportedAppVersion
-                        )
-                    )
-                )
-            }
+            "${payload.displayName} published to ${forgeRepo.ownerLogin}/${forgeRepo.repoName} ${payload.releaseTag} " +
+                formatSupportedAppVersions(payload.minSupportedAppVersion, payload.maxSupportedAppVersion)
         )
-    }
-
-    private fun buildUpdatedMarketRegistrationPayload(
-        issue: GitHubIssue,
-        type: PublishArtifactType,
-        displayName: String,
-        description: String,
-        minSupportedAppVersion: String?,
-        maxSupportedAppVersion: String?
-    ): MarketRegistrationPayload {
-        val info = ArtifactIssueParser.parseArtifactInfo(issue)
-        val nodeId = info.nodeId.ifBlank { "legacy-${issue.id}" }
-        val rootNodeId = info.rootNodeId.ifBlank { nodeId }
-        val isRootNode = rootNodeId == nodeId
-        val trimmedDisplayName = displayName.trim().ifBlank { info.title }
-        val trimmedDescription = description.trim().ifBlank { info.description }
-
-        return MarketRegistrationPayload(
-            type = type,
-            projectId = info.projectId.ifBlank { info.normalizedId },
-            projectDisplayName =
-                if (isRootNode) {
-                    trimmedDisplayName
-                } else {
-                    info.projectDisplayName.ifBlank { info.title }
-                },
-            projectDescription =
-                if (isRootNode) {
-                    trimmedDescription
-                } else {
-                    info.projectDescription.ifBlank { info.description }
-                },
-            runtimePackageId = info.runtimePackageId.ifBlank { info.normalizedId },
-            nodeId = nodeId,
-            rootNodeId = rootNodeId,
-            parentNodeIds = info.parentNodeIds,
-            publisherLogin = info.publisherLogin.ifBlank { issue.user.login },
-            forgeRepo = info.forgeRepo,
-            releaseTag = info.releaseTag,
-            assetName = info.assetName,
-            downloadUrl = info.downloadUrl,
-            sha256 = info.sha256,
-            version = info.version.trim().removePrefix("v").removePrefix("V").ifBlank { "1.0.0" },
-            displayName = trimmedDisplayName,
-            description = trimmedDescription,
-            sourceFileName = info.sourceFileName,
-            minSupportedAppVersion = normalizeAppVersionOrNull(minSupportedAppVersion),
-            maxSupportedAppVersion = normalizeAppVersionOrNull(maxSupportedAppVersion)
-        )
-    }
-
-    private suspend fun ensureArtifactDisplayNameAvailable(
-        displayName: String,
-        currentIssueId: Long? = null,
-        allowExistingOpenDuplicate: Boolean = false
-    ) {
-        val trimmedDisplayName = displayName.trim()
-        if (trimmedDisplayName.isBlank()) {
-            throw IllegalArgumentException(getText(R.string.artifact_publish_plugin_name_empty))
-        }
-        if (allowExistingOpenDuplicate) {
-            return
-        }
-
-        val existingIssues =
-            searchOpenIssuesByExactTitle(trimmedDisplayName).getOrElse { error ->
-                val searchError = error.message ?: getText(R.string.github_search_failed)
-                throw IllegalStateException(
-                    getText(R.string.artifact_publish_check_name_conflict_failed, searchError)
-                )
-            }
-        val normalizedTitle = normalizePublishTitle(trimmedDisplayName)
-        val conflictingIssue =
-            existingIssues.firstOrNull { existing ->
-                existing.id != currentIssueId &&
-                    normalizePublishTitle(existing.title) == normalizedTitle
-            }
-        if (conflictingIssue != null) {
-            throw IllegalStateException(
-                getText(R.string.artifact_publish_display_name_taken_message, trimmedDisplayName)
-            )
-        }
-    }
-
-    private fun resolvePublishDisplayName(request: PublishArtifactRequest): String {
-        val lockedDisplayName = request.publishContext?.lockedDisplayName?.trim().orEmpty()
-        if (request.publishContext != null) {
-            if (lockedDisplayName.isBlank()) {
-                throw IllegalStateException(getText(R.string.artifact_publish_locked_name_required))
-            }
-            return lockedDisplayName
-        }
-        return request.displayName.trim()
-    }
-
-    private fun normalizePublishTitle(title: String): String {
-        return title.trim().replace(Regex("\\s+"), " ").lowercase()
     }
 
     private fun formatPublishErrorMessage(rawMessage: String): String {
@@ -865,6 +615,40 @@ class ArtifactMarketViewModel(
         }
     }
 
+    private fun comparePublishVersions(left: String, right: String): Int {
+        val leftVersion = parsePublishVersion(left)
+        val rightVersion = parsePublishVersion(right)
+        val maxSize = maxOf(leftVersion.parts.size, rightVersion.parts.size)
+        for (index in 0 until maxSize) {
+            val diff = (leftVersion.parts.getOrNull(index) ?: 0) -
+                (rightVersion.parts.getOrNull(index) ?: 0)
+            if (diff != 0) return diff
+        }
+        if (leftVersion.suffix == rightVersion.suffix) return 0
+        if (leftVersion.suffix.isBlank()) return 1
+        if (rightVersion.suffix.isBlank()) return -1
+        return leftVersion.suffix.compareTo(rightVersion.suffix)
+    }
+
+    private fun parsePublishVersion(value: String): PublishVersionParts {
+        val normalized = value.trim().removePrefix("v").removePrefix("V")
+        val core = normalized.substringBefore("-").substringBefore("+")
+        val suffix =
+            normalized
+                .substringAfter("-", "")
+                .substringBefore("+")
+        val parts =
+            core.split(".")
+                .filter(String::isNotBlank)
+                .map { it.toIntOrNull() ?: 0 }
+        return PublishVersionParts(parts = parts, suffix = suffix)
+    }
+
+    private data class PublishVersionParts(
+        val parts: List<Int>,
+        val suffix: String
+    )
+
     class Factory(
         private val context: Context,
         private val scope: ArtifactMarketScope
@@ -880,5 +664,6 @@ class ArtifactMarketViewModel(
 
     companion object {
         private const val TAG = "ArtifactMarketViewModel"
+        private const val CURRENT_APP_VERSION = "1.11.0+5"
     }
 }

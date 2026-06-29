@@ -68,6 +68,7 @@ class CrashReportActivity : ComponentActivity() {
         )
 
         AppLogger.e("CrashReportActivity", "Displaying crash report, chars=${stackTrace.length}")
+        AppLogger.e("CrashReportActivity", "Stack trace:\n$stackTrace")
         setContent { OperitUtilityTheme { CrashReportScreen(stackTrace = stackTrace) } }
     }
 }

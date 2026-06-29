@@ -16,9 +16,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -33,7 +31,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.Alignment
 import androidx.lifecycle.Observer
 import androidx.lifecycle.lifecycleScope
 import com.ai.assistance.operit.R
@@ -104,12 +101,8 @@ class MainActivity : ComponentActivity() {
     // UpdateManager实例
     private lateinit var updateManager: UpdateManager
 
-
     // 是否显示权限引导界面
     private var showPermissionGuide by mutableStateOf(false)
-
-    // 是否已完成初始检查
-    private var initialChecksDone = false
 
     // 存储待处理的分享文件URIs
     private var pendingSharedFileUris: List<Uri>? = null
@@ -201,19 +194,11 @@ class MainActivity : ComponentActivity() {
         // Set window background to solid color to prevent system theme leaking through
         window.setBackgroundDrawableResource(android.R.color.black)
 
-        setAppContent()
-        lifecycleScope.launch {
-            delay(16)
-            completeStartup(savedInstanceState)
-        }
-    }
-
-    private fun completeStartup(savedInstanceState: Bundle?) {
-        (application as OperitApplication).initializeMainApplication()
-
         // Handle the intent that started the activity
         handleIntent(intent)
         restoreRuntimeTaskViewVisibilityIfNeeded()
+
+        (application as OperitApplication).initializeMainApplication()
 
         // 语言设置已在Application中初始化，这里无需重复
 
@@ -232,6 +217,8 @@ class MainActivity : ComponentActivity() {
             Toast.makeText(this, getString(R.string.plugin_loading_skipped), Toast.LENGTH_SHORT).show()
         }
 
+        // 设置初始界面
+        setAppContent()
         processPendingGitHubAuth()
 
         // 初始化并设置更新管理器
@@ -241,9 +228,6 @@ class MainActivity : ComponentActivity() {
         if (savedInstanceState == null) {
             // 进行必要的初始检查
             performInitialChecks()
-        } else {
-            // 配置变更时不重新检查，直接显示主界面
-            initialChecksDone = true
         }
 
         // 设置双击返回退出
@@ -450,12 +434,6 @@ class MainActivity : ComponentActivity() {
             if (!showPermissionGuide && agreementPreferences.isAgreementAccepted()) {
                 startPluginLoading()
             }
-
-            // 标记完成初始检查
-            initialChecksDone = true
-
-            // 设置应用内容
-            setAppContent()
         }
     }
 
@@ -701,16 +679,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             OperitTheme {
                 Box {
-                    // 如果初始化检查未完成，则显示一个占位符，避免在检查完成前显示不完整的界面
-                    if (!initialChecksDone) {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            CircularProgressIndicator()
-                        }
-                    } else {
-                        // 检查是否需要显示用户协议
+                    // 检查是否需要显示用户协议
                         if (!agreementPreferences.isAgreementAccepted()) {
                             AgreementScreen(
                                     onAgreementAccepted = {
@@ -810,7 +779,7 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
-    }
+
 
     private fun getHighestRefreshRate(): Int {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {

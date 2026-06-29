@@ -1,29 +1,15 @@
 package com.ai.assistance.operit.ui.features.packages.market
 
-import com.ai.assistance.operit.ui.features.packages.utils.IssueBodyMetadataParser
 import java.io.File
-import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
-import java.util.UUID
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
 
 const val OPERIT_MARKET_OWNER = "AAswordman"
 const val OPERIT_FORGE_REPO_NAME = "OperitForge"
 
-private const val ARTIFACT_MARKET_JSON_PREFIX = "<!-- operit-market-json: "
-private const val ARTIFACT_MARKET_PARSER_VERSION = "forge-v3"
 private const val SCRIPT_MARKET_LABEL = "script-artifact"
 private const val PACKAGE_MARKET_LABEL = "package-artifact"
 private const val PLACEHOLDER_MARKET_ARTIFACT_ID = "artifact"
 private val APP_VERSION_REGEX = Regex("""^(\d+)\.(\d+)\.(\d+)(?:\+(\d+))?$""")
-private val MARKET_ARTIFACT_JSON =
-    Json {
-        ignoreUnknownKeys = true
-        isLenient = true
-    }
-
 private data class AppVersion(
     val major: Int,
     val minor: Int,
@@ -63,22 +49,18 @@ enum class PublishArtifactType(
         marketLabelDescription = "Published package artifacts managed by Operit."
     );
 
-    fun marketDefinition(): GitHubIssueMarketDefinition {
-        return GitHubIssueMarketDefinition(
-            owner = OPERIT_MARKET_OWNER,
-            repo = marketRepo,
-            label = marketLabel,
-            pageSize = 50,
-            labelColor = marketLabelColor,
-            labelDescription = marketLabelDescription
-        )
-    }
-
     companion object {
         fun fromWireValue(value: String?): PublishArtifactType? {
             val normalized = value?.trim()?.lowercase().orEmpty()
             return entries.firstOrNull { it.wireValue == normalized }
         }
+    }
+}
+
+fun PublishArtifactType.marketFormatVersion(): String {
+    return when (this) {
+        PublishArtifactType.SCRIPT -> "script_v2"
+        PublishArtifactType.PACKAGE -> "toolpkg_v2"
     }
 }
 
@@ -125,13 +107,13 @@ data class LocalPublishableArtifact(
 )
 
 data class ArtifactPublishClusterContext(
+    val entryId: String,
     val projectId: String,
-    val rootNodeId: String,
     val runtimePackageId: String,
-    val parentNodeIds: List<String>,
     val lockedDisplayName: String,
     val projectDisplayName: String,
-    val projectDescription: String
+    val projectDescription: String,
+    val categoryId: String = ""
 )
 
 data class PublishArtifactDescriptor(
@@ -140,11 +122,9 @@ data class PublishArtifactDescriptor(
     val projectDisplayName: String,
     val projectDescription: String,
     val runtimePackageId: String,
-    val nodeId: String,
-    val rootNodeId: String,
-    val parentNodeIds: List<String>,
     val displayName: String,
     val description: String,
+    val categoryId: String,
     val version: String,
     val sourceFile: File,
     val contentType: String,
@@ -161,13 +141,11 @@ data class PublishReleaseDescriptor(
 
 data class MarketRegistrationPayload(
     val type: PublishArtifactType,
+    val entryId: String = "",
     val projectId: String,
     val projectDisplayName: String,
     val projectDescription: String,
     val runtimePackageId: String,
-    val nodeId: String,
-    val rootNodeId: String,
-    val parentNodeIds: List<String>,
     val publisherLogin: String,
     val forgeRepo: String,
     val releaseTag: String,
@@ -177,6 +155,7 @@ data class MarketRegistrationPayload(
     val version: String,
     val displayName: String,
     val description: String,
+    val categoryId: String,
     val sourceFileName: String,
     val minSupportedAppVersion: String?,
     val maxSupportedAppVersion: String?
@@ -189,9 +168,6 @@ data class ArtifactMarketMetadata(
     val projectDisplayName: String = "",
     val projectDescription: String = "",
     val runtimePackageId: String = "",
-    val nodeId: String = "",
-    val rootNodeId: String = "",
-    val parentNodeIds: List<String> = emptyList(),
     val publisherLogin: String = "",
     val releaseTag: String = "",
     val assetName: String = "",
@@ -200,6 +176,7 @@ data class ArtifactMarketMetadata(
     val version: String = "",
     val displayName: String = "",
     val description: String = "",
+    val categoryId: String = "",
     val sourceFileName: String = "",
     val minSupportedAppVersion: String? = null,
     val maxSupportedAppVersion: String? = null,
@@ -233,40 +210,27 @@ fun ArtifactMarketMetadata.effectiveRuntimePackageId(): String {
     return candidate.ifBlank { effectiveProjectId() }
 }
 
-fun ArtifactMarketMetadata.effectiveNodeId(issueId: Long? = null): String {
-    val candidate = nodeId.trim()
-    if (candidate.isNotBlank()) {
-        return candidate
-    }
-    return issueId?.let { "legacy-$it" } ?: "legacy-${effectiveProjectId()}"
-}
-
-fun ArtifactMarketMetadata.effectiveRootNodeId(issueId: Long? = null): String {
-    return rootNodeId.trim().ifBlank { effectiveNodeId(issueId) }
-}
-
-fun ArtifactMarketMetadata.effectiveParentNodeIds(): List<String> {
-    return parentNodeIds.map(String::trim).filter(String::isNotBlank)
-}
-
-fun ArtifactMarketMetadata.toPublishClusterContext(issueId: Long? = null): ArtifactPublishClusterContext {
+fun ArtifactMarketMetadata.toPublishClusterContext(entryId: String? = null): ArtifactPublishClusterContext {
     return ArtifactPublishClusterContext(
+        entryId = entryId ?: effectiveProjectId(),
         projectId = effectiveProjectId(),
-        rootNodeId = effectiveRootNodeId(issueId),
         runtimePackageId = effectiveRuntimePackageId(),
-        parentNodeIds = effectiveParentNodeIds(),
         lockedDisplayName = displayName.trim().ifBlank { effectiveProjectDisplayName() },
         projectDisplayName = effectiveProjectDisplayName(),
-        projectDescription = effectiveProjectDescription()
+        projectDescription = effectiveProjectDescription(),
+        categoryId = categoryId
     )
 }
+
+private val NON_ALPHANUMERIC_RX = Regex("[^a-z0-9]+")
+private val MULTI_DASH_RX = Regex("-+")
 
 fun normalizeMarketArtifactId(raw: String): String {
     val normalized =
         raw.trim()
             .lowercase()
-            .replace(Regex("[^a-z0-9]+"), "-")
-            .replace(Regex("-+"), "-")
+            .replace(NON_ALPHANUMERIC_RX, "-")
+            .replace(MULTI_DASH_RX, "-")
             .trim('-')
     return normalized.ifBlank { PLACEHOLDER_MARKET_ARTIFACT_ID }
 }
@@ -301,20 +265,13 @@ fun sameArtifactRuntimePackageId(
         normalizeMarketArtifactId(trimmedLeft) == normalizeMarketArtifactId(trimmedRight)
 }
 
-fun parseArtifactMarketMetadata(body: String): ArtifactMarketMetadata? {
-    return IssueBodyMetadataParser.parseCommentJson(
-        body = body,
-        prefix = ARTIFACT_MARKET_JSON_PREFIX,
-        tag = "ArtifactMarketMetadata",
-        metadataName = "artifact market metadata"
-    )
-}
-
 fun buildPublishArtifactDescriptor(
     type: PublishArtifactType,
     localArtifact: LocalPublishableArtifact,
     displayName: String,
     description: String,
+    detail: String,
+    categoryId: String,
     version: String,
     minSupportedAppVersion: String?,
     maxSupportedAppVersion: String?,
@@ -350,23 +307,12 @@ fun buildPublishArtifactDescriptor(
             displayName.trim().ifBlank { localArtifact.displayName }
         }
     val extension = localArtifact.sourceFile.extension.lowercase().ifBlank { "bin" }
-    val nodeId = UUID.randomUUID().toString()
-    val rootNodeId =
-        publishContext?.rootNodeId
-            ?.trim()
-            ?.takeIf { it.isNotBlank() }
-            ?: nodeId
     val projectId =
         publishContext?.projectId
             ?.trim()
             ?.takeIf { it.isNotBlank() }
             ?.let(::normalizeMarketArtifactId)
             ?: normalizeMarketArtifactId(runtimePackageId)
-    val parentNodeIds =
-        publishContext?.parentNodeIds
-            ?.map(String::trim)
-            ?.filter(String::isNotBlank)
-            .orEmpty()
     val projectDisplayName =
         publishContext?.projectDisplayName
             ?.trim()
@@ -376,8 +322,9 @@ fun buildPublishArtifactDescriptor(
         publishContext?.projectDescription
             ?.trim()
             ?.takeIf { it.isNotBlank() }
-            ?: description.trim().ifBlank { localArtifact.description }
-    val assetName = "$normalizedRuntimePackageId-v$cleanVersion-${nodeId.take(8)}.$extension"
+            ?: detail.trim().ifBlank { description.trim().ifBlank { localArtifact.description } }
+    val resolvedCategoryId = publishContext?.categoryId?.trim().orEmpty().ifBlank { categoryId.trim() }
+    val assetName = "$normalizedRuntimePackageId-v$cleanVersion.$extension"
 
     return PublishArtifactDescriptor(
         type = type,
@@ -385,11 +332,9 @@ fun buildPublishArtifactDescriptor(
         projectDisplayName = projectDisplayName,
         projectDescription = projectDescription,
         runtimePackageId = runtimePackageId,
-        nodeId = nodeId,
-        rootNodeId = rootNodeId,
-        parentNodeIds = parentNodeIds,
         displayName = resolvedDisplayName,
         description = description.trim().ifBlank { localArtifact.description },
+        categoryId = resolvedCategoryId,
         version = cleanVersion,
         sourceFile = localArtifact.sourceFile,
         contentType = inferArtifactContentType(type, extension),
@@ -404,7 +349,7 @@ fun buildPublishReleaseDescriptor(
 ): PublishReleaseDescriptor {
     val normalizedRuntimePackageId = normalizeMarketArtifactId(descriptor.runtimePackageId)
     val tagName =
-        "${descriptor.type.releaseTagPrefix}-${normalizedRuntimePackageId}-v${descriptor.version}-${descriptor.nodeId.take(8)}"
+        "${descriptor.type.releaseTagPrefix}-${normalizedRuntimePackageId}-v${descriptor.version}"
     return PublishReleaseDescriptor(
         tagName = tagName,
         releaseName = "${descriptor.displayName} v${descriptor.version}",
@@ -414,11 +359,6 @@ fun buildPublishReleaseDescriptor(
                 appendLine()
                 appendLine("Project ID: ${descriptor.projectId}")
                 appendLine("Runtime package ID: ${descriptor.runtimePackageId}")
-                appendLine("Node ID: ${descriptor.nodeId}")
-                appendLine("Root node ID: ${descriptor.rootNodeId}")
-                appendLine(
-                    "Parent node IDs: ${descriptor.parentNodeIds.takeIf { it.isNotEmpty() }?.joinToString(", ") ?: "-"}"
-                )
                 appendLine("Display name: ${descriptor.displayName}")
                 appendLine("Version: ${descriptor.version}")
                 appendLine(
@@ -436,10 +376,7 @@ fun buildArtifactMarketMetadata(
         projectId = payload.projectId,
         projectDisplayName = payload.projectDisplayName,
         projectDescription = payload.projectDescription,
-        runtimePackageId = payload.runtimePackageId,
-        nodeId = payload.nodeId,
-        rootNodeId = payload.rootNodeId,
-        parentNodeIds = payload.parentNodeIds,
+        runtimePackageId = payload.runtimePackageId,
         publisherLogin = payload.publisherLogin,
         releaseTag = payload.releaseTag,
         assetName = payload.assetName,
@@ -448,62 +385,13 @@ fun buildArtifactMarketMetadata(
         version = payload.version,
         displayName = payload.displayName,
         description = payload.description,
+        categoryId = payload.categoryId,
         sourceFileName = payload.sourceFileName,
         minSupportedAppVersion = payload.minSupportedAppVersion,
         maxSupportedAppVersion = payload.maxSupportedAppVersion
     )
 }
 
-fun buildArtifactMarketIssueBody(payload: MarketRegistrationPayload): String {
-    val metadata = buildArtifactMarketMetadata(payload)
-    val json = Json { ignoreUnknownKeys = true; prettyPrint = false }
-    val metadataJson = json.encodeToString(metadata)
-    val timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
-    val parentNodeIds = payload.parentNodeIds.takeIf { it.isNotEmpty() }?.joinToString(", ") ?: "-"
-
-    return buildString {
-        appendLine("$ARTIFACT_MARKET_JSON_PREFIX$metadataJson -->")
-        appendLine("<!-- operit-parser-version: $ARTIFACT_MARKET_PARSER_VERSION -->")
-        appendLine()
-        appendLine("## ${payload.type.titleLabel}")
-        appendLine()
-        appendLine(payload.description)
-        appendLine()
-        appendLine("## Project Cluster")
-        appendLine()
-        appendLine("- Project ID: `${payload.projectId}`")
-        appendLine("- Runtime package ID: `${payload.runtimePackageId}`")
-        appendLine("- Node ID: `${payload.nodeId}`")
-        appendLine("- Root node ID: `${payload.rootNodeId}`")
-        appendLine("- Parent node IDs: `$parentNodeIds`")
-        appendLine("- Project display name: `${payload.projectDisplayName}`")
-        appendLine("- Project description: ${payload.projectDescription.ifBlank { "-" }}")
-        appendLine()
-        appendLine("## Artifact")
-        appendLine()
-        appendLine("- Publisher: `${payload.publisherLogin}`")
-        appendLine("- Forge repo: `${payload.forgeRepo}`")
-        appendLine("- Release tag: `${payload.releaseTag}`")
-        appendLine("- Asset: `${payload.assetName}`")
-        appendLine("- SHA-256: `${payload.sha256}`")
-        appendLine("- Download: ${payload.downloadUrl}")
-        appendLine()
-        appendLine("## Metadata")
-        appendLine()
-        appendLine("| Field | Value |")
-        appendLine("| --- | --- |")
-        appendLine("| Type | ${payload.type.wireValue} |")
-        appendLine("| Project ID | ${payload.projectId} |")
-        appendLine("| Runtime package ID | ${payload.runtimePackageId} |")
-        appendLine("| Node ID | ${payload.nodeId} |")
-        appendLine("| Root node ID | ${payload.rootNodeId} |")
-        appendLine("| Parent node IDs | $parentNodeIds |")
-        appendLine("| Version | ${payload.version} |")
-        appendLine("| Supported app versions | ${formatSupportedAppVersions(payload.minSupportedAppVersion, payload.maxSupportedAppVersion)} |")
-        appendLine("| Source file | ${payload.sourceFileName.ifBlank { "-" }} |")
-        appendLine("| Updated at | $timestamp |")
-    }
-}
 
 fun normalizeAppVersionOrNull(value: String?): String? {
     return parseAppVersionOrNull(value)?.toString()

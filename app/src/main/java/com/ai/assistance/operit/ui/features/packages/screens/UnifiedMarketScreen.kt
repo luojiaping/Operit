@@ -1,5 +1,6 @@
 package com.ai.assistance.operit.ui.features.packages.screens
 
+import android.content.Context
 import android.widget.Toast
 import androidx.annotation.StringRes
 import androidx.compose.foundation.Image
@@ -15,6 +16,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -22,10 +25,25 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Api
+import androidx.compose.material.icons.filled.Apps
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.Dashboard
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Login
 import androidx.compose.material.icons.filled.Logout
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material.icons.filled.Store
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -33,10 +51,12 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -50,11 +70,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -67,34 +87,83 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.rememberAsyncImagePainter
 import com.ai.assistance.operit.R
-import com.ai.assistance.operit.data.api.ArtifactProjectDetailResponse
-import com.ai.assistance.operit.data.api.GitHubIssue
-import com.ai.assistance.operit.data.mcp.MCPRepository
+import com.ai.assistance.operit.data.api.MarketV2Entry
+import com.ai.assistance.operit.data.api.MarketV2ManifestCategory
+import com.ai.assistance.operit.data.api.MarketV2Notification
 import com.ai.assistance.operit.data.preferences.GitHubAuthPreferences
 import com.ai.assistance.operit.data.preferences.GitHubUser
-import com.ai.assistance.operit.data.skill.SkillRepository
 import com.ai.assistance.operit.ui.features.github.GitHubLoginWebViewDialog
-import com.ai.assistance.operit.ui.features.packages.market.ArtifactMarketBrowseConfig
-import com.ai.assistance.operit.ui.features.packages.market.ArtifactMarketScope
 import com.ai.assistance.operit.ui.features.packages.market.BindMarketSearchToTopBar
 import com.ai.assistance.operit.ui.features.packages.market.MarketBrowseSection
-import com.ai.assistance.operit.ui.features.packages.market.McpMarketBrowseConfig
-import com.ai.assistance.operit.ui.features.packages.market.SkillMarketBrowseConfig
-import com.ai.assistance.operit.ui.features.packages.market.rememberArtifactMarketBrowseEntry
-import com.ai.assistance.operit.ui.features.packages.market.rememberMcpMarketBrowseEntry
-import com.ai.assistance.operit.ui.features.packages.market.rememberSkillMarketBrowseEntry
-import com.ai.assistance.operit.ui.features.packages.screens.artifact.viewmodel.ArtifactProjectMarketViewModel
-import com.ai.assistance.operit.ui.features.packages.screens.mcp.viewmodel.MCPMarketViewModel
-import com.ai.assistance.operit.ui.features.packages.screens.skill.viewmodel.SkillMarketViewModel
+import com.ai.assistance.operit.ui.features.packages.market.MarketStatsType
+import com.ai.assistance.operit.ui.features.packages.market.UnifiedMarketBrowseConfig
+import com.ai.assistance.operit.ui.features.packages.market.UnifiedMarketCategoryConfig
+import com.ai.assistance.operit.ui.features.packages.market.toUnifiedMarketBrowseEntry
+import com.ai.assistance.operit.ui.features.packages.screens.market.viewmodel.UnifiedMarketBrowseScope
+import com.ai.assistance.operit.ui.features.packages.screens.market.viewmodel.UnifiedMarketBrowseViewModel
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
 enum class MarketHomeTab(@StringRes val labelRes: Int) {
-    ARTIFACT(R.string.market_tab_artifact),
-    SKILL(R.string.market_tab_skill),
-    MCP(R.string.market_tab_mcp),
+    ALL(R.string.market_tab_all),
+    CATEGORIES(R.string.market_tab_categories),
     MINE(R.string.market_tab_mine)
+}
+
+private enum class MarketCategoryTypeFilter(
+    @StringRes val labelRes: Int,
+    val wireType: String
+) {
+    ALL(R.string.market_category_type_all, ""),
+    SCRIPT(R.string.market_category_type_script, "script"),
+    PACKAGE(R.string.market_category_type_package, "package"),
+    SKILL(R.string.market_category_type_skill, "skill"),
+    MCP(R.string.market_category_type_mcp, "mcp")
+}
+
+private val MarketCategoryNameResById =
+    mapOf(
+        "search_research" to R.string.market_category_search_research,
+        "dev_code" to R.string.market_category_dev_code,
+        "automation_workflow" to R.string.market_category_automation_workflow,
+        "docs_knowledge" to R.string.market_category_docs_knowledge,
+        "media_content" to R.string.market_category_media_content,
+        "chat_communication" to R.string.market_category_chat_communication,
+        "integration_api" to R.string.market_category_integration_api,
+        "system_data" to R.string.market_category_system_data,
+        "business_productivity" to R.string.market_category_business_productivity,
+        "life_entertainment" to R.string.market_category_life_entertainment,
+        "other" to R.string.market_category_other
+    )
+
+private val MarketCategoryIconById =
+    mapOf(
+        "search_research" to Icons.Default.Search,
+        "dev_code" to Icons.Default.Code,
+        "automation_workflow" to Icons.Default.AutoAwesome,
+        "docs_knowledge" to Icons.Default.Description,
+        "media_content" to Icons.Default.Image,
+        "chat_communication" to Icons.Default.Chat,
+        "integration_api" to Icons.Default.Api,
+        "system_data" to Icons.Default.Storage,
+        "business_productivity" to Icons.Default.Dashboard,
+        "life_entertainment" to Icons.Default.Apps,
+        "other" to Icons.Default.Folder
+    )
+
+@StringRes
+private fun marketCategoryNameResOrNull(categoryId: String): Int? {
+    return MarketCategoryNameResById[categoryId]
+}
+
+@Composable
+fun marketCategoryLabel(categoryId: String): String {
+    return marketCategoryNameResOrNull(categoryId)?.let { stringResource(it) } ?: categoryId
+}
+
+fun marketCategoryLabel(context: Context, categoryId: String): String {
+    return marketCategoryNameResOrNull(categoryId)?.let { context.getString(it) } ?: categoryId
 }
 
 private data class MarketMineAuthState(
@@ -103,16 +172,15 @@ private data class MarketMineAuthState(
     val currentUser: GitHubUser? = null
 )
 
-private data class OpeningArtifactProject(
-    val projectId: String
-)
-
 @Composable
-private fun RefreshMarketPaneOnEnter(onRefresh: () -> Unit) {
+private fun RefreshMarketPaneOnEnter(
+    refreshKey: String,
+    onRefresh: () -> Unit
+) {
     val lifecycleOwner = LocalLifecycleOwner.current
     val currentOnRefresh by rememberUpdatedState(onRefresh)
 
-    DisposableEffect(lifecycleOwner) {
+    DisposableEffect(lifecycleOwner, refreshKey) {
         val lifecycle = lifecycleOwner.lifecycle
         if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
             currentOnRefresh()
@@ -123,37 +191,339 @@ private fun RefreshMarketPaneOnEnter(onRefresh: () -> Unit) {
             }
         }
         lifecycle.addObserver(observer)
-        onDispose {
-            lifecycle.removeObserver(observer)
-        }
+        onDispose { lifecycle.removeObserver(observer) }
     }
 }
 
 @Composable
 fun UnifiedMarketScreen(
-    initialTab: MarketHomeTab = MarketHomeTab.ARTIFACT,
+    initialTab: MarketHomeTab = MarketHomeTab.ALL,
     onNavigateToArtifactPublish: () -> Unit = {},
-    onNavigateToArtifactManage: () -> Unit = {},
-    onNavigateToArtifactDetail: (GitHubIssue) -> Unit = {},
-    onNavigateToSkillPublish: () -> Unit = {},
-    onNavigateToSkillManage: () -> Unit = {},
-    onNavigateToSkillDetail: (GitHubIssue) -> Unit = {},
-    onNavigateToMcpPublish: () -> Unit = {},
-    onNavigateToMcpManage: () -> Unit = {},
-    onNavigateToMcpDetail: (GitHubIssue) -> Unit = {}
+    onNavigateToRepoPublish: (MarketStatsType) -> Unit = {},
+    onNavigateToMarketManage: () -> Unit = {},
+    onNavigateToDetail: (MarketV2Entry) -> Unit = {},
+    onNavigateToCategory: (String) -> Unit = {},
+    onNavigateToNotifications: () -> Unit = {}
 ) {
     var selectedTab by rememberSaveable(initialTab) { mutableStateOf(initialTab) }
-    val tabStateHolder = rememberSaveableStateHolder()
+
+    val openEntry: (MarketV2Entry) -> Unit = onNavigateToDetail
 
     Column(modifier = Modifier.fillMaxSize()) {
-        TabRow(selectedTabIndex = selectedTab.ordinal) {
+        Box(modifier = Modifier.weight(1f)) {
+            when (selectedTab) {
+                MarketHomeTab.ALL -> MarketTypedListPane(
+                    stateKey = "market-all-types",
+                    scopeFactory = { selectedType ->
+                        if (selectedType == MarketCategoryTypeFilter.ALL) {
+                            UnifiedMarketBrowseScope.All
+                        } else {
+                            UnifiedMarketBrowseScope.type(selectedType.wireType)
+                        }
+                    },
+                    config = UnifiedMarketBrowseConfig,
+                    viewModelKeyFactory = { selectedType -> "market-all-${selectedType.name}" },
+                    onOpenEntry = openEntry
+                )
+
+                MarketHomeTab.CATEGORIES -> MarketCategoryIndexPane(
+                    onOpenCategory = onNavigateToCategory
+                )
+
+                MarketHomeTab.MINE -> MarketMinePane(
+                    onManage = onNavigateToMarketManage,
+                    onPublishArtifact = onNavigateToArtifactPublish,
+                    onPublishRepo = onNavigateToRepoPublish,
+                    onOpenNotifications = onNavigateToNotifications
+                )
+            }
+        }
+
+        NavigationBar(
+            modifier = Modifier.height(56.dp)
+        ) {
             MarketHomeTab.entries.forEach { tab ->
-                Tab(
+                NavigationBarItem(
                     selected = selectedTab == tab,
-                    onClick = { selectedTab = tab },
+                    onClick = {
+                        selectedTab = tab
+                    },
+                    icon = {
+                        Icon(
+                            imageVector = when (tab) {
+                                MarketHomeTab.ALL -> Icons.Default.Store
+                                MarketHomeTab.CATEGORIES -> Icons.Default.List
+                                MarketHomeTab.MINE -> Icons.Default.Person
+                            },
+                            contentDescription = stringResource(tab.labelRes)
+                        )
+                    },
+                    label = null
+                )
+            }
+        }
+    }
+
+}
+
+@Composable
+fun UnifiedMarketNotificationsScreen() {
+    MarketNotificationsPane()
+}
+
+@Composable
+fun UnifiedMarketCategoryScreen(
+    categoryId: String,
+    onNavigateToArtifactDetail: (MarketV2Entry) -> Unit = {},
+    onNavigateToSkillDetail: (MarketV2Entry) -> Unit = {},
+    onNavigateToMcpDetail: (MarketV2Entry) -> Unit = {}
+) {
+    val openEntry: (MarketV2Entry) -> Unit = { entry ->
+        when (entry.type.lowercase()) {
+            "skill" -> onNavigateToSkillDetail(entry)
+            "mcp" -> onNavigateToMcpDetail(entry)
+            "script",
+            "package" -> onNavigateToArtifactDetail(entry)
+            else -> onNavigateToArtifactDetail(entry)
+        }
+    }
+
+    MarketCategoryDetailPane(
+        categoryId = categoryId,
+        onOpenEntry = openEntry
+    )
+}
+
+@Composable
+private fun UnifiedMarketListPane(
+    scope: UnifiedMarketBrowseScope,
+    config: com.ai.assistance.operit.ui.features.packages.market.MarketBrowseSectionConfig,
+    viewModelKey: String,
+    onOpenEntry: (MarketV2Entry) -> Unit
+) {
+    val context = LocalContext.current
+    val viewModel: UnifiedMarketBrowseViewModel =
+        viewModel(
+            key = viewModelKey,
+            factory = UnifiedMarketBrowseViewModel.Factory(
+                context.applicationContext,
+                scope
+            )
+        )
+    val entries by viewModel.entries.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsState()
+    val isLoadingMore by viewModel.isLoadingMore.collectAsState()
+    val hasMore by viewModel.hasMore.collectAsState()
+    val searchQuery by viewModel.searchQuery.collectAsState()
+    val sortOption by viewModel.sortOption.collectAsState()
+    val errorMessage by viewModel.errorMessage.collectAsState()
+    val installStates by viewModel.installStates.collectAsState()
+    val localInstallStates by viewModel.localInstallStates.collectAsState()
+    BindMarketSearchToTopBar(
+        enabled = true,
+        searchQuery = searchQuery,
+        onSearchQueryChanged = viewModel::onSearchQueryChanged,
+        searchPlaceholderRes = config.searchPlaceholderRes
+    )
+
+    RefreshMarketPaneOnEnter(refreshKey = viewModelKey) {
+        viewModel.loadEntries()
+    }
+
+    errorMessage?.let { error ->
+        LaunchedEffect(error) {
+            Toast.makeText(context, error, Toast.LENGTH_LONG).show()
+            viewModel.clearError()
+        }
+    }
+
+    MarketBrowseSection(
+        items = entries,
+        isLoading = isLoading,
+        isLoadingMore = isLoadingMore,
+        hasMore = hasMore,
+        searchQuery = searchQuery,
+        sortOption = sortOption,
+        onSearchQueryChanged = viewModel::onSearchQueryChanged,
+        onSortOptionChanged = viewModel::onSortOptionChanged,
+        onRefresh = viewModel::loadEntries,
+        onLoadMore = viewModel::loadMoreEntries,
+        config = config,
+        itemKey = { it.id },
+        updatedAtSelector = { entry ->
+            if (sortOption == com.ai.assistance.operit.ui.features.packages.market.MarketSortOption.UPDATED) {
+                entry.updatedAt ?: entry.publishedAt ?: entry.createdAt.orEmpty()
+            } else {
+                entry.publishedAt ?: entry.updatedAt ?: entry.createdAt.orEmpty()
+            }
+        },
+        entryFactory = { entry ->
+            entry.toUnifiedMarketBrowseEntry(
+                installStates = installStates,
+                localInstallStates = localInstallStates,
+                onViewDetails = onOpenEntry,
+                onInstallEntry = viewModel::installEntry
+            )
+        }
+    )
+}
+
+@Composable
+private fun MarketCategoryIndexPane(
+    onOpenCategory: (String) -> Unit
+) {
+    val context = LocalContext.current
+    val viewModel: UnifiedMarketBrowseViewModel =
+        viewModel(
+            key = "market-categories",
+            factory = UnifiedMarketBrowseViewModel.Factory(
+                context.applicationContext,
+                UnifiedMarketBrowseScope.All
+            )
+        )
+    val categories by viewModel.categories.collectAsState()
+    val errorMessage by viewModel.errorMessage.collectAsState()
+
+    BindMarketSearchToTopBar(
+        enabled = false,
+        searchQuery = "",
+        onSearchQueryChanged = { _ -> },
+        searchPlaceholderRes = UnifiedMarketBrowseConfig.searchPlaceholderRes
+    )
+
+    LaunchedEffect(Unit) {
+        viewModel.loadManifest()
+    }
+
+    errorMessage?.let { error ->
+        LaunchedEffect(error) {
+            Toast.makeText(context, error, Toast.LENGTH_LONG).show()
+            viewModel.clearError()
+        }
+    }
+
+    if (categories.isEmpty()) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator()
+        }
+    } else {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp)
+        ) {
+            items(categories, key = { it.id }) { category ->
+                MarketCategoryCard(
+                    category = category,
+                    onClick = { onOpenCategory(category.id) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun MarketCategoryCard(
+    category: MarketV2ManifestCategory,
+    onClick: () -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(18.dp),
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 1.dp,
+        shadowElevation = 1.dp
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primaryContainer
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .padding(8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = marketCategoryIcon(category.id),
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = category.name.ifBlank { marketCategoryLabel(category.id) },
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Icon(
+                imageVector = Icons.Default.ChevronRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+private fun marketCategoryIcon(categoryId: String): ImageVector {
+    return MarketCategoryIconById[categoryId] ?: Icons.Default.Folder
+}
+
+@Composable
+private fun MarketCategoryDetailPane(
+    categoryId: String,
+    onOpenEntry: (MarketV2Entry) -> Unit
+) {
+    MarketTypedListPane(
+        stateKey = "market-category-$categoryId-types",
+        scopeFactory = { selectedType ->
+            if (selectedType == MarketCategoryTypeFilter.ALL) {
+                UnifiedMarketBrowseScope.category(categoryId)
+            } else {
+                UnifiedMarketBrowseScope.typeCategory(selectedType.wireType, categoryId)
+            }
+        },
+        config = UnifiedMarketCategoryConfig,
+        viewModelKeyFactory = { selectedType -> "market-category-${categoryId}-${selectedType.name}" },
+        onOpenEntry = onOpenEntry
+    )
+}
+
+@Composable
+private fun MarketTypedListPane(
+    stateKey: String,
+    scopeFactory: (MarketCategoryTypeFilter) -> UnifiedMarketBrowseScope,
+    config: com.ai.assistance.operit.ui.features.packages.market.MarketBrowseSectionConfig,
+    viewModelKeyFactory: (MarketCategoryTypeFilter) -> String,
+    onOpenEntry: (MarketV2Entry) -> Unit
+) {
+    var selectedType by rememberSaveable(stateKey) { mutableStateOf(MarketCategoryTypeFilter.ALL) }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        ScrollableTabRow(
+            selectedTabIndex = selectedType.ordinal,
+            edgePadding = 12.dp
+        ) {
+            MarketCategoryTypeFilter.entries.forEach { filter ->
+                Tab(
+                    selected = selectedType == filter,
+                    onClick = { selectedType = filter },
                     text = {
                         Text(
-                            text = stringResource(tab.labelRes),
+                            text = stringResource(filter.labelRes),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -162,29 +532,65 @@ fun UnifiedMarketScreen(
             }
         }
 
-        Box(modifier = Modifier.fillMaxSize()) {
-            tabStateHolder.SaveableStateProvider(selectedTab.name) {
-                when (selectedTab) {
-                    MarketHomeTab.ARTIFACT -> ArtifactMarketPane(
-                        onNavigateToDetail = onNavigateToArtifactDetail
-                    )
+        UnifiedMarketListPane(
+            scope = scopeFactory(selectedType),
+            config = config,
+            viewModelKey = viewModelKeyFactory(selectedType),
+            onOpenEntry = onOpenEntry
+        )
+    }
+}
 
-                    MarketHomeTab.SKILL -> SkillMarketPane(
-                        onNavigateToDetail = onNavigateToSkillDetail
-                    )
+@Composable
+private fun MarketNotificationsPane() {
+    val context = LocalContext.current
+    val viewModel: UnifiedMarketBrowseViewModel =
+        viewModel(
+            key = "market-notifications",
+            factory = UnifiedMarketBrowseViewModel.Factory(
+                context.applicationContext,
+                UnifiedMarketBrowseScope.All
+            )
+        )
+    val notifications by viewModel.notifications.collectAsState()
+    val errorMessage by viewModel.errorMessage.collectAsState()
 
-                    MarketHomeTab.MCP -> McpMarketPane(
-                        onNavigateToDetail = onNavigateToMcpDetail
-                    )
+    BindMarketSearchToTopBar(
+        enabled = false,
+        searchQuery = "",
+        onSearchQueryChanged = { _ -> },
+        searchPlaceholderRes = UnifiedMarketBrowseConfig.searchPlaceholderRes
+    )
 
-                    MarketHomeTab.MINE -> MarketMinePane(
-                        onManageArtifact = onNavigateToArtifactManage,
-                        onManageSkill = onNavigateToSkillManage,
-                        onManageMcp = onNavigateToMcpManage,
-                        onPublishArtifact = onNavigateToArtifactPublish,
-                        onPublishSkill = onNavigateToSkillPublish,
-                        onPublishMcp = onNavigateToMcpPublish
-                    )
+    LaunchedEffect(Unit) {
+        viewModel.loadNotifications()
+    }
+
+    errorMessage?.let { error ->
+        LaunchedEffect(error) {
+            Toast.makeText(context, error, Toast.LENGTH_LONG).show()
+            viewModel.clearError()
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        if (notifications.isEmpty()) {
+            MarketEmptyCard(
+                title = stringResource(R.string.market_notifications_empty_title),
+                description = stringResource(R.string.market_notifications_empty_description)
+            )
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(notifications, key = { it.id }) { notification ->
+                    MarketNotificationCard(notification = notification)
                 }
             }
         }
@@ -192,278 +598,44 @@ fun UnifiedMarketScreen(
 }
 
 @Composable
-private fun ArtifactMarketPane(
-    onNavigateToDetail: (GitHubIssue) -> Unit
-) {
-    val context = LocalContext.current
-    val viewModel: ArtifactProjectMarketViewModel =
-        viewModel(
-            key = "artifact-market-all",
-            factory = ArtifactProjectMarketViewModel.Factory(
-                context.applicationContext,
-                ArtifactMarketScope.ALL
+private fun MarketNotificationCard(notification: MarketV2Notification) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text(
+                text = notification.title.ifBlank { notification.kind },
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold
             )
-        )
-    val items by viewModel.marketItems.collectAsState()
-    val isLoading by viewModel.isLoading.collectAsState()
-    val isLoadingMore by viewModel.isLoadingMore.collectAsState()
-    val hasMore by viewModel.hasMore.collectAsState()
-    val searchQuery by viewModel.searchQuery.collectAsState()
-    val sortOption by viewModel.sortOption.collectAsState()
-    val installingIds by viewModel.installingIds.collectAsState()
-    val projectInstallStates by viewModel.projectInstallStates.collectAsState()
-    val errorMessage by viewModel.errorMessage.collectAsState()
-    var openingProject by remember { mutableStateOf<OpeningArtifactProject?>(null) }
-    var selectedProject by remember { mutableStateOf<ArtifactProjectDetailResponse?>(null) }
-
-    BindMarketSearchToTopBar(
-        enabled = true,
-        searchQuery = searchQuery,
-        onSearchQueryChanged = viewModel::onSearchQueryChanged,
-        searchPlaceholderRes = ArtifactMarketBrowseConfig.searchPlaceholderRes
-    )
-
-    RefreshMarketPaneOnEnter {
-        viewModel.refreshInstalledArtifacts()
-        viewModel.loadMarketData()
-    }
-
-    errorMessage?.let { error ->
-        LaunchedEffect(error) {
-            Toast.makeText(context, error, Toast.LENGTH_LONG).show()
-            viewModel.clearError()
-        }
-    }
-
-    MarketBrowseSection(
-        items = items,
-        isLoading = isLoading,
-        isLoadingMore = isLoadingMore,
-        hasMore = hasMore,
-        searchQuery = searchQuery,
-        sortOption = sortOption,
-        onSearchQueryChanged = viewModel::onSearchQueryChanged,
-        onSortOptionChanged = viewModel::onSortOptionChanged,
-        onRefresh = {
-            viewModel.refreshInstalledArtifacts()
-            viewModel.loadMarketData()
-        },
-        onLoadMore = viewModel::loadMoreMarketData,
-        config = ArtifactMarketBrowseConfig,
-        itemKey = { it.projectId },
-        updatedAtSelector = { it.latestPublishedAt.orEmpty() },
-        entryFactory = { item ->
-            rememberArtifactMarketBrowseEntry(
-                item = item,
-                projectInstallStates = projectInstallStates,
-                installingIds = installingIds,
-                onViewDetails = { projectId ->
-                    openingProject = OpeningArtifactProject(projectId = projectId)
-                    viewModel.openProject(
-                        projectId = projectId,
-                        onOpenSingleNode = { issue ->
-                            if (openingProject?.projectId == projectId) {
-                                openingProject = null
-                                onNavigateToDetail(issue)
-                            }
-                        },
-                        onOpenNodeTree = { project ->
-                            if (openingProject?.projectId == projectId) {
-                                openingProject = null
-                                selectedProject = project
-                            }
-                        },
-                        onOpenFailed = {
-                            if (openingProject?.projectId == projectId) {
-                                openingProject = null
-                            }
-                        }
-                    )
-                },
-                onInstallRequest = viewModel::installDefaultNode
-            )
-        }
-    )
-
-    openingProject?.let { project ->
-        ArtifactProjectNodeTreeLoadingDialog(
-            projectId = project.projectId,
-            onDismissRequest = { openingProject = null }
-        )
-    }
-
-    selectedProject?.let { project ->
-        ArtifactProjectNodeTreeDialog(
-            project = project,
-            onDismissRequest = { selectedProject = null },
-            onSelectNode = { issue ->
-                selectedProject = null
-                onNavigateToDetail(issue)
+            if (notification.body.isNotBlank()) {
+                Text(
+                    text = notification.body,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
-        )
-    }
-}
-
-@Composable
-private fun SkillMarketPane(
-    onNavigateToDetail: (GitHubIssue) -> Unit
-) {
-    val context = LocalContext.current
-    val skillRepository = remember { SkillRepository.getInstance(context.applicationContext) }
-    val viewModel: SkillMarketViewModel =
-        viewModel(
-            key = "skill-market",
-            factory = SkillMarketViewModel.Factory(
-                context.applicationContext,
-                skillRepository
-            )
-        )
-    val items by viewModel.skillItems.collectAsState()
-    val isLoading by viewModel.isLoading.collectAsState()
-    val isLoadingMore by viewModel.isLoadingMore.collectAsState()
-    val hasMore by viewModel.hasMore.collectAsState()
-    val searchQuery by viewModel.searchQuery.collectAsState()
-    val sortOption by viewModel.sortOption.collectAsState()
-    val marketStats by viewModel.marketStats.collectAsState()
-    val installingSkills by viewModel.installingSkills.collectAsState()
-    val installedSkillRepoUrls by viewModel.installedSkillRepoUrls.collectAsState()
-    val installedSkillNames by viewModel.installedSkillNames.collectAsState()
-    val errorMessage by viewModel.errorMessage.collectAsState()
-
-    BindMarketSearchToTopBar(
-        enabled = true,
-        searchQuery = searchQuery,
-        onSearchQueryChanged = viewModel::onSearchQueryChanged,
-        searchPlaceholderRes = SkillMarketBrowseConfig.searchPlaceholderRes
-    )
-
-    RefreshMarketPaneOnEnter {
-        viewModel.refreshInstalledSkills()
-        viewModel.loadSkillMarketData()
-    }
-
-    errorMessage?.let { error ->
-        LaunchedEffect(error) {
-            Toast.makeText(context, error, Toast.LENGTH_LONG).show()
-            viewModel.clearError()
+            if (notification.createdAt.isNotBlank()) {
+                Text(
+                    text = notification.createdAt.take(16).replace('T', ' '),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                )
+            }
         }
     }
-
-    MarketBrowseSection(
-        items = items,
-        isLoading = isLoading,
-        isLoadingMore = isLoadingMore,
-        hasMore = hasMore,
-        searchQuery = searchQuery,
-        sortOption = sortOption,
-        onSearchQueryChanged = viewModel::onSearchQueryChanged,
-        onSortOptionChanged = viewModel::onSortOptionChanged,
-        onRefresh = {
-            viewModel.loadSkillMarketData()
-            viewModel.refreshInstalledSkills()
-        },
-        onLoadMore = viewModel::loadMoreSkillMarketData,
-        config = SkillMarketBrowseConfig,
-        itemKey = { it.issue.id },
-        updatedAtSelector = { it.issue.updated_at },
-        entryFactory = { item ->
-            rememberSkillMarketBrowseEntry(
-                item = item,
-                marketStats = marketStats,
-                installingSkills = installingSkills,
-                installedSkillRepoUrls = installedSkillRepoUrls,
-                installedSkillNames = installedSkillNames,
-                onViewDetails = onNavigateToDetail,
-                onInstall = viewModel::installSkill
-            )
-        }
-    )
-}
-
-@Composable
-private fun McpMarketPane(
-    onNavigateToDetail: (GitHubIssue) -> Unit
-) {
-    val context = LocalContext.current
-    val mcpRepository = remember { MCPRepository(context.applicationContext) }
-    val viewModel: MCPMarketViewModel =
-        viewModel(
-            key = "mcp-market",
-            factory = MCPMarketViewModel.Factory(
-                context.applicationContext,
-                mcpRepository
-            )
-        )
-    val items by viewModel.mcpItems.collectAsState()
-    val isLoading by viewModel.isLoading.collectAsState()
-    val isLoadingMore by viewModel.isLoadingMore.collectAsState()
-    val hasMore by viewModel.hasMore.collectAsState()
-    val searchQuery by viewModel.searchQuery.collectAsState()
-    val sortOption by viewModel.sortOption.collectAsState()
-    val marketStats by viewModel.marketStats.collectAsState()
-    val installingPlugins by viewModel.installingPlugins.collectAsState()
-    val installProgress by viewModel.installProgress.collectAsState()
-    val installedPluginIds by viewModel.installedPluginIds.collectAsState()
-    val errorMessage by viewModel.errorMessage.collectAsState()
-
-    BindMarketSearchToTopBar(
-        enabled = true,
-        searchQuery = searchQuery,
-        onSearchQueryChanged = viewModel::onSearchQueryChanged,
-        searchPlaceholderRes = McpMarketBrowseConfig.searchPlaceholderRes
-    )
-
-    RefreshMarketPaneOnEnter {
-        viewModel.refreshInstalledPlugins()
-        viewModel.loadMCPMarketData()
-    }
-
-    errorMessage?.let { error ->
-        LaunchedEffect(error) {
-            Toast.makeText(context, error, Toast.LENGTH_LONG).show()
-            viewModel.clearError()
-        }
-    }
-
-    MarketBrowseSection(
-        items = items,
-        isLoading = isLoading,
-        isLoadingMore = isLoadingMore,
-        hasMore = hasMore,
-        searchQuery = searchQuery,
-        sortOption = sortOption,
-        onSearchQueryChanged = viewModel::onSearchQueryChanged,
-        onSortOptionChanged = viewModel::onSortOptionChanged,
-        onRefresh = {
-            viewModel.refreshInstalledPlugins()
-            viewModel.loadMCPMarketData()
-        },
-        onLoadMore = viewModel::loadMoreMCPMarketData,
-        config = McpMarketBrowseConfig,
-        itemKey = { it.issue.id },
-        updatedAtSelector = { it.issue.updated_at },
-        entryFactory = { item ->
-            rememberMcpMarketBrowseEntry(
-                item = item,
-                marketStats = marketStats,
-                installingPlugins = installingPlugins,
-                installProgress = installProgress,
-                installedPluginIds = installedPluginIds,
-                onViewDetails = onNavigateToDetail,
-                onInstall = viewModel::installMcp
-            )
-        }
-    )
 }
 
 @Composable
 private fun MarketMinePane(
-    onManageArtifact: () -> Unit,
-    onManageSkill: () -> Unit,
-    onManageMcp: () -> Unit,
+    onManage: () -> Unit,
     onPublishArtifact: () -> Unit,
-    onPublishSkill: () -> Unit,
-    onPublishMcp: () -> Unit
+    onPublishRepo: (MarketStatsType) -> Unit,
+    onOpenNotifications: () -> Unit
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -491,12 +663,13 @@ private fun MarketMinePane(
             .collect { value = it }
     }
     var showLoginDialog by remember { mutableStateOf(false) }
+    var showPublishDialog by remember { mutableStateOf(false) }
 
     BindMarketSearchToTopBar(
         enabled = false,
         searchQuery = "",
         onSearchQueryChanged = { _ -> },
-        searchPlaceholderRes = ArtifactMarketBrowseConfig.searchPlaceholderRes
+        searchPlaceholderRes = UnifiedMarketBrowseConfig.searchPlaceholderRes
     )
 
     Column(
@@ -514,83 +687,48 @@ private fun MarketMinePane(
                 currentUser = authState.currentUser,
                 onLogin = { showLoginDialog = true },
                 onLogout = {
-                    coroutineScope.launch {
-                        githubAuth.logout()
-                    }
+                    coroutineScope.launch { githubAuth.logout() }
                 }
             )
 
-            MarketMineSectionTitle(titleRes = R.string.market_section_manage)
             MarketMineActionCard(
-                title = stringResource(R.string.market_manage_artifact),
+                title = stringResource(R.string.market_section_manage),
                 onClick = {
-                    if (authState.isLoggedIn) {
-                        onManageArtifact()
-                    } else {
-                        showLoginDialog = true
-                    }
+                    if (authState.isLoggedIn) onManage() else showLoginDialog = true
                 },
                 icon = Icons.Default.Settings
             )
             MarketMineActionCard(
-                title = stringResource(R.string.market_manage_skill),
+                title = stringResource(R.string.market_section_publish),
                 onClick = {
-                    if (authState.isLoggedIn) {
-                        onManageSkill()
-                    } else {
-                        showLoginDialog = true
-                    }
-                },
-                icon = Icons.Default.Settings
-            )
-            MarketMineActionCard(
-                title = stringResource(R.string.market_manage_mcp),
-                onClick = {
-                    if (authState.isLoggedIn) {
-                        onManageMcp()
-                    } else {
-                        showLoginDialog = true
-                    }
-                },
-                icon = Icons.Default.Settings
-            )
-
-            Spacer(modifier = Modifier.height(4.dp))
-            MarketMineSectionTitle(titleRes = R.string.market_section_publish)
-            MarketMineActionCard(
-                title = stringResource(R.string.market_publish_artifact),
-                onClick = {
-                    if (authState.isLoggedIn) {
-                        onPublishArtifact()
-                    } else {
-                        showLoginDialog = true
-                    }
+                    if (authState.isLoggedIn) showPublishDialog = true else showLoginDialog = true
                 },
                 icon = Icons.Default.Add
             )
             MarketMineActionCard(
-                title = stringResource(R.string.market_publish_skill),
+                title = stringResource(R.string.market_notifications_title),
                 onClick = {
-                    if (authState.isLoggedIn) {
-                        onPublishSkill()
-                    } else {
-                        showLoginDialog = true
-                    }
+                    if (authState.isLoggedIn) onOpenNotifications() else showLoginDialog = true
                 },
-                icon = Icons.Default.Add
-            )
-            MarketMineActionCard(
-                title = stringResource(R.string.market_publish_mcp),
-                onClick = {
-                    if (authState.isLoggedIn) {
-                        onPublishMcp()
-                    } else {
-                        showLoginDialog = true
-                    }
-                },
-                icon = Icons.Default.Add
+                icon = Icons.Default.Notifications
             )
         }
+    }
+
+    if (showPublishDialog) {
+        MarketActionChooserDialog(
+            title = stringResource(R.string.market_section_publish),
+            onDismiss = { showPublishDialog = false },
+            actions = listOf(
+                MarketDialogAction(stringResource(R.string.market_publish_artifact), onPublishArtifact),
+                MarketDialogAction(stringResource(R.string.market_publish_skill)) {
+                    onPublishRepo(MarketStatsType.SKILL)
+                },
+                MarketDialogAction(stringResource(R.string.market_publish_mcp)) {
+                    onPublishRepo(MarketStatsType.MCP)
+                }
+            )
+        )
     }
 
     if (showLoginDialog) {
@@ -599,6 +737,61 @@ private fun MarketMinePane(
             onLoginSuccess = { showLoginDialog = false }
         )
     }
+}
+
+private data class MarketDialogAction(
+    val title: String,
+    val onClick: () -> Unit
+)
+
+@Composable
+private fun MarketActionChooserDialog(
+    title: String,
+    onDismiss: () -> Unit,
+    actions: List<MarketDialogAction>
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(text = title) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                actions.forEach { action ->
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                onDismiss()
+                                action.onClick()
+                            },
+                        shape = RoundedCornerShape(14.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = action.title,
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Icon(
+                                imageVector = Icons.Default.ChevronRight,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(text = stringResource(R.string.cancel))
+            }
+        }
+    )
 }
 
 @Composable
@@ -733,20 +926,10 @@ private fun MarketAccountCard(
 }
 
 @Composable
-private fun MarketMineSectionTitle(@StringRes titleRes: Int) {
-    Text(
-        text = stringResource(titleRes),
-        style = MaterialTheme.typography.titleSmall,
-        fontWeight = FontWeight.SemiBold,
-        color = MaterialTheme.colorScheme.onSurface
-    )
-}
-
-@Composable
 private fun MarketMineActionCard(
     title: String,
     onClick: () -> Unit,
-    icon: androidx.compose.ui.graphics.vector.ImageVector
+    icon: ImageVector
 ) {
     Surface(
         modifier = Modifier
@@ -757,45 +940,75 @@ private fun MarketMineActionCard(
         tonalElevation = 1.dp,
         shadowElevation = 1.dp
     ) {
-        Column {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primaryContainer
             ) {
-                Surface(
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.primaryContainer
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .padding(8.dp),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .padding(8.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = icon,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                    }
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
                 }
-
-                Text(
-                    text = title,
-                    modifier = Modifier.weight(1f),
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Medium
-                )
-
-                Icon(
-                    imageVector = Icons.Default.ChevronRight,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
             }
+
+            Text(
+                text = title,
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Medium
+            )
+
+            Icon(
+                imageVector = Icons.Default.ChevronRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun MarketEmptyCard(
+    title: String,
+    description: String
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(28.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }

@@ -1,8 +1,8 @@
 package com.ai.assistance.operit.ui.features.packages.market
 
 import com.ai.assistance.operit.R
-import com.ai.assistance.operit.data.api.GitHubIssue
-import com.ai.assistance.operit.data.api.GitHubLabel
+import com.ai.assistance.operit.data.api.MarketV2Entry
+import com.ai.assistance.operit.data.api.MarketV2PublisherEntrySummary
 
 const val MCP_MARKET_VISIBILITY_LABEL = "mcp-plugin"
 const val SKILL_MARKET_VISIBILITY_LABEL = "skill-plugin"
@@ -119,56 +119,33 @@ fun MarketReviewReason.labelResId(): Int {
     }
 }
 
-fun GitHubIssue.hasAnyLabelName(labelNames: Set<String>): Boolean {
-    return labels.any { label ->
-        labelNames.any { expected -> expected.equals(label.name, ignoreCase = true) }
-    }
-}
-
-fun List<GitHubLabel>.withoutLabelNames(labelNames: Set<String>): List<GitHubLabel> {
-    return filterNot { label ->
-        labelNames.any { excluded -> excluded.equals(label.name, ignoreCase = true) }
-    }
-}
-
-fun GitHubIssue.resolveMarketReviewSnapshot(publicLabelNames: Set<String>): MarketReviewSnapshot {
-    val labelNames = labels.map { it.name.trim() }
-    val normalizedLabelNames = labelNames.map { it.lowercase() }.toSet()
-    val reasons =
-        labels.mapNotNull { label ->
-            MarketReviewReason.fromLabelName(label.name)
-        }
+fun MarketV2Entry.resolveMarketReviewSnapshot(): MarketReviewSnapshot {
 
     val state =
-        when {
-            normalizedLabelNames.contains(REVIEW_REJECTED_LABEL.lowercase()) ->
-                MarketReviewState.REJECTED
-
-            normalizedLabelNames.contains(REVIEW_CHANGES_REQUESTED_LABEL.lowercase()) ->
-                MarketReviewState.CHANGES_REQUESTED
-
-            publicLabelNames.any { publicLabel ->
-                normalizedLabelNames.contains(publicLabel.lowercase())
-            } -> MarketReviewState.APPROVED
-
+        when (stateCode.lowercase()) {
+            "approved", "open" -> MarketReviewState.APPROVED
+            "changes_requested" -> MarketReviewState.CHANGES_REQUESTED
+            "rejected", "security_blocked" -> MarketReviewState.REJECTED
             else -> MarketReviewState.PENDING
         }
-
     return MarketReviewSnapshot(
         state = state,
-        reasons = reasons.distinct(),
+        reasons = emptyList(),
         isPubliclyApproved = state == MarketReviewState.APPROVED
     )
 }
 
-fun GitHubIssue.resolveMcpReviewSnapshot(): MarketReviewSnapshot {
-    return resolveMarketReviewSnapshot(setOf(MCP_MARKET_VISIBILITY_LABEL))
-}
-
-fun GitHubIssue.resolveSkillReviewSnapshot(): MarketReviewSnapshot {
-    return resolveMarketReviewSnapshot(setOf(SKILL_MARKET_VISIBILITY_LABEL))
-}
-
-fun GitHubIssue.resolveArtifactReviewSnapshot(): MarketReviewSnapshot {
-    return resolveMarketReviewSnapshot(ARTIFACT_MARKET_VISIBILITY_LABELS)
+fun MarketV2PublisherEntrySummary.resolveMarketReviewSnapshot(): MarketReviewSnapshot {
+    val state =
+        when (stateCode.lowercase()) {
+            "approved", "open" -> MarketReviewState.APPROVED
+            "changes_requested" -> MarketReviewState.CHANGES_REQUESTED
+            "rejected", "security_blocked" -> MarketReviewState.REJECTED
+            else -> MarketReviewState.PENDING
+        }
+    return MarketReviewSnapshot(
+        state = state,
+        reasons = emptyList(),
+        isPubliclyApproved = state == MarketReviewState.APPROVED
+    )
 }
