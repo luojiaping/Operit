@@ -60,7 +60,6 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -68,7 +67,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -77,13 +75,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.rememberAsyncImagePainter
 import com.ai.assistance.operit.R
@@ -171,29 +166,6 @@ private data class MarketMineAuthState(
     val isLoggedIn: Boolean = false,
     val currentUser: GitHubUser? = null
 )
-
-@Composable
-private fun RefreshMarketPaneOnEnter(
-    refreshKey: String,
-    onRefresh: () -> Unit
-) {
-    val lifecycleOwner = LocalLifecycleOwner.current
-    val currentOnRefresh by rememberUpdatedState(onRefresh)
-
-    DisposableEffect(lifecycleOwner, refreshKey) {
-        val lifecycle = lifecycleOwner.lifecycle
-        if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
-            currentOnRefresh()
-        }
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                currentOnRefresh()
-            }
-        }
-        lifecycle.addObserver(observer)
-        onDispose { lifecycle.removeObserver(observer) }
-    }
-}
 
 @Composable
 fun UnifiedMarketScreen(
@@ -316,9 +288,12 @@ private fun UnifiedMarketListPane(
     val hasMore by viewModel.hasMore.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
     val sortOption by viewModel.sortOption.collectAsState()
+    val featuredOnly by viewModel.featuredOnly.collectAsState()
     val errorMessage by viewModel.errorMessage.collectAsState()
     val installStates by viewModel.installStates.collectAsState()
     val localInstallStates by viewModel.localInstallStates.collectAsState()
+    val listScrollIndex by viewModel.listScrollIndex.collectAsState()
+    val listScrollOffset by viewModel.listScrollOffset.collectAsState()
     BindMarketSearchToTopBar(
         enabled = true,
         searchQuery = searchQuery,
@@ -326,8 +301,8 @@ private fun UnifiedMarketListPane(
         searchPlaceholderRes = config.searchPlaceholderRes
     )
 
-    RefreshMarketPaneOnEnter(refreshKey = viewModelKey) {
-        viewModel.loadEntries()
+    LaunchedEffect(viewModelKey) {
+        viewModel.loadEntriesIfNeeded()
     }
 
     errorMessage?.let { error ->
@@ -346,10 +321,15 @@ private fun UnifiedMarketListPane(
         sortOption = sortOption,
         onSearchQueryChanged = viewModel::onSearchQueryChanged,
         onSortOptionChanged = viewModel::onSortOptionChanged,
+        featuredOnly = featuredOnly,
+        onFeaturedOnlyChanged = viewModel::onFeaturedOnlyChanged,
         onRefresh = viewModel::loadEntries,
         onLoadMore = viewModel::loadMoreEntries,
         config = config,
         itemKey = { it.id },
+        initialFirstVisibleItemIndex = listScrollIndex,
+        initialFirstVisibleItemScrollOffset = listScrollOffset,
+        onScrollPositionChanged = viewModel::updateListScrollPosition,
         updatedAtSelector = { entry ->
             if (sortOption == com.ai.assistance.operit.ui.features.packages.market.MarketSortOption.UPDATED) {
                 entry.updatedAt ?: entry.publishedAt ?: entry.createdAt.orEmpty()
@@ -462,7 +442,7 @@ private fun MarketCategoryCard(
             }
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = category.name.ifBlank { marketCategoryLabel(category.id) },
+                    text = marketCategoryLabel(category.id),
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,

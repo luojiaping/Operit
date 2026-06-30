@@ -51,6 +51,9 @@ class MarketInteractionController(
     private val _isPostingComment = MutableStateFlow<Set<String>>(emptySet())
     val isPostingComment: StateFlow<Set<String>> = _isPostingComment.asStateFlow()
 
+    private val _isDeletingComment = MutableStateFlow<Set<String>>(emptySet())
+    val isDeletingComment: StateFlow<Set<String>> = _isDeletingComment.asStateFlow()
+
     private val _userAvatarCache = MutableStateFlow<Map<String, String>>(emptyMap())
     val userAvatarCache: StateFlow<Map<String, String>> = _userAvatarCache.asStateFlow()
 
@@ -188,6 +191,7 @@ class MarketInteractionController(
         if (id.isBlank()) return
         scope.launch {
             try {
+                _isDeletingComment.value = _isDeletingComment.value + commentId
                 val result = marketApiService.deleteComment(commentId)
                 result.fold(
                     onSuccess = {
@@ -205,6 +209,8 @@ class MarketInteractionController(
             } catch (e: Exception) {
                 onError("Failed to delete comment: ${e.message}")
                 AppLogger.e(logTag, "Exception while deleting comment $commentId on entry $id", e)
+            } finally {
+                _isDeletingComment.value = _isDeletingComment.value - commentId
             }
         }
     }
@@ -355,6 +361,5 @@ class MarketInteractionController(
 
 
 private fun MarketV2Reaction.reactionKey(): String = reaction.ifBlank { content }
-
 
 

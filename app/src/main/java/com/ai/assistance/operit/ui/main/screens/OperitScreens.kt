@@ -295,7 +295,14 @@ sealed class Screen(
             UnifiedMarketDetailEntryScreen(
                 initialEntry = entry,
                 fromManage = fromManage,
-                onNavigateBack = onGoBack
+                onNavigateBack = onGoBack,
+                onPublishNewVersion = { target ->
+                    when (target.type.lowercase()) {
+                        "script", "package" -> navigateTo(ArtifactContinuePublish(target.toArtifactPublishClusterContext()))
+                        "skill" -> navigateTo(RepoPublishVersion(MarketStatsType.SKILL, target))
+                        "mcp" -> navigateTo(RepoPublishVersion(MarketStatsType.MCP, target))
+                    }
+                }
             )
         }
     }

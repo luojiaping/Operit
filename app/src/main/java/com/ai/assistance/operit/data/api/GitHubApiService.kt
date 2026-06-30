@@ -42,6 +42,8 @@ data class GitHubRepository(
     val language: String?,
     val topics: List<String> = emptyList(),
     val size: Int = 0,
+    @SerialName("default_branch")
+    val defaultBranch: String = "",
     val created_at: String,
     val updated_at: String,
     val owner: GitHubUser

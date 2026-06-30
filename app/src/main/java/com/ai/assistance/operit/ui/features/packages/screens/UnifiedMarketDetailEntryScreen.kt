@@ -15,6 +15,10 @@ import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.material.icons.filled.Update
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -28,14 +32,24 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import coil.compose.rememberAsyncImagePainter
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -77,7 +91,8 @@ import com.ai.assistance.operit.ui.features.packages.screens.market.viewmodel.Un
 fun UnifiedMarketDetailEntryScreen(
     initialEntry: MarketV2Entry,
     fromManage: Boolean = false,
-    onNavigateBack: () -> Unit = {}
+    onNavigateBack: () -> Unit = {},
+    onPublishNewVersion: (MarketV2Entry) -> Unit = {}
 ) {
     val context = LocalContext.current
     val viewModel: UnifiedMarketDetailViewModel =
@@ -94,6 +109,7 @@ fun UnifiedMarketDetailEntryScreen(
     val commentsMap by viewModel.entryComments.collectAsState()
     val isLoadingComments by viewModel.isLoadingComments.collectAsState()
     val isPostingComment by viewModel.isPostingComment.collectAsState()
+    val isDeletingComment by viewModel.isDeletingComment.collectAsState()
     val reactionsMap by viewModel.entryReactions.collectAsState()
     val isLoadingReactions by viewModel.isLoadingReactions.collectAsState()
     val isReacting by viewModel.isReacting.collectAsState()
@@ -207,8 +223,7 @@ fun UnifiedMarketDetailEntryScreen(
                 enabled =
                     entry.canInstallFromUnifiedMarket() &&
                         installProgress == null &&
-                        localInstallState?.kind != MarketLocalInstallStateKind.INSTALLED &&
-                        localInstallState?.kind != MarketLocalInstallStateKind.BLOCKED_CONFLICT,
+                        localInstallState?.kind != MarketLocalInstallStateKind.INSTALLED,
                 isLoading = installProgress != null,
                 loadingLabel = installProgress?.detailLabel(),
                 icon = if (localInstallState.shouldShowSwitchAction()) Icons.Default.Update else Icons.Default.Check
@@ -234,7 +249,81 @@ fun UnifiedMarketDetailEntryScreen(
                 null
             },
         sections = entry.detailSections(),
-        trailingAction =
+        overviewExtraContent = {
+            val mainPublisherId = entry.publisher?.id ?: entry.publisherId
+            val entryContributors = entry.contributors.filter { it.id != mainPublisherId && it.id.isNotBlank() }
+            if (entryContributors.isNotEmpty()) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = stringResource(R.string.market_detail_contributors),
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            entryContributors.forEach { contributor ->
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    modifier = Modifier.width(48.dp)
+                                ) {
+                                    Image(
+                                        painter = rememberAsyncImagePainter(
+                                            (contributor.avatarUrl ?: contributor.avatar ?: "").ifBlank { "" }
+                                        ),
+                                        contentDescription = contributor.login,
+                                        modifier = Modifier.size(32.dp).clip(CircleShape),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                    Text(
+                                        text = contributor.login,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            if (entry.allowPublicUpdates && entry.isOpen()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = stringResource(R.string.market_publish_new_version),
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = stringResource(R.string.market_publish_new_version_detail_desc),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Button(
+                            onClick = { onPublishNewVersion(entry) },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(stringResource(R.string.market_publish_new_version))
+                        }
+                    }
+                }
+            }
+        },
             entry.versions.takeIf { it.isNotEmpty() }?.let {
                 UnifiedMarketDetailIconAction(
                     contentDescription = stringResource(R.string.market_detail_view_version_history),
@@ -335,6 +424,20 @@ fun UnifiedMarketDetailEntryScreen(
         )
     }
 
+    if (isDeletingComment.isNotEmpty()) {
+        AlertDialog(
+            onDismissRequest = {},
+            title = { Text(stringResource(R.string.market_detail_deleting_comment)) },
+            text = {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    CircularProgressIndicator()
+                    Text(stringResource(R.string.market_detail_deleting_comment_message))
+                }
+            },
+            confirmButton = {}
+        )
+    }
+
     if (showVersionHistoryDialog) {
         MarketVersionHistoryDialog(
             entry = entry,
@@ -432,14 +535,34 @@ private fun MarketVersionHistoryRow(
                 text =
                     stringResource(
                         R.string.supported_app_versions_colon,
-                        version.minAppVersion.orEmpty(),
-                        version.maxAppVersion.orEmpty()
+                        version.minAppVer.orEmpty(),
+                        version.maxAppVer.orEmpty()
                     ),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
+            version.publisher?.let { publisher ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Image(
+                        painter = rememberAsyncImagePainter(
+                            (publisher.avatarUrl ?: publisher.avatar ?: "").ifBlank { "" }
+                        ),
+                        contentDescription = publisher.login,
+                        modifier = Modifier.size(18.dp).clip(CircleShape),
+                        contentScale = ContentScale.Crop
+                    )
+                    Text(
+                        text = publisher.login,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
             version.changelog.takeIf { it.isNotBlank() }?.let {
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                 Text(
@@ -475,9 +598,7 @@ private fun MarketInstallProgress.detailLabel(): String {
 private fun MarketLocalInstallState?.detailActionLabel(): String {
     return when (this?.kind) {
         MarketLocalInstallStateKind.INSTALLED -> stringResource(R.string.mcp_plugin_installed)
-        MarketLocalInstallStateKind.UPDATE_AVAILABLE,
-        MarketLocalInstallStateKind.CONFLICT -> stringResource(R.string.market_install_switch_to_version)
-        MarketLocalInstallStateKind.BLOCKED_CONFLICT -> stringResource(R.string.market_install_builtin_conflict)
+        MarketLocalInstallStateKind.UPDATE_AVAILABLE -> stringResource(R.string.market_install_switch_to_version)
         MarketLocalInstallStateKind.NOT_INSTALLED,
         null -> stringResource(R.string.mcp_plugin_install)
     }
@@ -485,9 +606,7 @@ private fun MarketLocalInstallState?.detailActionLabel(): String {
 
 private fun MarketLocalInstallState?.shouldShowSwitchAction(): Boolean {
     return when (this?.kind) {
-        MarketLocalInstallStateKind.UPDATE_AVAILABLE,
-        MarketLocalInstallStateKind.CONFLICT -> true
-        MarketLocalInstallStateKind.BLOCKED_CONFLICT -> false
+        MarketLocalInstallStateKind.UPDATE_AVAILABLE -> true
         MarketLocalInstallStateKind.INSTALLED,
         MarketLocalInstallStateKind.NOT_INSTALLED,
         null -> false
@@ -639,5 +758,5 @@ private fun buildPreviewBannerMessage(
 ): String {
     val stateLabel = context.getString(state.labelResId())
     val reasonLabel = reasons.joinToString(separator = " / ") { context.getString(it.labelResId()) }
-    return if (reasonLabel.isBlank()) stateLabel else "$stateLabel · $reasonLabel"
+    return if (reasonLabel.isBlank()) stateLabel else "$stateLabel 路 $reasonLabel"
 }

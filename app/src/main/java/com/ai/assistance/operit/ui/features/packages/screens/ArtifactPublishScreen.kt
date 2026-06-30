@@ -27,6 +27,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -62,6 +63,7 @@ private data class ArtifactPublishEditInfo(
     val description: String,
     val detail: String,
     val categoryId: String,
+    val allowPublicUpdates: Boolean,
     val version: String,
     val minSupportedAppVersion: String?,
     val maxSupportedAppVersion: String?,
@@ -80,9 +82,10 @@ private fun com.ai.assistance.operit.data.api.MarketV2Entry.toArtifactPublishEdi
         description = description,
         detail = detail,
         categoryId = categoryId,
+        allowPublicUpdates = allowPublicUpdates,
         version = versionValue?.version.orEmpty(),
-        minSupportedAppVersion = versionValue?.minAppVersion,
-        maxSupportedAppVersion = versionValue?.maxAppVersion,
+        minSupportedAppVersion = versionValue?.minAppVer,
+        maxSupportedAppVersion = versionValue?.maxAppVer,
         runtimePackageId = versionValue?.runtimePackageId.orEmpty(),
         normalizedId = id,
         sourceFileName = assetValue?.assetName.orEmpty().ifBlank { assetValue?.name.orEmpty() }
@@ -170,6 +173,9 @@ fun ArtifactPublishScreen(
     }
     var categoryId by rememberSaveable(activePublishContext?.categoryId) {
         mutableStateOf(initialInfo?.categoryId.orEmpty().ifBlank { activePublishContext?.categoryId.orEmpty() })
+    }
+    var allowPublicUpdates by rememberSaveable(initialInfo?.allowPublicUpdates) {
+        mutableStateOf(initialInfo?.allowPublicUpdates ?: true)
     }
     var version by rememberSaveable { mutableStateOf(initialInfo?.version.orEmpty().ifBlank { "1.0.0" }) }
     var minSupportedAppVersion by rememberSaveable { mutableStateOf(initialInfo?.minSupportedAppVersion.orEmpty()) }
@@ -506,7 +512,7 @@ fun ArtifactPublishScreen(
             val selectedCategoryLabel =
                 categoryId
                     .takeIf { it.isNotBlank() }
-                    ?.let { selected -> categories.firstOrNull { it.id == selected }?.name?.ifBlank { selected } ?: selected }
+                    ?.let { selected -> marketCategoryLabel(selected) }
                     .orEmpty()
             OutlinedTextField(
                 value = selectedCategoryLabel,
@@ -528,11 +534,39 @@ fun ArtifactPublishScreen(
             ) {
                 categories.forEach { category ->
                     DropdownMenuItem(
-                        text = { Text(category.name.ifBlank { category.id }) },
+                        text = { Text(marketCategoryLabel(category.id)) },
                         onClick = {
                             categoryId = category.id
                             categoryExpanded = false
                         }
+                    )
+                }
+            }
+        }
+        if (!isContinuationMode) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                        Text(
+                            text = stringResource(R.string.market_allow_public_updates_title),
+                            style = MaterialTheme.typography.titleSmall
+                        )
+                        Text(
+                            text = stringResource(R.string.market_allow_public_updates_desc),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = allowPublicUpdates,
+                        onCheckedChange = { allowPublicUpdates = it }
                     )
                 }
             }
@@ -740,6 +774,7 @@ fun ArtifactPublishScreen(
                                 description = description,
                                 detail = detail,
                                 categoryId = categoryId,
+                                allowPublicUpdates = allowPublicUpdates,
                                 minSupportedAppVersion = minSupportedAppVersion.ifBlank { null },
                                 maxSupportedAppVersion = maxSupportedAppVersion.ifBlank { null }
                             )
@@ -750,6 +785,7 @@ fun ArtifactPublishScreen(
                                 description = description,
                                 detail = detail,
                                 categoryId = categoryId,
+                                allowPublicUpdates = allowPublicUpdates,
                                 version = version,
                                 minSupportedAppVersion = minSupportedAppVersion.ifBlank { null },
                                 maxSupportedAppVersion = maxSupportedAppVersion.ifBlank { null },

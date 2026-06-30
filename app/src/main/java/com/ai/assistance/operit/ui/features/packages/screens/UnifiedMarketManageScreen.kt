@@ -4,8 +4,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -106,6 +108,8 @@ fun UnifiedMarketManageScreen(
 
     val showManageLoading = isLoggedIn && !hasLoaded && entries.isEmpty()
     val showEmptyState = hasLoaded && errorMessage == null && entries.isEmpty()
+    val ownedEntries = remember(entries) { entries.filter { it.isOwnerRelation() } }
+    val contributedEntries = remember(entries) { entries.filter { it.isContributorRelation() } }
 
     MarketManageScaffold(
         isLoggedIn = isLoggedIn,
@@ -148,77 +152,44 @@ fun UnifiedMarketManageScreen(
                 contentPadding = PaddingValues(bottom = 120.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                items(entries, key = { it.id }) { entry ->
-                    val review = remember(entry) { entry.resolveMarketReviewSnapshot() }
-                    MarketManageItemCard(
-                        title = entry.title,
-                        description = entry.manageSummaryText(),
-                        entryId = entry.id,
-                        isOpen = entry.isOpen(),
-                        onClick = {
-                            viewModel.openEntryDetail(entry, onNavigateToDetail)
-                        },
-                        supportingContent = {
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                MarketManageReviewStatusChip(reviewState = review.state)
-                                MarketEntryTypeBadge(entry.type)
-                            }
-                            if (review.reasons.isNotEmpty()) {
-                                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    review.reasons.take(2).forEach { reason ->
-                                        MarketManageReviewReasonChip(reason = reason)
-                                    }
-                                }
-                            }
-                        },
-                        actions = {
-                            MarketManageSecondaryActionButton(
-                                label = stringResource(R.string.edit),
-                                icon = Icons.Default.Edit,
-                                onClick = {
-                                    viewModel.openEntryDetail(entry) { fullEntry ->
-                                        when (val type = fullEntry.marketStatsType()) {
-                                            MarketStatsType.SCRIPT,
-                                            MarketStatsType.PACKAGE -> onNavigateToEditArtifact(fullEntry)
-                                            MarketStatsType.SKILL,
-                                            MarketStatsType.MCP -> onNavigateToEditRepo(type, fullEntry)
-                                            null -> Unit
-                                        }
-                                    }
-                                }
-                            )
-                            if (entry.isOpen()) {
-                                MarketManageSecondaryActionButton(
-                                    label = stringResource(R.string.market_publish_new_version),
-                                    icon = Icons.Default.Update,
-                                    onClick = {
-                                        viewModel.openEntryDetail(entry) { fullEntry ->
-                                            when (val type = fullEntry.marketStatsType()) {
-                                                MarketStatsType.SCRIPT,
-                                                MarketStatsType.PACKAGE -> onNavigateToPublishArtifactVersion(fullEntry)
-                                                MarketStatsType.SKILL,
-                                                MarketStatsType.MCP -> onNavigateToPublishRepoVersion(type, fullEntry)
-                                                null -> Unit
-                                            }
-                                        }
-                                    }
-                                )
-                            }
-                            if (entry.isOpen()) {
-                                MarketManageDangerActionButton(
-                                    label = stringResource(R.string.remove),
-                                    icon = Icons.Default.Delete,
-                                    onClick = { showDeleteDialog = entry }
-                                )
-                            } else {
-                                MarketManagePrimaryActionButton(
-                                    label = stringResource(R.string.republish),
-                                    icon = Icons.Default.Refresh,
-                                    onClick = { viewModel.resubmitEntry(entry) }
-                                )
-                            }
+                if (ownedEntries.isNotEmpty()) {
+                    item(key = "owned-title") {
+                        ManageSectionTitle(text = stringResource(R.string.market_manage_owned_section))
+                    }
+                    items(ownedEntries, key = { "owned-${it.id}" }) { entry ->
+                        ManagedEntryCard(
+                            entry = entry,
+                            canManageEntry = true,
+                            viewModel = viewModel,
+                            onNavigateToDetail = onNavigateToDetail,
+                            onNavigateToEditArtifact = onNavigateToEditArtifact,
+                            onNavigateToEditRepo = onNavigateToEditRepo,
+                            onNavigateToPublishArtifactVersion = onNavigateToPublishArtifactVersion,
+                            onNavigateToPublishRepoVersion = onNavigateToPublishRepoVersion,
+                            onDelete = { showDeleteDialog = it }
+                        )
+                    }
+                }
+                if (contributedEntries.isNotEmpty()) {
+                    item(key = "contributed-title") {
+                        if (ownedEntries.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(4.dp))
                         }
-                    )
+                        ManageSectionTitle(text = stringResource(R.string.market_manage_contributed_section))
+                    }
+                    items(contributedEntries, key = { "contributed-${it.id}" }) { entry ->
+                        ManagedEntryCard(
+                            entry = entry,
+                            canManageEntry = false,
+                            viewModel = viewModel,
+                            onNavigateToDetail = onNavigateToDetail,
+                            onNavigateToEditArtifact = onNavigateToEditArtifact,
+                            onNavigateToEditRepo = onNavigateToEditRepo,
+                            onNavigateToPublishArtifactVersion = onNavigateToPublishArtifactVersion,
+                            onNavigateToPublishRepoVersion = onNavigateToPublishRepoVersion,
+                            onDelete = { showDeleteDialog = it }
+                        )
+                    }
                 }
             }
         }
@@ -254,6 +225,105 @@ fun UnifiedMarketManageScreen(
             }
         )
     }
+}
+
+@Composable
+private fun ManageSectionTitle(text: String) {
+    Text(
+        text = text,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp),
+        style = MaterialTheme.typography.titleSmall,
+        color = MaterialTheme.colorScheme.primary
+    )
+}
+
+@Composable
+private fun ManagedEntryCard(
+    entry: MarketV2PublisherEntrySummary,
+    canManageEntry: Boolean,
+    viewModel: UnifiedMarketManageViewModel,
+    onNavigateToDetail: (MarketV2Entry) -> Unit,
+    onNavigateToEditArtifact: (MarketV2Entry) -> Unit,
+    onNavigateToEditRepo: (MarketStatsType, MarketV2Entry) -> Unit,
+    onNavigateToPublishArtifactVersion: (MarketV2Entry) -> Unit,
+    onNavigateToPublishRepoVersion: (MarketStatsType, MarketV2Entry) -> Unit,
+    onDelete: (MarketV2PublisherEntrySummary) -> Unit
+) {
+    val review = remember(entry) { entry.resolveMarketReviewSnapshot() }
+    MarketManageItemCard(
+        title = entry.title,
+        description = entry.manageSummaryText(),
+        entryId = entry.id,
+        isOpen = entry.isOpen(),
+        onClick = {
+            viewModel.openEntryDetail(entry, onNavigateToDetail)
+        },
+        supportingContent = {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                MarketManageReviewStatusChip(reviewState = review.state)
+                MarketEntryTypeBadge(entry.type)
+                MarketManageRelationBadge(entry.relation)
+            }
+            if (review.reasons.isNotEmpty()) {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    review.reasons.take(2).forEach { reason ->
+                        MarketManageReviewReasonChip(reason = reason)
+                    }
+                }
+            }
+        },
+        actions = {
+            if (canManageEntry) {
+                MarketManageSecondaryActionButton(
+                    label = stringResource(R.string.edit),
+                    icon = Icons.Default.Edit,
+                    onClick = {
+                        viewModel.openEntryDetail(entry) { fullEntry ->
+                            when (val type = fullEntry.marketStatsType()) {
+                                MarketStatsType.SCRIPT,
+                                MarketStatsType.PACKAGE -> onNavigateToEditArtifact(fullEntry)
+                                MarketStatsType.SKILL,
+                                MarketStatsType.MCP -> onNavigateToEditRepo(type, fullEntry)
+                                null -> Unit
+                            }
+                        }
+                    }
+                )
+            }
+            if (entry.isOpen()) {
+                MarketManageSecondaryActionButton(
+                    label = stringResource(R.string.market_publish_new_version),
+                    icon = Icons.Default.Update,
+                    onClick = {
+                        viewModel.openEntryDetail(entry) { fullEntry ->
+                            when (val type = fullEntry.marketStatsType()) {
+                                MarketStatsType.SCRIPT,
+                                MarketStatsType.PACKAGE -> onNavigateToPublishArtifactVersion(fullEntry)
+                                MarketStatsType.SKILL,
+                                MarketStatsType.MCP -> onNavigateToPublishRepoVersion(type, fullEntry)
+                                null -> Unit
+                            }
+                        }
+                    }
+                )
+            }
+            if (canManageEntry) {
+                if (entry.isOpen()) {
+                    MarketManageDangerActionButton(
+                        label = stringResource(R.string.remove),
+                        icon = Icons.Default.Delete,
+                        onClick = { onDelete(entry) }
+                    )
+                } else {
+                    MarketManagePrimaryActionButton(
+                        label = stringResource(R.string.republish),
+                        icon = Icons.Default.Refresh,
+                        onClick = { viewModel.resubmitEntry(entry) }
+                    )
+                }
+            }
+        }
+    )
 }
 
 @Composable
@@ -336,8 +406,43 @@ private fun MarketEntryTypeBadge(type: String) {
     )
 }
 
+@Composable
+private fun MarketManageRelationBadge(relation: String) {
+    val isContributor = relation.equals("contributor", ignoreCase = true)
+    MarketManageLabelChip(
+        text =
+            stringResource(
+                if (isContributor) {
+                    R.string.market_manage_relation_contributor
+                } else {
+                    R.string.market_manage_relation_owner
+                }
+            ),
+        containerColor =
+            if (isContributor) {
+                MaterialTheme.colorScheme.tertiaryContainer
+            } else {
+                MaterialTheme.colorScheme.primaryContainer
+            },
+        contentColor =
+            if (isContributor) {
+                MaterialTheme.colorScheme.onTertiaryContainer
+            } else {
+                MaterialTheme.colorScheme.onPrimaryContainer
+            }
+    )
+}
+
 private fun MarketV2PublisherEntrySummary.isOpen(): Boolean {
     return stateCode.equals("approved", ignoreCase = true)
+}
+
+private fun MarketV2PublisherEntrySummary.isOwnerRelation(): Boolean {
+    return relation.equals("owner", ignoreCase = true)
+}
+
+private fun MarketV2PublisherEntrySummary.isContributorRelation(): Boolean {
+    return relation.equals("contributor", ignoreCase = true)
 }
 
 @Composable

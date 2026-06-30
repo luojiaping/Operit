@@ -6,7 +6,6 @@ import com.ai.assistance.operit.data.preferences.GitHubAuthPreferences
 import com.ai.assistance.operit.data.preferences.GitHubUser
 import com.ai.assistance.operit.ui.features.packages.market.normalizeMarketArtifactId
 import com.ai.assistance.operit.util.AppLogger
-import java.io.File
 import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
@@ -18,7 +17,6 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
-import okhttp3.Cache
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -229,6 +227,7 @@ data class MarketV2PublisherEntrySummary(
     val id: String = "",
     val title: String = "",
     val type: String = "",
+    val relation: String,
     val stateCode: String = "pending",
     val categoryId: String = "",
     val updatedAt: String = ""
@@ -291,6 +290,7 @@ data class MarketV2Entry(
     val detail: String = "",
     val authorId: String = "",
     val publisherId: String = "",
+    val allowPublicUpdates: Boolean = true,
     val categoryId: String = "",
     val stateCode: String = "approved",
     val createdAt: String? = null,
@@ -306,7 +306,9 @@ data class MarketV2Entry(
     val downloadCount: Int = 0,
     val stats: MarketV2EntryStats? = null,
     val author: MarketV2Author? = null,
-    val publisher: MarketV2Author? = null
+    val publisher: MarketV2Author? = null,
+    val contributors: List<MarketV2Author> = emptyList(),
+    val featured: Boolean = false,
 )
 
 @Serializable
@@ -354,9 +356,11 @@ data class MarketV2Asset(
 data class MarketV2Version(
     val id: String = "",
     val version: String = "",
-    val formatVersion: String = "",
-    val minAppVersion: String? = null,
-    val maxAppVersion: String? = null,
+    val formatVer: String = "",
+    val publisherId: String = "",
+    val publisher: MarketV2Author? = null,
+    val minAppVer: String? = null,
+    val maxAppVer: String? = null,
     val changelog: String = "",
     val installConfig: String = "",
     val stateCode: String = "approved",
@@ -402,6 +406,7 @@ data class MarketV2PublishRequest(
     val description: String,
     val detail: String = "",
     val categoryId: String = "",
+    val allowPublicUpdates: Boolean = true,
     val version: MarketV2PublishVersion,
     val source: MarketV2PublishSource? = null,
     val repoVersion: MarketV2PublishRepoVersion? = null,
@@ -420,15 +425,16 @@ data class MarketV2EntryUpdateRequest(
     val title: String,
     val description: String,
     val detail: String = "",
-    val categoryId: String = ""
+    val categoryId: String = "",
+    val allowPublicUpdates: Boolean? = null
 )
 
 @Serializable
 data class MarketV2PublishVersion(
     val version: String,
-    val formatVersion: String,
-    val minAppVersion: String,
-    val maxAppVersion: String? = null,
+    val formatVer: String,
+    val minAppVer: String,
+    val maxAppVer: String? = null,
     val changelog: String? = null,
     val projectId: String? = null,
     val runtimePackageId: String? = null
@@ -444,8 +450,6 @@ data class MarketV2PublishSource(
 data class MarketV2PublishRepoVersion(
     val refType: String = "branch",
     val refName: String = "main",
-    val subdir: String = "",
-    val manifestPath: String = "",
     val installConfig: String = "{}"
 )
 
@@ -700,8 +704,8 @@ class MarketStatsApiService {
                 displayName = entry.title,
                 description = entry.detail,
                 sourceFileName = asset.assetName.ifBlank { asset.name },
-                minSupportedAppVersion = version.minAppVersion,
-                maxSupportedAppVersion = version.maxAppVersion,
+                minSupportedAppVersion = version.minAppVer,
+                maxSupportedAppVersion = version.maxAppVer,
                 publishedAt = version.publishedAt,
                 state = version.stateCode.toPublicationState(),
                 entry = entry.copy(
@@ -1150,7 +1154,7 @@ class MarketStatsApiService {
     private fun String.toV2Sort(): String {
         return when (lowercase()) {
             "likes" -> "likes"
-            "featured" -> "featured"
+            "downloads" -> "downloads"
             else -> "updated"
         }
     }
@@ -1239,6 +1243,8 @@ class MarketStatsApiService {
             title = title,
             description = description,
             detail = detail,
+            categoryId = categoryId,
+            allowPublicUpdates = allowPublicUpdates,
             stateCode = "pending",
             source = null
         )
@@ -1251,6 +1257,7 @@ class MarketStatsApiService {
             description = this.description,
             detail = this.detail,
             categoryId = this.categoryId,
+            allowPublicUpdates = this.allowPublicUpdates ?: true,
             stateCode = "pending"
         )
     }
@@ -1327,7 +1334,6 @@ class MarketStatsApiService {
         private const val TAG = "MarketStatsApiService"
         private const val USER_AGENT = "Operit-Market-V2"
         private const val TIMEOUT_SECONDS = 15L
-        private const val STATIC_CACHE_SIZE_BYTES = 8L * 1024L * 1024L
         private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
         private val BASE_URL = "https://api.operit.app".toHttpUrl()
         private val STATIC_BASE_URL = "https://static.operit.app".toHttpUrl()
@@ -1336,13 +1342,6 @@ class MarketStatsApiService {
         private var marketSession: String? = null
         private val MARKET_SESSION_LOCK = Any()
 
-        private val STATIC_CACHE by lazy {
-            Cache(
-                directory = File(OperitApplication.instance.cacheDir, "market_v2_http_cache"),
-                maxSize = STATIC_CACHE_SIZE_BYTES
-            )
-        }
-
         private val STATIC_CLIENT by lazy {
             OkHttpClient.Builder()
                 .connectTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS)
@@ -1350,7 +1349,6 @@ class MarketStatsApiService {
                 .writeTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS)
                 .followRedirects(true)
                 .followSslRedirects(true)
-                .cache(STATIC_CACHE)
                 .build()
         }
 

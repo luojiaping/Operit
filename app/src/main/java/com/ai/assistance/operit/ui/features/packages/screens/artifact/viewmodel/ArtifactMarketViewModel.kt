@@ -153,6 +153,7 @@ class ArtifactMarketViewModel(
         description: String,
         detail: String,
         categoryId: String,
+        allowPublicUpdates: Boolean,
         version: String,
         minSupportedAppVersion: String?,
         maxSupportedAppVersion: String?,
@@ -177,6 +178,7 @@ class ArtifactMarketViewModel(
                 description = description,
                 detail = detail,
                 categoryId = categoryId,
+                allowPublicUpdates = allowPublicUpdates,
                 version = version,
                 minSupportedAppVersion = minSupportedAppVersion,
                 maxSupportedAppVersion = maxSupportedAppVersion,
@@ -191,6 +193,7 @@ class ArtifactMarketViewModel(
         description: String,
         detail: String,
         categoryId: String,
+        allowPublicUpdates: Boolean,
         minSupportedAppVersion: String?,
         maxSupportedAppVersion: String?
     ) {
@@ -234,7 +237,8 @@ class ArtifactMarketViewModel(
                         title = payload.displayName,
                         description = payload.description,
                         detail = payload.projectDescription,
-                        categoryId = categoryId
+                        categoryId = categoryId,
+                        allowPublicUpdates = allowPublicUpdates
                     )
                 ).fold(
                     onSuccess = {

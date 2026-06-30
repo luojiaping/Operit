@@ -11,8 +11,8 @@ val UnifiedMarketBrowseConfig =
         emptyDefaultTitleRes = R.string.no_artifacts_available,
         sortOptions = listOf(
             MarketSortOption.UPDATED,
-            MarketSortOption.LIKES,
-            MarketSortOption.FEATURED
+            MarketSortOption.DOWNLOADS,
+            MarketSortOption.LIKES
         )
     )
 
@@ -24,6 +24,7 @@ val UnifiedMarketCategoryConfig =
         emptyDefaultTitleRes = R.string.no_artifacts_available,
         sortOptions = listOf(
             MarketSortOption.UPDATED,
+            MarketSortOption.DOWNLOADS,
             MarketSortOption.LIKES
         )
     )
@@ -62,8 +63,6 @@ private fun MarketLocalInstallState?.toBrowseActionState(): MarketBrowseActionSt
     return when (this?.kind) {
         MarketLocalInstallStateKind.INSTALLED -> MarketBrowseActionState.Installed
         MarketLocalInstallStateKind.UPDATE_AVAILABLE -> MarketBrowseActionState.Updatable
-        MarketLocalInstallStateKind.CONFLICT,
-        MarketLocalInstallStateKind.BLOCKED_CONFLICT -> MarketBrowseActionState.Unavailable(MarketUnavailableKind.Warning)
         MarketLocalInstallStateKind.NOT_INSTALLED,
         null -> MarketBrowseActionState.Available
     }
