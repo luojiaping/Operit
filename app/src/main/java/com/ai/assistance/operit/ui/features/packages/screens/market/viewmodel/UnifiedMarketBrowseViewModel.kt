@@ -246,13 +246,18 @@ class UnifiedMarketBrowseViewModel(
 
     fun loadNotifications() {
         viewModelScope.launch {
-            marketApiService.getNotifications(limit = 50, offset = 0).fold(
-                onSuccess = { _notifications.value = it },
-                onFailure = { error ->
-                    _errorMessage.value = error.message ?: "Failed to load market notifications"
-                    AppLogger.e(TAG, "Failed to load market notifications", error)
-                }
-            )
+            _isLoading.value = true
+            try {
+                marketApiService.getNotifications(limit = 50, offset = 0).fold(
+                    onSuccess = { _notifications.value = it },
+                    onFailure = { error ->
+                        _errorMessage.value = error.message ?: "Failed to load market notifications"
+                        AppLogger.e(TAG, "Failed to load market notifications", error)
+                    }
+                )
+            } finally {
+                _isLoading.value = false
+            }
         }
     }
 
@@ -364,6 +369,6 @@ private fun MarketV2Entry.updatedTimestamp(): String {
 private fun MarketV2Entry.likeCount(): Int {
     return stats?.likes ?: reactions.sumOf { reaction ->
         val key = reaction.reaction.ifBlank { reaction.content }
-        if (key == "+1" || key.equals("like", ignoreCase = true)) reaction.count.coerceAtLeast(1) else 0
+        if (key == "+1" || key.equals("like", ignoreCase = true)) reaction.total.coerceAtLeast(1) else 0
     }
 }

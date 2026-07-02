@@ -735,6 +735,36 @@ class GitHubApiService(private val context: Context) {
         }
     }
 
+    suspend fun deleteRelease(
+        owner: String,
+        repo: String,
+        releaseId: Long
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val authHeader = authPreferences.getAuthorizationHeader()
+                ?: return@withContext Result.failure(Exception("No access token available"))
+
+            val request =
+                Request.Builder()
+                    .url("$GITHUB_API_BASE/repos/$owner/$repo/releases/$releaseId")
+                    .delete()
+                    .addHeader("Authorization", authHeader)
+                    .addHeader("Accept", "application/vnd.github+json")
+                    .build()
+
+            val response = client.newCall(request).execute()
+            val responseBody = response.body?.string()
+
+            if (response.isSuccessful) {
+                Result.success(Unit)
+            } else {
+                Result.failure(buildHttpException(response.code, response.message, responseBody))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     suspend fun deleteReleaseAsset(
         owner: String,
         repo: String,

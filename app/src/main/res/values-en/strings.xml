@@ -7442,7 +7442,10 @@
     <string name="supported_app_versions_colon">Min version: %1$s, Max version: %2$s</string>
     <string name="min_supported_app_version">Minimum supported app version</string>
     <string name="max_supported_app_version">Maximum supported app version</string>
-    <string name="supported_version_input_hint">Enter a version number like `1.10.0`, can be left blank</string>
+    <string name="min_supported_version_input_hint">Required. Enter a version like `1.10.0` or `1.10.0+5`</string>
+    <string name="max_supported_version_input_hint">Optional; blank defaults to 1.99.99. 2.0.0 or above allows Operit 2</string>
+    <string name="operit2_version_warning_title">Confirm Operit 2 support?</string>
+    <string name="operit2_version_warning_message">This will allow Operit 2 to use this plugin. Make sure the plugin works correctly on Operit 2.</string>
     <string name="publish_failed_title">Publish failed</string>
     <string name="retry_market_registration">Retry market registration</string>
     <string name="update_to_market">Update to market</string>
@@ -7745,6 +7748,9 @@
     <string name="market_review_rejected">Rejected</string>
     <string name="market_review_status_label">Review Status</string>
     <string name="market_review_reasons_label">Reasons for Rejection</string>
+    <string name="market_review_step_submitted">Submitted</string>
+    <string name="market_review_step_scheduled">Scheduled</string>
+    <string name="market_review_step_unlisted">Unlisted</string>
     <string name="market_review_reason_metadata_incomplete">Incomplete Metadata</string>
     <string name="market_review_reason_install_config_invalid">Invalid Installation Configuration</string>
     <string name="market_review_reason_repository_unreachable">Repository Unreachable</string>

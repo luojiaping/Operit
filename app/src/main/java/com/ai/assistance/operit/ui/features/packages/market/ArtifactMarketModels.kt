@@ -407,6 +407,9 @@ fun validateSupportedAppVersions(
 ) {
     val normalizedMin = normalizeAppVersionOrNull(minSupportedAppVersion)
     val normalizedMax = normalizeAppVersionOrNull(maxSupportedAppVersion)
+    require(normalizedMin != null) {
+        "Minimum supported app version is required"
+    }
     if (normalizedMin != null && normalizedMax != null) {
         require(compareAppVersions(normalizedMin, normalizedMax) <= 0) {
             "Minimum supported app version cannot be greater than maximum supported app version"
@@ -448,6 +451,13 @@ fun isAppVersionSupported(
         return false
     }
     return true
+}
+
+fun isOperit2VersionAllowed(maxSupportedAppVersion: String?): Boolean {
+    val normalizedMax =
+        runCatching { normalizeAppVersionOrNull(maxSupportedAppVersion) }.getOrNull()
+            ?: return false
+    return compareAppVersions(normalizedMax, "2.0.0") >= 0
 }
 
 fun formatSupportedAppVersions(

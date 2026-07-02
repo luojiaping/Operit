@@ -81,7 +81,7 @@ private fun MarketV2Entry.downloadCountValue(): Int {
 private fun MarketV2Entry.likeCount(): Int {
     return stats?.likes ?: reactions.sumOf { reaction ->
         val key = reaction.reaction.ifBlank { reaction.content }
-        if (key == "+1" || key.equals("like", ignoreCase = true)) reaction.count.coerceAtLeast(1) else 0
+        if (key == "+1" || key.equals("like", ignoreCase = true)) reaction.total.coerceAtLeast(1) else 0
     }
 }
 

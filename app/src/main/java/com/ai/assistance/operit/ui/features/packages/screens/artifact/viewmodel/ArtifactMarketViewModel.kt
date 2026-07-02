@@ -80,9 +80,6 @@ class ArtifactMarketViewModel(
     private val _requiresForgeInitialization = MutableStateFlow(false)
     val requiresForgeInitialization: StateFlow<Boolean> = _requiresForgeInitialization.asStateFlow()
 
-    private val _registrationRetryAvailable = MutableStateFlow(false)
-    val registrationRetryAvailable: StateFlow<Boolean> = _registrationRetryAvailable.asStateFlow()
-
     val isLoggedIn: StateFlow<Boolean> =
         githubAuth.isLoggedInFlow.stateIn(
             scope = viewModelScope,
@@ -92,7 +89,6 @@ class ArtifactMarketViewModel(
 
     private val supportedTypes = scope.supportedTypes()
     private var pendingPublishRequest: PublishArtifactRequest? = null
-    private var pendingMarketRegistrationPayload: MarketRegistrationPayload? = null
 
     init {
         refreshPublishableArtifacts()
@@ -276,27 +272,6 @@ class ArtifactMarketViewModel(
         _publishProgressStage.value = PublishProgressStage.IDLE
     }
 
-    fun retryPendingMarketRegistration() {
-        val payload = pendingMarketRegistrationPayload ?: return
-        viewModelScope.launch {
-            _publishProgressStage.value = PublishProgressStage.REGISTERING_MARKET
-            _publishErrorMessage.value = null
-            forgePublishService.retryMarketRegistration(payload).fold(
-                onSuccess = {
-                    _registrationRetryAvailable.value = false
-                    pendingMarketRegistrationPayload = null
-                    _publishProgressStage.value = PublishProgressStage.COMPLETED
-                    _publishSuccessMessage.value =
-                        appendMarketScheduleNotice(getText(R.string.artifact_market_registration_completed))
-                },
-                onFailure = { error ->
-                    _publishErrorMessage.value = error.message ?: "Failed to register market entry"
-                    _publishProgressStage.value = PublishProgressStage.IDLE
-                }
-            )
-        }
-    }
-
     fun clearError() {
         _errorMessage.value = null
     }
@@ -307,6 +282,13 @@ class ArtifactMarketViewModel(
         _publishSuccessMessage.value = null
         if (_publishProgressStage.value == PublishProgressStage.COMPLETED) {
             _publishProgressStage.value = PublishProgressStage.IDLE
+        }
+    }
+
+    fun clearPendingMarketRegistrationRetry() {
+        _publishErrorMessage.value = null
+        if (_publishProgressStage.value == PublishProgressStage.IDLE) {
+            _publishMessage.value = null
         }
     }
 
@@ -328,8 +310,6 @@ class ArtifactMarketViewModel(
 
                 _publishErrorMessage.value = null
                 _publishSuccessMessage.value = null
-                _registrationRetryAvailable.value = false
-                pendingMarketRegistrationPayload = null
                 pendingPublishRequest = resolvedRequest
                 _publishProgressStage.value = PublishProgressStage.VALIDATING
                 _publishMessage.value = getText(R.string.artifact_publish_checking_identity_conflicts)
@@ -364,9 +344,7 @@ class ArtifactMarketViewModel(
                                 _publishSuccessMessage.value = buildSuccessMessage(result.forgeRepo, result.payload)
                             }
 
-                            is PublishAttemptResult.RegistrationRetryRequired -> {
-                                pendingMarketRegistrationPayload = result.payload
-                                _registrationRetryAvailable.value = true
+                            is PublishAttemptResult.RegistrationFailed -> {
                                 _publishProgressStage.value = PublishProgressStage.IDLE
                                 _publishErrorMessage.value = result.errorMessage
                             }

@@ -99,7 +99,9 @@ data class UnifiedMarketDetailParticipant(
     val roleLabel: String,
     val name: String,
     val avatarUrl: String? = null,
-    val fallbackAvatarText: String
+    val fallbackAvatarText: String,
+    val authorId: String? = null,
+    val onClick: ((String, String, String) -> Unit)? = null
 )
 
 data class UnifiedMarketDetailMetric(
@@ -388,7 +390,8 @@ private fun UnifiedMarketDetailHeaderCard(
                 header.participants.take(2).forEach { participant ->
                     UnifiedMarketDetailParticipantChip(
                         participant = participant,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
+                        onClick = participant.onClick
                     )
                 }
             }
@@ -492,10 +495,20 @@ private fun UnifiedMarketDetailLeadingIcon(
 @Composable
 private fun UnifiedMarketDetailParticipantChip(
     participant: UnifiedMarketDetailParticipant,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onClick: ((String, String, String) -> Unit)? = null
 ) {
+    val participantAuthorId = participant.authorId
+    val clickModifier =
+        if (!participantAuthorId.isNullOrBlank() && onClick != null) {
+            Modifier.clickable {
+                onClick(participantAuthorId, participant.name, participant.avatarUrl.orEmpty())
+            }
+        } else {
+            Modifier
+        }
     Row(
-        modifier = modifier,
+        modifier = modifier.then(clickModifier),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

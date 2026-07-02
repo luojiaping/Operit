@@ -4240,6 +4240,19 @@
     <string name="market_notifications_empty_description">市场消息会显示在这里</string>
     <string name="market_manage_removed">已提交移除「%1$s」的请求</string>
     <string name="market_manage_resubmitted">已提交重新上架「%1$s」的请求</string>
+    <string name="market_manage_resubmit">重新提交</string>
+    <string name="market_manage_resubmitting_title">正在重新提交</string>
+    <string name="market_manage_resubmitting_message">正在提交审核请求，请稍候…</string>
+    <string name="market_manage_resubmit_cooldown_message">该条目已进入本地冷却期，剩余 %1$s 后才能再次提交。</string>
+    <string name="market_manage_resubmit_rejected_blocked">该条目已被拒绝，客户端不允许再次提交。</string>
+    <string name="market_manage_resubmit_state_blocked">只有已打回的条目可以重新提交。</string>
+    <string name="market_manage_resubmit_confirm_title">确认重新提交？</string>
+    <string name="market_manage_resubmit_confirm_message">将把「%1$s」重新提交到审核队列。</string>
+    <string name="market_manage_resubmit_last_state">上次审核：%1$s</string>
+    <string name="market_manage_resubmit_last_reason">打回原因：%1$s</string>
+    <string name="market_manage_review_dialog_title">审核状态</string>
+    <string name="market_manage_resubmit_confirm_warning">请确认已经按打回原因完成修改。提交成功后，本地 12 小时内不可再次提交。</string>
+    <string name="market_manage_resubmit_confirm_action">确认提交</string>
     <string name="market_error_load_failed">加载失败</string>
     <string name="market_error_action_failed">操作失败</string>
     <string name="market_manage_artifact">管理包</string>
@@ -4364,6 +4377,9 @@
     <string name="market_review_rejected">已拒绝</string>
     <string name="market_review_status_label">审核状态</string>
     <string name="market_review_reasons_label">未通过原因</string>
+    <string name="market_review_step_submitted">已提交</string>
+    <string name="market_review_step_scheduled">待上架</string>
+    <string name="market_review_step_unlisted">未上架</string>
     <string name="market_review_reason_metadata_incomplete">元数据不完整</string>
     <string name="market_review_reason_install_config_invalid">安装配置无效</string>
     <string name="market_review_reason_repository_unreachable">仓库不可访问</string>
@@ -4526,7 +4542,10 @@
     <string name="supported_app_versions_colon">最低版本: %1$s，最高版本: %2$s</string>
     <string name="min_supported_app_version">支持的最低软件版本</string>
     <string name="max_supported_app_version">支持的最高软件版本</string>
-    <string name="supported_version_input_hint">请输入 `1.10.0` 这样的版本号，可留空</string>
+    <string name="min_supported_version_input_hint">必填。请输入 `1.10.0` 或 `1.10.0+5` 这样的版本号</string>
+    <string name="max_supported_version_input_hint">选填，留空默认 1.99.99。填 2.0.0 及以上会允许 Operit 2 使用</string>
+    <string name="operit2_version_warning_title">确认支持 Operit 2？</string>
+    <string name="operit2_version_warning_message">这会允许 Operit 2 使用该插件。请确保插件支持在 Operit 2 上正常运行。</string>
     <string name="publish_failed_title">发布失败</string>
     <string name="retry_market_registration">重试市场登记</string>
     <string name="update_to_market">更新到市场</string>
@@ -4598,6 +4617,11 @@
     <string name="market_detail_view_version_history">查看历史版本</string>
     <string name="market_detail_version_history_title">历史版本</string>
     <string name="market_detail_current_version">当前版本</string>
+    <string name="market_author_profile_id">作者 ID：%1$s</string>
+    <string name="market_author_profile_owned">发布的插件</string>
+    <string name="market_author_profile_contributed">参与的插件</string>
+    <string name="market_author_profile_loading">正在加载作者主页...</string>
+    <string name="market_author_profile_empty">这个作者暂无公开发布或参与记录</string>
     <string name="comment_label">评论</string>
     <string name="publish_action">发布</string>
     <string name="invalid_artifact_metadata">该市场条目的元数据无效，无法展示详情。</string>
@@ -7888,4 +7912,11 @@
     <string name="package_conflict_delete_source">删除源文件</string>
     <string name="package_conflict_delete_success">冲突包源文件已删除</string>
     <string name="package_conflict_delete_failed">删除冲突包源文件失败</string>
+    <string name="notification_kind_comment_new">新评论</string>
+    <string name="notification_kind_comment_reply">回复了你的评论</string>
+    <string name="notification_kind_review_approved">已通过审核</string>
+    <string name="notification_kind_review_rejected">未通过审核</string>
+    <string name="notification_kind_review_changes">需要修改</string>
+    <string name="notification_kind_entry_curated">入选精选</string>
+
 </resources>

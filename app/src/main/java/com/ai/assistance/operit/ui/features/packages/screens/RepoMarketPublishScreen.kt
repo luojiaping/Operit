@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -133,45 +135,30 @@ fun RepoMarketPublishScreen(
 
         OutlinedTextField(
             value = title,
-            onValueChange = {
-                if (!isVersionMode) {
-                    title = it
-                }
-            },
+            onValueChange = { title = it },
             label = { Text(repoNameLabel(type)) },
             modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
             singleLine = true,
-            readOnly = isVersionMode,
             isError = title.isBlank()
         )
 
         OutlinedTextField(
             value = description,
-            onValueChange = {
-                if (!isVersionMode) {
-                    description = it
-                }
-            },
+            onValueChange = { description = it },
             label = { Text(repoDescriptionLabel(type)) },
             modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
             minLines = 3,
             maxLines = 6,
-            readOnly = isVersionMode,
             isError = description.isBlank()
         )
 
         OutlinedTextField(
             value = detail,
-            onValueChange = {
-                if (!isVersionMode) {
-                    detail = it
-                }
-            },
+            onValueChange = { detail = it },
             label = { Text(stringResource(R.string.market_detail_section_details)) },
             modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
             minLines = 4,
-            maxLines = 10,
-            readOnly = isVersionMode
+            maxLines = 10
         )
 
         OutlinedTextField(
@@ -193,12 +180,8 @@ fun RepoMarketPublishScreen(
         RepoCategoryDropdown(
             selectedCategory = category,
             categories = categories,
-            onCategorySelected = {
-                if (!isVersionMode) {
-                    category = it
-                }
-            },
-            enabled = !isVersionMode,
+            onCategorySelected = { category = it },
+            enabled = true,
             modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
         )
 
@@ -308,10 +291,11 @@ fun RepoMarketPublishScreen(
             ) {
                 if (isPublishing) {
                     CircularProgressIndicator(
-                        modifier = Modifier.padding(end = 8.dp),
+                        modifier = Modifier.size(18.dp),
                         color = MaterialTheme.colorScheme.onPrimary,
                         strokeWidth = 2.dp
                     )
+                    Spacer(modifier = Modifier.width(8.dp))
                     Text(stringResource(R.string.updating_progress))
                 } else {
                     Text(stringResource(R.string.update_plugin))
@@ -333,10 +317,11 @@ fun RepoMarketPublishScreen(
             ) {
                 if (isPublishing) {
                     CircularProgressIndicator(
-                        modifier = Modifier.padding(end = 8.dp),
+                        modifier = Modifier.size(18.dp),
                         color = MaterialTheme.colorScheme.onPrimary,
                         strokeWidth = 2.dp
                     )
+                    Spacer(modifier = Modifier.width(8.dp))
                     Text(stringResource(if (isVersionMode) R.string.updating_progress else R.string.publishing_progress))
                 } else {
                     Text(stringResource(if (isVersionMode) R.string.artifact_publish_publish_update_version else R.string.publish_to_market))
@@ -377,6 +362,11 @@ fun RepoMarketPublishScreen(
                             if (isVersionMode && editingEntry != null) {
                                 viewModel.publishNewVersion(
                                     entry = editingEntry,
+                                    title = title,
+                                    description = description,
+                                    detail = detail,
+                                    category = category,
+                                    allowPublicUpdates = allowPublicUpdates,
                                     version = version,
                                     installConfig = installConfig
                                 )

@@ -47,6 +47,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import coil.compose.rememberAsyncImagePainter
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
@@ -92,7 +93,8 @@ fun UnifiedMarketDetailEntryScreen(
     initialEntry: MarketV2Entry,
     fromManage: Boolean = false,
     onNavigateBack: () -> Unit = {},
-    onPublishNewVersion: (MarketV2Entry) -> Unit = {}
+    onPublishNewVersion: (MarketV2Entry) -> Unit = {},
+    onNavigateToAuthor: (String, String, String) -> Unit = { _, _, _ -> }
 ) {
     val context = LocalContext.current
     val viewModel: UnifiedMarketDetailViewModel =
@@ -124,7 +126,7 @@ fun UnifiedMarketDetailEntryScreen(
     val localInstallState = localInstallStates[entryId]
     val likes =
         if (currentReactions.isNotEmpty()) {
-            currentReactions.sumOf { if (it.reaction.ifBlank { it.content } == "+1") it.count.coerceAtLeast(1) else 0 }
+            currentReactions.sumOf { if (it.reaction.ifBlank { it.content } == "+1") it.total.coerceAtLeast(1) else 0 }
         } else {
             entry.marketLikeCount()
         }
@@ -184,13 +186,17 @@ fun UnifiedMarketDetailEntryScreen(
                             roleLabel = stringResource(R.string.market_detail_author_role),
                             name = entry.marketAuthorName(),
                             avatarUrl = entry.marketAuthorAvatar(),
-                            fallbackAvatarText = marketDetailInitial(entry.marketAuthorName())
+                            fallbackAvatarText = marketDetailInitial(entry.marketAuthorName()),
+                            authorId = entry.marketAuthorId(),
+                            onClick = onNavigateToAuthor
                         ),
                         UnifiedMarketDetailParticipant(
                             roleLabel = stringResource(R.string.market_detail_sharer_role),
                             name = entry.marketPublisherName(),
                             avatarUrl = entry.marketPublisherAvatar(),
-                            fallbackAvatarText = marketDetailInitial(entry.marketPublisherName())
+                            fallbackAvatarText = marketDetailInitial(entry.marketPublisherName()),
+                            authorId = entry.marketPublisherId(),
+                            onClick = onNavigateToAuthor
                         )
                     ),
                 badges = entry.detailBadges(),
@@ -240,7 +246,7 @@ fun UnifiedMarketDetailEntryScreen(
             if (isPreviewMode) {
                 UnifiedMarketDetailBanner(
                     title = stringResource(R.string.market_detail_preview_title),
-                    message = buildPreviewBannerMessage(context, review.state, review.reasons),
+                    message = buildPreviewBannerMessage(context, review.state),
                     icon = Icons.Default.Warning,
                     containerColor = androidx.compose.material3.MaterialTheme.colorScheme.tertiaryContainer,
                     contentColor = androidx.compose.material3.MaterialTheme.colorScheme.onTertiaryContainer
@@ -266,13 +272,22 @@ fun UnifiedMarketDetailEntryScreen(
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.SemiBold
                         )
-                        Row(
+                        LazyRow(
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            entryContributors.forEach { contributor ->
+                            items(entryContributors, key = { it.id }) { contributor ->
                                 Column(
                                     horizontalAlignment = Alignment.CenterHorizontally,
-                                    modifier = Modifier.width(48.dp)
+                                    modifier =
+                                        Modifier
+                                            .width(48.dp)
+                                            .clickable {
+                                                onNavigateToAuthor(
+                                                    contributor.id,
+                                                    contributor.login,
+                                                    contributor.avatarUrl ?: contributor.avatar ?: ""
+                                                )
+                                            }
                                 ) {
                                     Image(
                                         painter = rememberAsyncImagePainter(
@@ -442,6 +457,7 @@ fun UnifiedMarketDetailEntryScreen(
         MarketVersionHistoryDialog(
             entry = entry,
             onDismiss = { showVersionHistoryDialog = false },
+            onNavigateToAuthor = onNavigateToAuthor,
             onSelectVersion = { version ->
                 selectedEntry = entry.withSelectedVersion(version)
                 showVersionHistoryDialog = false
@@ -454,6 +470,7 @@ fun UnifiedMarketDetailEntryScreen(
 private fun MarketVersionHistoryDialog(
     entry: MarketV2Entry,
     onDismiss: () -> Unit,
+    onNavigateToAuthor: (String, String, String) -> Unit,
     onSelectVersion: (MarketV2Version) -> Unit
 ) {
     AlertDialog(
@@ -468,6 +485,7 @@ private fun MarketVersionHistoryDialog(
                     MarketVersionHistoryRow(
                         version = version,
                         selected = version.id == entry.latestVersion?.id,
+                        onNavigateToAuthor = onNavigateToAuthor,
                         onClick = { onSelectVersion(version) }
                     )
                 }
@@ -485,6 +503,7 @@ private fun MarketVersionHistoryDialog(
 private fun MarketVersionHistoryRow(
     version: MarketV2Version,
     selected: Boolean,
+    onNavigateToAuthor: (String, String, String) -> Unit,
     onClick: () -> Unit
 ) {
     Surface(
@@ -545,6 +564,16 @@ private fun MarketVersionHistoryRow(
             )
             version.publisher?.let { publisher ->
                 Row(
+                    modifier =
+                        Modifier.clickable {
+                            if (publisher.id.isNotBlank()) {
+                                onNavigateToAuthor(
+                                    publisher.id,
+                                    publisher.login,
+                                    publisher.avatarUrl ?: publisher.avatar ?: ""
+                                )
+                            }
+                        },
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
@@ -667,15 +696,6 @@ private fun MarketV2Entry.metadataRows(
                 Icons.Default.Check
             )
         )
-        if (review.reasons.isNotEmpty()) {
-            add(
-                UnifiedMarketDetailInfoRow(
-                    context.getString(R.string.market_review_reasons_label),
-                    review.reasons.joinToString(separator = " / ") { context.getString(it.labelResId()) },
-                    Icons.Default.Info
-                )
-            )
-        }
         add(
             UnifiedMarketDetailInfoRow(
                 context.getString(R.string.market_detail_published_label),
@@ -713,7 +733,7 @@ private fun MarketV2Entry.downloadsCount(): Int = stats?.downloads ?: downloads.
 private fun MarketV2Entry.marketLikeCount(): Int {
     return stats?.likes ?: reactions.sumOf { reaction ->
         val key = reaction.reaction.ifBlank { reaction.content }
-        if (key == "+1" || key.equals("like", ignoreCase = true)) reaction.count.coerceAtLeast(1) else 0
+        if (key == "+1" || key.equals("like", ignoreCase = true)) reaction.total.coerceAtLeast(1) else 0
     }
 }
 
@@ -727,6 +747,10 @@ private fun MarketV2Entry.marketAuthorName(): String {
         .ifBlank { "unknown" }
 }
 
+private fun MarketV2Entry.marketAuthorId(): String {
+    return author?.id.orEmpty().ifBlank { authorId }
+}
+
 private fun MarketV2Entry.marketAuthorAvatar(): String {
     return author?.avatarUrl ?: author?.avatar ?: ""
 }
@@ -735,6 +759,10 @@ private fun MarketV2Entry.marketPublisherName(): String {
     return publisher?.login.orEmpty()
         .ifBlank { publisherId.removePrefix("gh_") }
         .ifBlank { "unknown" }
+}
+
+private fun MarketV2Entry.marketPublisherId(): String {
+    return publisher?.id.orEmpty().ifBlank { publisherId }
 }
 
 private fun MarketV2Entry.marketPublisherAvatar(): String {
@@ -753,10 +781,7 @@ private fun openExternalUrl(context: Context, url: String) {
 
 private fun buildPreviewBannerMessage(
     context: Context,
-    state: MarketReviewState,
-    reasons: List<com.ai.assistance.operit.ui.features.packages.market.MarketReviewReason>
+    state: MarketReviewState
 ): String {
-    val stateLabel = context.getString(state.labelResId())
-    val reasonLabel = reasons.joinToString(separator = " / ") { context.getString(it.labelResId()) }
-    return if (reasonLabel.isBlank()) stateLabel else "$stateLabel 路 $reasonLabel"
+    return context.getString(state.labelResId())
 }

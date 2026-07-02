@@ -157,20 +157,32 @@ class RepoMarketPublishViewModel(
 
     suspend fun publishNewVersion(
         entry: MarketV2Entry,
+        title: String,
+        description: String,
+        detail: String,
+        category: String,
+        allowPublicUpdates: Boolean,
         version: String,
         installConfig: String = ""
     ): Result<Unit> {
         validateNewVersion(entry, version)
+        val hasEntryPatch =
+            title != entry.title ||
+                description != entry.description ||
+                detail != entry.detail ||
+                category != entry.categoryId ||
+                allowPublicUpdates != entry.allowPublicUpdates
         return submit(
             entryId = entry.id,
-            title = entry.title,
-            description = entry.description,
-            detail = entry.detail,
+            title = title,
+            description = description,
+            detail = detail,
             repositoryUrl = entry.source?.url.orEmpty(),
             version = version,
             installConfig = installConfig,
-            category = entry.categoryId,
-            allowPublicUpdates = entry.allowPublicUpdates
+            category = category,
+            allowPublicUpdates = allowPublicUpdates,
+            includeEntryPatch = hasEntryPatch
         )
     }
 
@@ -216,7 +228,8 @@ class RepoMarketPublishViewModel(
         version: String,
         installConfig: String,
         category: String,
-        allowPublicUpdates: Boolean
+        allowPublicUpdates: Boolean,
+        includeEntryPatch: Boolean = false
     ): Result<Unit> {
         if (!githubAuth.isLoggedIn()) {
             return Result.failure(IllegalStateException(loginRequiredMessage()))
@@ -241,7 +254,7 @@ class RepoMarketPublishViewModel(
                 if (entryId == null) {
                     marketStatsApiService.publish(request).map { Unit }
                 } else {
-                    marketStatsApiService.publishNewVersion(entryId = entryId, request = request).map { Unit }
+                    marketStatsApiService.publishNewVersion(entryId = entryId, request = request, includeEntryPatch = includeEntryPatch).map { Unit }
                 }
             result
         } catch (e: Exception) {
@@ -275,7 +288,10 @@ class RepoMarketPublishViewModel(
                 formatVer = "${type.wireValue}_v2",
                 minAppVer = CURRENT_APP_VERSION
             ),
-            source = MarketV2PublishSource(url = repoTarget.sourceUrl),
+            source = MarketV2PublishSource(
+                kind = "github_repo",
+                url = repoTarget.sourceUrl
+            ),
             repoVersion = MarketV2PublishRepoVersion(
                 refType = repoTarget.refType,
                 refName = repoTarget.refName,

@@ -42,8 +42,7 @@ sealed class PublishAttemptResult {
         val payload: MarketRegistrationPayload
     ) : PublishAttemptResult()
 
-    data class RegistrationRetryRequired(
-        val payload: MarketRegistrationPayload,
+    data class RegistrationFailed(
         val errorMessage: String
     ) : PublishAttemptResult()
 }
@@ -54,6 +53,11 @@ class GitHubForgePublishService(
     private val marketStatsApiService: MarketStatsApiService = MarketStatsApiService()
 ) {
     private val githubAuth = GitHubAuthPreferences.getInstance(context)
+
+    private data class EnsuredRelease(
+        val release: GitHubRelease,
+        val created: Boolean
+    )
 
     suspend fun publishArtifact(
         request: PublishArtifactRequest,
@@ -110,7 +114,7 @@ class GitHubForgePublishService(
             val releaseDescriptor = buildPublishReleaseDescriptor(descriptor)
 
             onProgress(PublishProgressStage.CREATING_RELEASE)
-            val release =
+            val ensuredRelease =
                 ensureRelease(
                     owner = currentUser.login,
                     repo = forgeRepoResult.repoName,
@@ -118,6 +122,7 @@ class GitHubForgePublishService(
                 ).getOrElse { error ->
                     return@withContext Result.failure(error)
                 }
+            val release = ensuredRelease.release
 
             onProgress(PublishProgressStage.UPLOADING_ASSET)
             val fileBytes = sourceFile.readBytes()
@@ -190,9 +195,15 @@ class GitHubForgePublishService(
                     payload = payload,
                     existingEntryId = request.publishContext?.entryId
                 ).getOrElse { error ->
+                    rollbackFailedMarketRegistration(
+                        owner = currentUser.login,
+                        repo = forgeRepoResult.repoName,
+                        release = release,
+                        releaseWasCreated = ensuredRelease.created,
+                        uploadedAsset = uploadedAsset
+                    )
                     return@withContext Result.success(
-                        PublishAttemptResult.RegistrationRetryRequired(
-                            payload = payload,
+                        PublishAttemptResult.RegistrationFailed(
                             errorMessage = error.message ?: "Failed to register market entry"
                         )
                     )
@@ -211,12 +222,6 @@ class GitHubForgePublishService(
         } catch (e: Exception) {
             Result.failure(e)
         }
-    }
-
-    suspend fun retryMarketRegistration(
-        payload: MarketRegistrationPayload
-    ): Result<MarketV2Entry> = withContext(Dispatchers.IO) {
-        registerMarketEntry(payload, existingEntryId = payload.entryId)
     }
 
     private suspend fun ensureForgeRepository(
@@ -290,7 +295,7 @@ class GitHubForgePublishService(
         owner: String,
         repo: String,
         releaseDescriptor: PublishReleaseDescriptor
-    ): Result<GitHubRelease> {
+    ): Result<EnsuredRelease> {
         val existing =
             githubApiService.findReleaseByTag(owner, repo, releaseDescriptor.tagName).getOrElse { error ->
                 return Result.failure(error)
@@ -305,7 +310,7 @@ class GitHubForgePublishService(
                 body = releaseDescriptor.releaseBody,
                 draft = false,
                 prerelease = false
-            )
+            ).map { release -> EnsuredRelease(release = release, created = true) }
         } else {
             githubApiService.updateRelease(
                 owner = owner,
@@ -315,7 +320,21 @@ class GitHubForgePublishService(
                 body = releaseDescriptor.releaseBody,
                 draft = false,
                 prerelease = false
-            )
+            ).map { release -> EnsuredRelease(release = release, created = false) }
+        }
+    }
+
+    private suspend fun rollbackFailedMarketRegistration(
+        owner: String,
+        repo: String,
+        release: GitHubRelease,
+        releaseWasCreated: Boolean,
+        uploadedAsset: GitHubReleaseAsset
+    ) {
+        if (releaseWasCreated) {
+            githubApiService.deleteRelease(owner, repo, release.id)
+        } else {
+            githubApiService.deleteReleaseAsset(owner, repo, uploadedAsset.id)
         }
     }
 
@@ -359,8 +378,8 @@ class GitHubForgePublishService(
                 version = MarketV2PublishVersion(
                     version = payload.version,
                     formatVer = payload.type.marketFormatVersion(),
-                    minAppVer = payload.minSupportedAppVersion ?: CURRENT_APP_VERSION,
-                    maxAppVer = payload.maxSupportedAppVersion,
+                    minAppVer = requireNotNull(payload.minSupportedAppVersion) { "Minimum supported app version is required" },
+                    maxAppVer = payload.maxSupportedAppVersion ?: DEFAULT_MAX_SUPPORTED_APP_VERSION,
                     projectId = payload.projectId,
                     runtimePackageId = payload.runtimePackageId
                 ),
@@ -379,7 +398,8 @@ class GitHubForgePublishService(
 
         return marketStatsApiService.publishNewVersion(
             entryId = resolvedEntryId,
-            request = request
+            request = request,
+            includeEntryPatch = true
         ).map { response ->
             MarketV2Entry(
                 type = payload.type.wireValue,
@@ -392,8 +412,8 @@ class GitHubForgePublishService(
                     id = response.versionId,
                     version = payload.version,
                     formatVer = payload.type.marketFormatVersion(),
-                    minAppVer = payload.minSupportedAppVersion ?: CURRENT_APP_VERSION,
-                    maxAppVer = payload.maxSupportedAppVersion,
+                    minAppVer = requireNotNull(payload.minSupportedAppVersion) { "Minimum supported app version is required" },
+                    maxAppVer = payload.maxSupportedAppVersion ?: DEFAULT_MAX_SUPPORTED_APP_VERSION,
                     stateCode = "pending",
                     projectId = payload.projectId,
                     runtimePackageId = payload.runtimePackageId
@@ -412,8 +432,7 @@ class GitHubForgePublishService(
         val digest = MessageDigest.getInstance("SHA-256").digest(bytes)
         return digest.joinToString("") { "%02x".format(it) }
     }
-
     companion object {
-        private const val CURRENT_APP_VERSION = "1.11.0+5"
+        const val DEFAULT_MAX_SUPPORTED_APP_VERSION = "1.99.99"
     }
 }

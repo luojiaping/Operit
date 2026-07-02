@@ -646,6 +646,26 @@ class ChatViewModel(private val context: Context) : ViewModel() {
         chatHistoryDelegate.createNewChat(characterCardName = characterCardName, characterGroupId = characterGroupId)
     }
 
+    fun createNewChatWithDraft(draft: String) {
+        val trimmedDraft = draft.trim()
+        if (trimmedDraft.isBlank()) return
+
+        viewModelScope.launch {
+            showChatHistorySelector(false)
+            val previousChatId = chatHistoryDelegate.currentChatId.value
+            chatHistoryDelegate.createNewChat()
+            chatHistoryDelegate.currentChatId
+                .filter { chatId -> chatId != null && chatId != previousChatId }
+                .first()
+            messageProcessingDelegate.updateUserMessage(
+                TextFieldValue(
+                    text = trimmedDraft,
+                    selection = TextRange(trimmedDraft.length)
+                )
+            )
+        }
+    }
+
     fun switchChat(chatId: String) {
         chatHistoryDelegate.switchChat(chatId)
         chatRuntimeHolder.syncMainChatSelectionToFloating(chatId)

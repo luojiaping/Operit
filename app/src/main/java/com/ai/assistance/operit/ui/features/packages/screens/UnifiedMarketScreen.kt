@@ -44,7 +44,11 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Store
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material.icons.filled.Cancel
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Comment
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -59,6 +63,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.AlertDialog
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -533,6 +538,7 @@ private fun MarketNotificationsPane() {
             )
         )
     val notifications by viewModel.notifications.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsState()
     val errorMessage by viewModel.errorMessage.collectAsState()
 
     BindMarketSearchToTopBar(
@@ -559,7 +565,9 @@ private fun MarketNotificationsPane() {
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        if (notifications.isEmpty()) {
+        if (isLoading && notifications.isEmpty()) {
+            MarketAccountLoadingCard()
+        } else if (notifications.isEmpty()) {
             MarketEmptyCard(
                 title = stringResource(R.string.market_notifications_empty_title),
                 description = stringResource(R.string.market_notifications_empty_description)
@@ -581,34 +589,115 @@ private fun MarketNotificationsPane() {
 private fun MarketNotificationCard(notification: MarketV2Notification) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        shape = RoundedCornerShape(12.dp)
     ) {
-        Column(
+        Row(
             modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text(
-                text = notification.title.ifBlank { notification.kind },
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold
+            Icon(
+                imageVector = notificationKindIcon(notification.kind),
+                contentDescription = null,
+                tint = notificationKindColor(notification.kind),
+                modifier = Modifier.size(24.dp).padding(top = 2.dp)
             )
-            if (notification.body.isNotBlank()) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = notificationKindLabel(notification.kind),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = notificationKindColor(notification.kind)
+                    )
+                    Text(
+                        text = relativeTime(notification.createdAt),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                    )
+                }
                 Text(
-                    text = notification.body,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    text = notification.title.ifBlank { notificationKindLabel(notification.kind) },
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
                 )
-            }
-            if (notification.createdAt.isNotBlank()) {
-                Text(
-                    text = notification.createdAt.take(16).replace('T', ' '),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                )
+                if (notification.body.isNotBlank()) {
+                    Text(
+                        text = notification.body,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
         }
     }
 }
+
+private fun notificationKindIcon(kind: String): ImageVector {
+    return when (kind) {
+        "comment_new", "comment_reply" -> Icons.Default.Comment
+        "review_approved", "entry_curated" -> Icons.Default.CheckCircle
+        "review_rejected" -> Icons.Default.Cancel
+        "review_changes" -> Icons.Default.Refresh
+        else -> Icons.Default.Notifications
+    }
+}
+
+private fun notificationKindLabel(kind: String): String {
+    return when (kind) {
+        "comment_new" -> "新评论"
+        "comment_reply" -> "回复了你的评论"
+        "review_approved" -> "已通过审核"
+        "review_rejected" -> "未通过审核"
+        "review_changes" -> "需要修改"
+        "entry_curated" -> "入选精选"
+        else -> kind
+    }
+}
+
+@Composable
+private fun notificationKindColor(kind: String): Color {
+    return when (kind) {
+        "comment_new", "comment_reply" -> MaterialTheme.colorScheme.primary
+        "review_approved" -> MaterialTheme.colorScheme.primary
+        "entry_curated" -> MaterialTheme.colorScheme.tertiary
+        "review_rejected" -> MaterialTheme.colorScheme.error
+        "review_changes" -> MaterialTheme.colorScheme.tertiary
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+}
+
+private fun relativeTime(isoDate: String): String {
+    if (isoDate.isBlank()) return ""
+    return try {
+        val instant = java.time.Instant.parse(isoDate)
+        val now = java.time.Instant.now()
+        val duration = java.time.Duration.between(instant, now)
+        val seconds = duration.seconds
+        when {
+            seconds < 60 -> "刚刚"
+            seconds < 3600 -> "${seconds / 60} 分钟前"
+            seconds < 86400 -> "${seconds / 3600} 小时前"
+            seconds < 2592000 -> "${seconds / 86400} 天前"
+            seconds < 31104000 -> "${seconds / 2592000} 个月前"
+            else -> "${seconds / 31104000} 年前"
+        }
+    } catch (e: Exception) {
+        isoDate.take(16).replace("T", " ")
+    }
+}
+
 
 @Composable
 private fun MarketMinePane(
