@@ -103,11 +103,11 @@ class OpenAIResponsesProvider(
         requestJson: JSONObject,
         enableThinking: Boolean
     ) {
-        if (!enableThinking) {
+        val reasoningObject = requestJson.optJSONObject("reasoning")
+        if (!enableThinking && reasoningObject == null) {
             return
         }
 
-        val reasoningObject = requestJson.optJSONObject("reasoning")
         if (reasoningObject == null && requestJson.has("reasoning") && !requestJson.isNull("reasoning")) {
             AppLogger.w(
                 "OpenAIResponsesProvider",
@@ -119,7 +119,7 @@ class OpenAIResponsesProvider(
         val finalReasoningObject = reasoningObject ?: JSONObject()
         val existingEffort =
             finalReasoningObject.optString("effort", "").trim().takeIf { it.isNotEmpty() }
-        if (existingEffort == null) {
+        if (existingEffort == null && enableThinking) {
             val effort = resolveResponsesReasoningEffort(context)
             if (effort != null) {
                 finalReasoningObject.put("effort", effort)
@@ -252,6 +252,7 @@ object OpenAIResponsesPayloadAdapter {
     data class ParsedResponseOutput(
         val textChunks: List<String>,
         val reasoningChunks: List<String>,
+        val reasoningObserved: Boolean,
         val toolCalls: JSONArray,
         val usage: UsageCounts?
     )
@@ -299,6 +300,8 @@ object OpenAIResponsesPayloadAdapter {
             converted.remove("response_format")
         }
 
+        moveReasoningEffortToReasoningObject(converted)
+
         if (converted.has("tools")) {
             val originalTools = converted.optJSONArray("tools")
             if (originalTools != null) {
@@ -317,10 +320,30 @@ object OpenAIResponsesPayloadAdapter {
         return converted
     }
 
+    private fun moveReasoningEffortToReasoningObject(requestJson: JSONObject) {
+        if (!requestJson.has("reasoning_effort") || requestJson.isNull("reasoning_effort")) {
+            return
+        }
+
+        val effort = requestJson.optString("reasoning_effort", "").trim()
+        requestJson.remove("reasoning_effort")
+        if (effort.isEmpty()) {
+            return
+        }
+
+        val reasoningObject = requestJson.optJSONObject("reasoning") ?: JSONObject()
+        val existingEffort = reasoningObject.optString("effort", "").trim()
+        if (existingEffort.isEmpty()) {
+            reasoningObject.put("effort", effort)
+        }
+        requestJson.put("reasoning", reasoningObject)
+    }
+
     fun parseNonStreamingResponse(jsonResponse: JSONObject): ParsedResponseOutput {
         val textChunks = mutableListOf<String>()
         val reasoningChunks = mutableListOf<String>()
         val toolCalls = JSONArray()
+        var reasoningObserved = false
 
         val output = jsonResponse.optJSONArray("output")
         if (output != null) {
@@ -352,6 +375,7 @@ object OpenAIResponsesPayloadAdapter {
                     }
 
                     "reasoning" -> {
+                        reasoningObserved = true
                         val summaryArray = item.optJSONArray("summary")
                         if (summaryArray != null) {
                             for (j in 0 until summaryArray.length()) {
@@ -377,6 +401,7 @@ object OpenAIResponsesPayloadAdapter {
         return ParsedResponseOutput(
             textChunks = textChunks,
             reasoningChunks = reasoningChunks,
+            reasoningObserved = reasoningObserved,
             toolCalls = toolCalls,
             usage = parseUsageCounts(jsonResponse.optJSONObject("usage"))
         )

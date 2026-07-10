@@ -41,14 +41,19 @@ fun WorkspaceChangeConfirmDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    val dialogMetrics = rememberCompactDialogMetrics()
+    val previewMaxHeight = if (dialogMetrics.isCompactHeight) 120.dp else 260.dp
+    val cardModifier =
+        Modifier
+            .fillMaxWidth(0.95f)
+            .compactDialogHeightOrWrapContent(dialogMetrics)
+
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = true)
     ) {
         Card(
-            modifier = Modifier
-                .fillMaxWidth(0.95f)
-                .wrapContentHeight(),
+            modifier = cardModifier,
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
         ) {
@@ -102,7 +107,7 @@ fun WorkspaceChangeConfirmDialog(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .heightIn(min = 80.dp, max = 260.dp)
+                            .heightIn(min = 80.dp, max = previewMaxHeight)
                             .clip(RoundedCornerShape(8.dp))
                             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
                             .padding(horizontal = 8.dp, vertical = 6.dp)

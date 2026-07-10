@@ -87,8 +87,8 @@ AI自动分类管理记忆，支持时间查询/导入导出/自动总结，智�
 | 🌐 **网络工具** | HTTP请求、网页访问、文件上传下载、Web开发与导出 |
 | ⚙️ **系统操作** | 安装应用、权限管理、无障碍 / ADB / Root 三通道自动化（含 AutoGLM 自动点击 Agent，支持 adb root 虚拟屏/多显示器） |
 | 🎬 **媒体处理** | 视频转换、帧提取、OCR/图像理解、相机拍照、音视频读取 |
-| 🧑‍💻 **开发与终端** | Web 工作区/一键打包、代码编辑/语法高亮、终端 SSH/Chroot/vim、Ctrl 组合键 |
-| 🎨 **AI 创作** | 绘图工具包（OpenAI/Qwen/NanoBanana）、图片搜索/下载 |
+| 🧑‍💻 **开发与终端** | 工作区/一键打包、代码编辑/语法高亮、终端 SSH/Chroot/vim、Ctrl 组合键 |
+| 🎨 **AI 创作** | 绘图工具包（OpenAI/Qwen/NanoBanana/Zhipu）、图片搜索/下载 |
 | 🔍 **搜索引擎** | 深度搜索、DuckDuckGo、Tavily、谷歌学术、Bing、Sogou、Quark、百度地图集成 |
 | 🧩 **工具包 & 工作流** | 工具包生态/包管理、工作流自动化、定时触发、语音唤醒触发 |
 
@@ -114,7 +114,7 @@ AI自动分类管理记忆，支持时间查询/导入导出/自动总结，智�
 
 - 🤖 **Tasker集成**：触发自定义AI代理事件，深度自动化
 - 🌐 **MCP/Skill 市场**：一键安装插件、远程MCP、自动描述、uvx/npx支持
-- 🔌 **多模型支持**：OpenAI、Claude、Gemini、百灵、OpenRouter、LMStudio
+- 🔌 **多模型支持**：OpenAI Responses API、Claude、Gemini、xAI、Novita、Ollama、NVIDIA、OpenRouter、LMStudio、百灵等
 - 🧪 **模型与提示词管理**：多配置/参数自定义、提示词市场
 - 🔐 **权限系统**：工具级权限控制与安全提示
 - 🔑 **密钥池与统计**：批量测试/导入、Token 统计（模型饼图）
@@ -175,11 +175,11 @@ AI自动分类管理记忆，支持时间查询/导入导出/自动总结，智�
 
 | 项目 | 说明 |
 |-----|------|
-| 📋 **系统要求** | Android 8.0+ (API 26+)，建议 4GB+ 内存，200MB+ 存储 |
+| 📋 **系统要求** | Android 8.0+ (API 26+)，建议 6GB+ 内存，5GB+ 剩余存储 |
 | 📥 **下载安装** | [Release页面](https://github.com/AAswordman/Operit/releases) 下载最新APK |
 | 📖 **使用指南** | [完整文档](https://aaswordman.github.io/OperitWeb) 包含详细教程和示例 |
 
-> **安全提示：** 为确保您的数据安全，请务必从官方 [Release页面](https://github.com/AAswordman/Operit/releases) 或 [官方网站](https://aaswordman.github.io/OperitWeb/) 下载本应用。通过未知渠道下载的安装包可能被恶意修改，从而导致隐私泄露或设备被监听。
+> **安全提示：** 为确保您的数据安全，请务必从官方 [Release页面](https://github.com/AAswordman/Operit/releases) 或 [官方网站](https://operit.app) 下载本应用。通过未知渠道下载的安装包可能被恶意修改，从而导致隐私泄露或设备被监听。
 
 **安装步骤：** 下载APK → 安装启动 → 按引导配置 → 开始使用 ✨
 
@@ -200,7 +200,29 @@ AI自动分类管理记忆，支持时间查询/导入导出/自动总结，智�
 <tr><th>版本</th><th>发布日期</th><th>核心更新</th></tr>
 
 <tr>
-<td><b>v1.10.1</b><br><sub>最新</sub></td>
+<td><b>v1.12.0</b><br><sub>最新</sub></td>
+<td>2026-07-01</td>
+<td>
+• <b>市场与创作生态</b>：统一市场流程，新增 Artifact 市场、项目管理与发布能力，完善市场搜索、GitHub OAuth 登录、示例仓库与侧栏入口<br>
+• <b>工具包与工作区</b>：抽离 ToolPkg IPC / runtime 管理，新增 hook runner、计划模式 runtime IPC、工作区变更追踪/附件/模板、zip include_root_directory 参数<br>
+• <b>多语言、语音与媒体</b>：新增韩语、西班牙语、葡萄牙语本地化，加入 MIMO/Mimo、VITS、ONNX、Doubao TTS、音乐播放队列，并优化图片附件与附件文件名去重<br>
+• <b>稳定性与安全</b>：移除硬编码默认 DeepSeek API Key，新增崩溃修复恢复流程与启动隔离，修复模型提供商显示、按钮文本溢出、云端 embedding 校验、DashScope 音频识别等问题
+</td>
+</tr>
+
+<tr>
+<td><b>v1.11.0</b></td>
+<td>2026-05-16</td>
+<td>
+• <b>Web Chat 与 Artifact 市场</b>：新增 Web Chat 与 Artifact 市场，支持网页聊天模型选择、历史导航、项目管理与作品发布，并将问题库迁移到记忆库体系<br>
+• <b>工具包、Hook 与 Compose DSL</b>：新增 ToolPkg AI provider、单轮对话控制、工具 hook 拦截与执行器，扩展 Compose DSL 的 WebView、slot、调试 dump 与重渲染能力<br>
+• <b>记忆、上下文与历史</b>：支持按用户选择消息自动保存记忆、自动保存计划、WorldBook 搜索/刷新、上下文限制器、历史窗口分页与消息定位预览<br>
+• <b>开发与自动化增强</b>：增强浏览器 iframe 快照/点击、GitHub 通知管理、QQ Bot 示例、文件选择 API、Java Bridge 测试、远程/Windows 设置页与桌面小组件
+</td>
+</tr>
+
+<tr>
+<td><b>v1.10.1</b></td>
 <td>2026-04-17</td>
 <td>
 • <b>内置浏览器与网页自动化</b>：大幅增强内置浏览器，支持标签页、历史、书签、权限、多窗口、最小化与视口控制，并补齐浏览器脚本的导入、安装、启停、存储与页面菜单能力<br>

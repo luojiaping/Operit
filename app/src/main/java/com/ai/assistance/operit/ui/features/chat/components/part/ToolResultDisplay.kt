@@ -25,6 +25,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.ai.assistance.operit.R
+import com.ai.assistance.operit.ui.features.chat.components.compactDialogHeightWhenShort
+import com.ai.assistance.operit.ui.features.chat.components.rememberCompactDialogMetrics
 
 /** 工具执行结果显示组件 简洁风格，显示工具执行结果，无边框，与CompactToolDisplay风格一致 通过缩进和特殊图标区分工具调用和执行结果 支持点击查看详细内容 */
 @Composable
@@ -123,12 +125,16 @@ private fun ToolResultDetailDialog(
         onCopy: () -> Unit
 ) {
     val context = LocalContext.current
+    val dialogMetrics = rememberCompactDialogMetrics()
+    val resultMaxHeight = if (dialogMetrics.isCompactHeight) 160.dp else 300.dp
+    val cardModifier =
+            Modifier.fillMaxWidth().padding(16.dp).compactDialogHeightWhenShort(dialogMetrics)
     Dialog(
             onDismissRequest = onDismiss,
             properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = true)
     ) {
         Card(
-                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                modifier = cardModifier,
                 shape = RoundedCornerShape(16.dp),
                 elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
@@ -183,7 +189,7 @@ private fun ToolResultDetailDialog(
                 Box(
                         modifier =
                                 Modifier.fillMaxWidth()
-                                        .heightIn(min = 50.dp, max = 300.dp)
+                                        .heightIn(min = 50.dp, max = resultMaxHeight)
                                         .verticalScroll(rememberScrollState())
                                         .background(
                                                 color =

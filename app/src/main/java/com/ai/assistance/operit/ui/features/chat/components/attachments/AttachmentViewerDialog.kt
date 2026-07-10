@@ -52,6 +52,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.core.content.FileProvider
 import com.ai.assistance.operit.R
+import com.ai.assistance.operit.ui.features.chat.components.compactDialogHeightWhenShort
+import com.ai.assistance.operit.ui.features.chat.components.rememberCompactDialogMetrics
 import com.ai.assistance.operit.util.AppLogger
 import com.ai.assistance.operit.util.ImageBitmapLimiter
 import com.ai.assistance.operit.util.MediaBase64Limiter
@@ -80,6 +82,8 @@ fun AttachmentViewerDialog(
 
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
+    val dialogMetrics = rememberCompactDialogMetrics()
+    val mediaMaxHeight = if (dialogMetrics.isCompactHeight) 220.dp else 500.dp
 
     val isImage = attachment.mimeType.startsWith("image/")
     val isAudio = attachment.mimeType.startsWith("audio/")
@@ -185,7 +189,7 @@ fun AttachmentViewerDialog(
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(max = 520.dp),
+                .compactDialogHeightWhenShort(dialogMetrics, defaultMaxHeight = 520.dp),
             shape = RoundedCornerShape(12.dp),
             color = MaterialTheme.colorScheme.surface,
             tonalElevation = 4.dp
@@ -238,7 +242,7 @@ fun AttachmentViewerDialog(
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .heightIn(max = 500.dp)
+                                    .heightIn(max = mediaMaxHeight)
                                     .clip(RoundedCornerShape(8.dp))
                             ) {
                                 Image(
@@ -278,7 +282,10 @@ fun AttachmentViewerDialog(
                                 uri = fileUri,
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .heightIn(min = 180.dp, max = 420.dp),
+                                    .heightIn(
+                                        min = if (dialogMetrics.isCompactHeight) 120.dp else 180.dp,
+                                        max = if (dialogMetrics.isCompactHeight) 220.dp else 420.dp
+                                    ),
                                 autoPlay = false
                             )
                         } else {

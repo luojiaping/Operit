@@ -55,6 +55,7 @@ import com.ai.assistance.operit.data.model.ChatHistory
 import com.ai.assistance.operit.data.model.ToolParameter
 import com.ai.assistance.operit.ui.common.markdown.StreamMarkdownRenderer
 import com.ai.assistance.operit.ui.common.rememberLocal
+import com.ai.assistance.operit.ui.features.chat.components.rememberCompactDialogMetrics
 import com.ai.assistance.operit.ui.features.chat.components.attachments.AudioAttachmentPlayer
 import com.ai.assistance.operit.ui.features.chat.components.attachments.VideoAttachmentPlayer
 import com.ai.assistance.operit.ui.features.chat.webview.LocalWebServer
@@ -1236,21 +1237,36 @@ private fun WorkspaceCommandExecutionDialog(
         }
     }
 
+    val dialogMetrics = rememberCompactDialogMetrics()
+    val outerPadding = if (dialogMetrics.isCompact) 8.dp else 20.dp
+    val contentPadding = if (dialogMetrics.isCompact) 16.dp else 20.dp
+    val outputMinHeight = if (dialogMetrics.isCompact) 96.dp else 180.dp
+    val outputMaxHeight = if (dialogMetrics.isCompact) 220.dp else 360.dp
+    val surfaceModifier =
+        Modifier
+            .fillMaxWidth()
+            .padding(outerPadding)
+            .let { base ->
+                if (dialogMetrics.isCompact) {
+                    base.heightIn(max = dialogMetrics.maxHeight - outerPadding * 2)
+                } else {
+                    base
+                }
+            }
+
     Dialog(
         onDismissRequest = onClose,
         properties = DialogProperties(dismissOnBackPress = false, dismissOnClickOutside = false)
     ) {
         Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(20.dp),
+            modifier = surfaceModifier,
             shape = RoundedCornerShape(20.dp),
             tonalElevation = 8.dp
         ) {
             Column(
-                modifier = Modifier
+                Modifier
                     .fillMaxWidth()
-                    .padding(20.dp),
+                    .padding(contentPadding),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text(
@@ -1282,9 +1298,17 @@ private fun WorkspaceCommandExecutionDialog(
                     LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                 }
                 Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 180.dp, max = 360.dp),
+                    modifier =
+                        if (dialogMetrics.isCompact) {
+                            Modifier
+                                .fillMaxWidth()
+                                .weight(1f, fill = false)
+                                .heightIn(min = outputMinHeight, max = outputMaxHeight)
+                        } else {
+                            Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = outputMinHeight, max = outputMaxHeight)
+                        },
                     shape = RoundedCornerShape(16.dp),
                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
                 ) {

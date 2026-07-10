@@ -1656,6 +1656,8 @@ open class OpenAIProvider(
         var isInReasoningMode: Boolean = false,
         var hasEmittedThinkStart: Boolean = false,
         var hasEmittedRegularContent: Boolean = false,
+        var streamedReasoningContentLength: Int = 0,
+        var reasoningObserved: Boolean = false,
         var isFirstResponse: Boolean = true,
         val accumulatedToolCalls: MutableMap<Int, JSONObject> = mutableMapOf(),
         val toolCallState: ToolCallState = ToolCallState(),
@@ -1880,6 +1882,64 @@ open class OpenAIProvider(
         }
     }
 
+    private fun hasResponsesReasoningItem(responseObj: JSONObject?): Boolean {
+        val output = responseObj?.optJSONArray("output") ?: return false
+        for (i in 0 until output.length()) {
+            val item = output.optJSONObject(i) ?: continue
+            if (item.optString("type", "") == "reasoning") {
+                return true
+            }
+        }
+        return false
+    }
+
+    private fun extractResponsesReasoningText(responseObj: JSONObject?): String {
+        val output = responseObj?.optJSONArray("output") ?: return ""
+        val chunks = mutableListOf<String>()
+
+        for (i in 0 until output.length()) {
+            val item = output.optJSONObject(i) ?: continue
+            if (item.optString("type", "") != "reasoning") {
+                continue
+            }
+
+            val itemText = extractResponsesReasoningTextFromItem(item)
+            if (itemText.isNotEmpty()) {
+                chunks.add(itemText)
+            }
+        }
+
+        return chunks.joinToString("\n\n")
+    }
+
+    private fun extractResponsesReasoningTextFromItem(item: JSONObject): String {
+        val chunks = mutableListOf<String>()
+
+        val summaryArray = item.optJSONArray("summary")
+        if (summaryArray != null) {
+            for (i in 0 until summaryArray.length()) {
+                val summaryPart = summaryArray.optJSONObject(i) ?: continue
+                val text = summaryPart.optString("text", "").trim()
+                if (text.isNotEmpty()) {
+                    chunks.add(text)
+                }
+            }
+        }
+
+        val contentArray = item.optJSONArray("content")
+        if (contentArray != null) {
+            for (i in 0 until contentArray.length()) {
+                val contentPart = contentArray.optJSONObject(i) ?: continue
+                val text = contentPart.optString("text", "").trim()
+                if (text.isNotEmpty()) {
+                    chunks.add(text)
+                }
+            }
+        }
+
+        return chunks.joinToString("\n\n")
+    }
+
     private suspend fun processResponsesStreamingEvent(
         context: Context,
         jsonResponse: JSONObject,
@@ -1909,17 +1969,52 @@ open class OpenAIProvider(
             }
 
             "response.reasoning_text.delta", "response.reasoning_summary_text.delta" -> {
+                state.reasoningObserved = true
                 val delta = jsonResponse.optString("delta", "")
                 if (delta.isNotEmpty()) {
                     processContentDelta(delta, "", state, emitter)
                 }
             }
 
+            "response.reasoning_text.done", "response.reasoning_summary_text.done" -> {
+                state.reasoningObserved = true
+                val text = jsonResponse.optString("text", "")
+                if (text.isNotEmpty() && state.streamedReasoningContentLength == 0) {
+                    emitCompletedResponsesReasoningText(text, state, emitter)
+                }
+            }
+
+            "response.reasoning_summary_part.done" -> {
+                state.reasoningObserved = true
+                val part = jsonResponse.optJSONObject("part")
+                val text = part?.optString("text", "") ?: ""
+                if (text.isNotEmpty() && state.streamedReasoningContentLength == 0) {
+                    emitCompletedResponsesReasoningText(text, state, emitter)
+                }
+            }
+
             "response.output_item.added", "response.output_item.done" -> {
-                if (!enableToolCall) return
                 val outputIndex = jsonResponse.optInt("output_index", -1)
                 val item = jsonResponse.optJSONObject("item")
-                if (outputIndex < 0 || item == null || item.optString("type", "") != "function_call") {
+                if (outputIndex < 0 || item == null) {
+                    return
+                }
+
+                if (item.optString("type", "") == "reasoning") {
+                    state.reasoningObserved = true
+                    val itemReasoningText =
+                        if (eventType == "response.output_item.done") {
+                            extractResponsesReasoningTextFromItem(item)
+                        } else {
+                            ""
+                        }
+                    if (itemReasoningText.isNotEmpty() && state.streamedReasoningContentLength == 0) {
+                        emitCompletedResponsesReasoningText(itemReasoningText, state, emitter)
+                    }
+                    return
+                }
+
+                if (!enableToolCall || item.optString("type", "") != "function_call") {
                     return
                 }
 
@@ -1986,16 +2081,30 @@ open class OpenAIProvider(
             }
 
             "response.completed" -> {
+                val responseObj = jsonResponse.optJSONObject("response")
+                val usage = responseObj?.optJSONObject("usage")
+                val reasoningTokens =
+                    usage
+                        ?.optJSONObject("output_tokens_details")
+                        ?.optInt("reasoning_tokens", 0)
+                        ?: 0
+                if (reasoningTokens > 0 || hasResponsesReasoningItem(responseObj)) {
+                    state.reasoningObserved = true
+                }
+
                 if (state.isInReasoningMode) {
                     state.isInReasoningMode = false
                     emitter.emitTag("</think>")
                     state.hasEmittedThinkStart = false
+                } else {
+                    val lateReasoningText = extractResponsesReasoningText(responseObj)
+                    if (lateReasoningText.isNotEmpty() && state.streamedReasoningContentLength == 0) {
+                        emitCompletedResponsesReasoningText(lateReasoningText, state, emitter)
+                    }
                 }
 
                 closeAllOpenToolCalls(state, emitter)
-
-                val responseObj = jsonResponse.optJSONObject("response")
-                applyUsageToCounters(responseObj?.optJSONObject("usage"), onTokensUpdated)
+                applyUsageToCounters(usage, onTokensUpdated)
             }
 
             "response.failed", "response.error" -> {
@@ -2065,6 +2174,7 @@ open class OpenAIProvider(
 
         // 处理思考内容
         if (hasReasoning && !state.hasEmittedRegularContent) {
+            state.streamedReasoningContentLength += reasoningContent.length
             if (!state.isInReasoningMode) {
                 state.isInReasoningMode = true
                 if (!state.hasEmittedThinkStart) {
@@ -2093,6 +2203,19 @@ open class OpenAIProvider(
             }
 
             emitter.emitContent(regularContent)
+        }
+    }
+
+    private suspend fun emitCompletedResponsesReasoningText(
+        reasoningText: String,
+        state: StreamingState,
+        emitter: StreamEmitter
+    ) {
+        if (state.hasEmittedRegularContent) {
+            emitter.emitThinkContent(reasoningText)
+            state.streamedReasoningContentLength += reasoningText.length
+        } else {
+            processContentDelta(reasoningText, "", state, emitter)
         }
     }
 
@@ -2190,10 +2313,10 @@ open class OpenAIProvider(
                 if (data == "[DONE]") {
                     flushImageBuffers(state, emitter)
                     closeAllOpenToolCalls(state, emitter)
-                    // 收到流结束标记，关闭思考标签
                     if (state.isInReasoningMode) {
                         state.isInReasoningMode = false
                         emitter.emitTag("</think>")
+                        state.hasEmittedThinkStart = false
                     }
                     AppLogger.d("AIService", "【发送消息】收到流结束标记[DONE]")
                     break
@@ -2410,18 +2533,18 @@ open class OpenAIProvider(
                                 if (useResponsesApi) {
                                     val parsed = OpenAIResponsesPayloadAdapter.parseNonStreamingResponse(jsonResponse)
 
+                                    parsed.reasoningChunks.forEach { reasoningChunk ->
+                                        if (reasoningChunk.isNotEmpty()) {
+                                            emitter.emitThinkContent(reasoningChunk)
+                                        }
+                                    }
+
                                     if (!handledImages) {
                                         parsed.textChunks.forEach { textChunk ->
                                             if (textChunk.isNotEmpty()) {
                                                 hasEmittedRegularContent = true
                                                 emitter.emitContent(textChunk)
                                             }
-                                        }
-                                    }
-
-                                    parsed.reasoningChunks.forEach { reasoningChunk ->
-                                        if (reasoningChunk.isNotEmpty() && !hasEmittedRegularContent) {
-                                            emitter.emitThinkContent(reasoningChunk)
                                         }
                                     }
 

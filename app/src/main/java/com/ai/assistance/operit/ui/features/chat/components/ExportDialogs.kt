@@ -14,6 +14,8 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -176,6 +178,16 @@ fun AndroidExportDialog(
     var isVersionNameError by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
+    val dialogMetrics = rememberCompactDialogMetrics()
+    val compactScrollState = rememberCompactDialogScrollState()
+    val cardModifier =
+            Modifier
+                    .fillMaxWidth(0.95f)
+                    .compactDialogHeightOrWrapContent(dialogMetrics)
+    val contentModifier =
+            Modifier
+                    .padding(20.dp)
+                    .verticalScrollWhenShort(dialogMetrics, compactScrollState)
     val imageCropLauncher =
             rememberLauncherForActivityResult(contract = CropImageContract()) { result ->
                 if (result.isSuccessful) {
@@ -201,11 +213,14 @@ fun AndroidExportDialog(
             properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = false)
     ) {
         Card(
-                modifier = Modifier.fillMaxWidth(0.95f).wrapContentHeight(),
+                modifier = cardModifier,
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
         ) {
-            Column(modifier = Modifier.padding(20.dp), horizontalAlignment = Alignment.Start) {
+            Column(
+                    modifier = contentModifier,
+                    horizontalAlignment = Alignment.Start
+            ) {
                 Text(
                         context.getString(R.string.configure_android_app),
                         style = MaterialTheme.typography.headlineSmall,
@@ -399,6 +414,16 @@ fun WindowsExportDialog(
     var iconUri by remember { mutableStateOf<Uri?>(null) }
 
     val context = LocalContext.current
+    val dialogMetrics = rememberCompactDialogMetrics()
+    val compactScrollState = rememberCompactDialogScrollState()
+    val cardModifier =
+            Modifier
+                    .fillMaxWidth(0.95f)
+                    .compactDialogHeightOrWrapContent(dialogMetrics)
+    val contentModifier =
+            Modifier
+                    .padding(20.dp)
+                    .verticalScrollWhenShort(dialogMetrics, compactScrollState)
     val imageCropLauncher =
             rememberLauncherForActivityResult(contract = CropImageContract()) { result ->
                 if (result.isSuccessful) {
@@ -425,11 +450,14 @@ fun WindowsExportDialog(
             properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = false)
     ) {
         Card(
-                modifier = Modifier.fillMaxWidth(0.95f).wrapContentHeight(),
+                modifier = cardModifier,
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
         ) {
-            Column(modifier = Modifier.padding(20.dp), horizontalAlignment = Alignment.Start) {
+            Column(
+                    modifier = contentModifier,
+                    horizontalAlignment = Alignment.Start
+            ) {
                 Text(
                         context.getString(R.string.configure_windows_app),
                         style = MaterialTheme.typography.headlineSmall,

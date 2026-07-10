@@ -25,6 +25,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.window.Dialog
 import com.ai.assistance.operit.R
 import androidx.compose.ui.window.DialogProperties
+import com.ai.assistance.operit.ui.features.chat.components.compactDialogHeightWhenShort
+import com.ai.assistance.operit.ui.features.chat.components.rememberCompactDialogMetrics
 
 /**
  * 通用的内容详情弹窗
@@ -45,13 +47,20 @@ fun ContentDetailDialog(
 ) {
     var isRawView by remember { mutableStateOf(false) }
     val isXmlContent = remember(content) { content.trim().startsWith("<") }
+    val dialogMetrics = rememberCompactDialogMetrics()
+    val contentMaxHeight = if (dialogMetrics.isCompactHeight) 160.dp else 400.dp
+    val cardModifier =
+        Modifier
+            .fillMaxWidth()
+            .padding(16.dp)
+            .compactDialogHeightWhenShort(dialogMetrics)
 
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = true)
     ) {
         Card(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            modifier = cardModifier,
             shape = RoundedCornerShape(16.dp),
             elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
@@ -100,7 +109,7 @@ fun ContentDetailDialog(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(min = 50.dp, max = 400.dp) // 增加最大高度
+                        .heightIn(min = 50.dp, max = contentMaxHeight)
                         .background(
                             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                             shape = RoundedCornerShape(8.dp)

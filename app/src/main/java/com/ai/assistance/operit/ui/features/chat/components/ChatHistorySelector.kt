@@ -1615,11 +1615,29 @@ fun ChatHistorySelector(
     }
 
     if (showSettingsDialog) {
+        val dialogMetrics = rememberCompactDialogMetrics()
+        val outerPadding = if (dialogMetrics.isCompact) 8.dp else 16.dp
+        val contentPadding = if (dialogMetrics.isCompact) 12.dp else 16.dp
+        val scrollState = rememberCompactDialogScrollState()
+        val cardModifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(outerPadding)
+                .let { base ->
+                    if (dialogMetrics.isCompact) {
+                        base.heightIn(max = dialogMetrics.maxHeight - outerPadding * 2)
+                    } else {
+                        base
+                    }
+                }
+        val contentModifier =
+            Modifier
+                .padding(contentPadding)
+                .verticalScrollWhenCompact(dialogMetrics, scrollState)
+
         Dialog(onDismissRequest = { showSettingsDialog = false }) {
             Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
+                modifier = cardModifier,
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surface
@@ -1628,9 +1646,7 @@ fun ChatHistorySelector(
                     defaultElevation = 6.dp
                 )
             ) {
-                Column(
-                    modifier = Modifier.padding(16.dp)
-                ) {
+                Column(modifier = contentModifier) {
                     Text(
                         text = stringResource(R.string.chat_history_settings),
                         style = MaterialTheme.typography.headlineSmall,
@@ -2491,4 +2507,3 @@ fun ChatHistorySelector(
         }
     }
 }
-
