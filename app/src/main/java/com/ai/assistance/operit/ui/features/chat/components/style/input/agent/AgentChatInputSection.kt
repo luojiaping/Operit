@@ -1519,6 +1519,12 @@ private fun AgentModelSelectorPopup(
         )
     }
     val inputMenuTogglesBySlot = inputMenuToggles.groupBy { InputMenuToggleSlots.normalize(it.slot) }
+    val currentConfig = configSummaries.find { it.id == currentConfigMapping.configId }
+    val currentModelName = currentConfig?.let { config ->
+        val validIndex = getValidModelIndex(config.modelName, currentConfigMapping.modelIndex)
+        getModelByIndex(config.modelName, validIndex)
+    }.orEmpty()
+    val maxThinkingQualityLevel = ApiPreferences.MAX_THINKING_QUALITY_LEVEL
 
     Popup(
         alignment = Alignment.TopStart,
@@ -1571,7 +1577,15 @@ private fun AgentModelSelectorPopup(
                         enableThinkingMode = enableThinkingMode,
                         onToggleThinkingMode = onToggleThinkingMode,
                         thinkingQualityLevel = thinkingQualityLevel,
-                        onThinkingQualityLevelChange = onThinkingQualityLevelChange,
+                        maxThinkingQualityLevel = maxThinkingQualityLevel,
+                        onThinkingQualityLevelChange = { level ->
+                            onThinkingQualityLevelChange(
+                                level.coerceIn(
+                                    ApiPreferences.MIN_THINKING_QUALITY_LEVEL,
+                                    maxThinkingQualityLevel
+                                )
+                            )
+                        },
                         thinkingSlotToggles = inputMenuTogglesBySlot[InputMenuToggleSlots.THINKING].orEmpty(),
                         expanded = showThinkingDropdown,
                         onExpandedChange = { showThinkingDropdown = it },
@@ -1671,6 +1685,7 @@ private fun AgentThinkingSettingsItem(
     enableThinkingMode: Boolean,
     onToggleThinkingMode: () -> Unit,
     thinkingQualityLevel: Int,
+    maxThinkingQualityLevel: Int,
     onThinkingQualityLevelChange: (Int) -> Unit,
     thinkingSlotToggles: List<InputMenuToggleDefinition>,
     expanded: Boolean,
@@ -1758,6 +1773,7 @@ private fun AgentThinkingSettingsItem(
                 AgentThinkingSliderSettingItem(
                     label = stringResource(R.string.thinking_quality),
                     value = thinkingQualityLevel,
+                    maxThinkingQualityLevel = maxThinkingQualityLevel,
                     onValueChange = onThinkingQualityLevelChange,
                     onInfoClick = onThinkingQualityInfoClick,
                 )
@@ -1776,13 +1792,17 @@ private fun AgentThinkingSettingsItem(
 private fun AgentThinkingSliderSettingItem(
     label: String,
     value: Int,
+    maxThinkingQualityLevel: Int,
     onValueChange: (Int) -> Unit,
     onInfoClick: () -> Unit,
 ) {
     var sliderValue by remember { mutableStateOf(value.toFloat()) }
 
-    LaunchedEffect(value) {
-        sliderValue = value.toFloat().coerceIn(1f, 4f)
+    LaunchedEffect(value, maxThinkingQualityLevel) {
+        sliderValue = value.toFloat().coerceIn(
+            ApiPreferences.MIN_THINKING_QUALITY_LEVEL.toFloat(),
+            maxThinkingQualityLevel.toFloat()
+        )
     }
 
     Column(
@@ -1816,7 +1836,10 @@ private fun AgentThinkingSliderSettingItem(
             )
             Spacer(modifier = Modifier.weight(1f))
             Text(
-                text = sliderValue.roundToInt().coerceIn(1, 4).toString(),
+                text = sliderValue.roundToInt().coerceIn(
+                    ApiPreferences.MIN_THINKING_QUALITY_LEVEL,
+                    maxThinkingQualityLevel
+                ).toString(),
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary,
@@ -1827,10 +1850,18 @@ private fun AgentThinkingSliderSettingItem(
             value = sliderValue,
             onValueChange = { sliderValue = it },
             onValueChangeFinished = {
-                onValueChange(sliderValue.roundToInt().coerceIn(1, 4))
+                onValueChange(
+                    sliderValue.roundToInt().coerceIn(
+                        ApiPreferences.MIN_THINKING_QUALITY_LEVEL,
+                        maxThinkingQualityLevel
+                    )
+                )
             },
-            valueRange = 1f..4f,
-            steps = 2,
+            valueRange =
+                ApiPreferences.MIN_THINKING_QUALITY_LEVEL.toFloat()..
+                    maxThinkingQualityLevel.toFloat(),
+            steps = (maxThinkingQualityLevel -
+                ApiPreferences.MIN_THINKING_QUALITY_LEVEL - 1).coerceAtLeast(0),
             modifier = Modifier.fillMaxWidth(),
         )
     }

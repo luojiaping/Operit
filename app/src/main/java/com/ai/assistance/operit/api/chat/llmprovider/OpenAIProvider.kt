@@ -11,6 +11,7 @@ import com.ai.assistance.operit.data.model.ApiProviderType
 import com.ai.assistance.operit.data.model.ModelOption
 import com.ai.assistance.operit.data.model.ModelParameter
 import com.ai.assistance.operit.data.model.ToolPrompt
+import com.ai.assistance.operit.data.preferences.ApiPreferences
 import com.ai.assistance.operit.api.chat.llmprovider.EndpointCompleter
 import com.ai.assistance.operit.util.AppLogger
 import com.ai.assistance.operit.util.ChatMarkupRegex
@@ -38,6 +39,8 @@ import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
@@ -547,8 +550,68 @@ open class OpenAIProvider(
     ): RequestBody {
         val jsonString =
             createRequestBodyInternal(context, chatHistory, modelParameters, stream, availableTools, preserveThinkInHistory)
-        return createJsonRequestBody(jsonString)
+        if (!supportsOpenAiChatReasoningEffort()) {
+            return createJsonRequestBody(jsonString)
+        }
+        val requestJson = JSONObject(jsonString)
+        applyOpenAiChatReasoning(context, requestJson, enableThinking)
+        return createJsonRequestBody(requestJson.toString())
     }
+
+    private fun applyOpenAiChatReasoning(
+        context: Context,
+        requestJson: JSONObject,
+        enableThinking: Boolean
+    ) {
+        if (!supportsOpenAiChatReasoningEffort()) {
+            return
+        }
+
+        val existingEffort = requestJson.optString("reasoning_effort", "").trim()
+        if (existingEffort.isNotEmpty()) {
+            AppLogger.d(
+                "OpenAIProvider",
+                "Preserving caller-supplied Chat Completions reasoning_effort=$existingEffort"
+            )
+            return
+        }
+
+        val effort = if (enableThinking) {
+            resolveOpenAiChatReasoningEffort(context)
+        } else {
+            "none"
+        } ?: return
+        requestJson.put("reasoning_effort", effort)
+        AppLogger.d(
+            "OpenAIProvider",
+            "OpenAI Chat Completions reasoning_effort=$effort"
+        )
+    }
+
+    private fun resolveOpenAiChatReasoningEffort(context: Context): String? {
+        val qualityLevel = runCatching {
+            runBlocking {
+                ApiPreferences.getInstance(context).thinkingQualityLevelFlow.first()
+            }
+        }.getOrElse {
+            AppLogger.w(
+                "OpenAIProvider",
+                "Failed to read thinking quality level; reasoning_effort not applied",
+                it
+            )
+            return null
+        }
+
+        val effortLevels = listOf("low", "medium", "high", "xhigh", "max")
+        val qualityIndex = qualityLevel.coerceIn(
+            ApiPreferences.MIN_THINKING_QUALITY_LEVEL,
+            ApiPreferences.MAX_THINKING_QUALITY_LEVEL
+        ) - 1
+        return effortLevels[qualityIndex]
+    }
+
+    private fun supportsOpenAiChatReasoningEffort(): Boolean =
+        providerType == ApiProviderType.OPENAI || providerType == ApiProviderType.OPENAI_GENERIC
 
     protected fun createJsonRequestBody(jsonString: String): RequestBody {
         return jsonString.toByteArray(Charsets.UTF_8).toRequestBody(JSON)
@@ -2011,6 +2074,16 @@ open class OpenAIProvider(
                     if (itemReasoningText.isNotEmpty() && state.streamedReasoningContentLength == 0) {
                         emitCompletedResponsesReasoningText(itemReasoningText, state, emitter)
                     }
+                    if (eventType == "response.output_item.done") {
+                        OpenAIResponsesPayloadAdapter.createReasoningMetadataTag(item)?.let { metadataTag ->
+                            if (state.isInReasoningMode) {
+                                state.isInReasoningMode = false
+                                emitter.emitTag("</think>")
+                                state.hasEmittedThinkStart = false
+                            }
+                            emitter.emitTag(metadataTag)
+                        }
+                    }
                     return
                 }
 
@@ -2537,6 +2610,9 @@ open class OpenAIProvider(
                                         if (reasoningChunk.isNotEmpty()) {
                                             emitter.emitThinkContent(reasoningChunk)
                                         }
+                                    }
+                                    parsed.reasoningMetadataTags.forEach { metadataTag ->
+                                        emitter.emitTag(metadataTag)
                                     }
 
                                     if (!handledImages) {
