@@ -683,6 +683,7 @@ class JsEngine(private val context: Context) {
      * @param script 完整的JavaScript脚本内容
      * @param functionName 要调用的函数名称
      * @param params 要传递给函数的参数
+     * @param timeoutSec 最长等待秒数；null 表示等待实际完成或主动取消
      * @return 函数执行结果
      */
     internal fun executeScriptFunction(
@@ -692,7 +693,7 @@ class JsEngine(private val context: Context) {
             envOverrides: Map<String, String> = emptyMap(),
             onIntermediateResult: ((Any?) -> Unit)? = null,
             dispatchIntermediateOnMain: Boolean = true,
-            timeoutSec: Long = JsTimeoutConfig.MAIN_TIMEOUT_SECONDS.toLong(),
+            timeoutSec: Long? = JsTimeoutConfig.MAIN_TIMEOUT_SECONDS.toLong(),
             executionListener: JsExecutionListener? = null
     ): Any? {
         val effectiveParams = params.toMutableMap()
@@ -762,16 +763,21 @@ class JsEngine(private val context: Context) {
         val buildExecutionScriptStartTime = if (shouldLogTiming) messageTimingNow() else 0L
         val paramsObject = JSONObject(effectiveParams)
         val paramsJson = paramsObject.toString()
-        val safeTimeoutSec = if (timeoutSec <= 0L) 1L else timeoutSec
-        val preTimeoutMs = JsTimeoutConfig.PRE_TIMEOUT_SECONDS * 1000L
+        val safeTimeoutSec = timeoutSec?.let { if (it <= 0L) 1L else it }
+        val preTimeoutMs =
+            if (safeTimeoutSec == null) {
+                null
+            } else {
+                JsTimeoutConfig.PRE_TIMEOUT_SECONDS * 1000L
+            }
         val executionArgsJson =
             JSONArray()
                 .put(callId)
                 .put(paramsObject)
                 .put(script)
                 .put(functionName)
-                .put(safeTimeoutSec)
-                .put(preTimeoutMs)
+                .put(safeTimeoutSec ?: JSONObject.NULL)
+                .put(preTimeoutMs ?: JSONObject.NULL)
                 .toString()
         if (shouldLogTiming) {
             logMessageTiming(
@@ -799,17 +805,14 @@ class JsEngine(private val context: Context) {
             }
         )
 
-        val preTimeoutTimer = java.util.Timer()
         val waitResultStartTime = if (shouldLogTiming) messageTimingNow() else 0L
         return try {
-            preTimeoutTimer.schedule(
-                object : java.util.TimerTask() {
-                    override fun run() {}
-                },
-                JsTimeoutConfig.PRE_TIMEOUT_SECONDS * 1000
-            )
-
-            val result = session.future.get(safeTimeoutSec, TimeUnit.SECONDS)
+            val result =
+                if (safeTimeoutSec == null) {
+                    session.future.get()
+                } else {
+                    session.future.get(safeTimeoutSec, TimeUnit.SECONDS)
+                }
             removeExecutionSession(callId)
             if (shouldLogTiming) {
                 logMessageTiming(
@@ -831,7 +834,7 @@ class JsEngine(private val context: Context) {
             val failureReason =
                 when (e) {
                     is java.util.concurrent.TimeoutException ->
-                        "Script execution timed out after ${if (timeoutSec <= 0L) 1L else timeoutSec} seconds"
+                        "Script execution timed out after ${safeTimeoutSec ?: 1L} seconds"
                     else -> e.message ?: e.javaClass.simpleName
                 }
             AppLogger.e(
@@ -855,8 +858,6 @@ class JsEngine(private val context: Context) {
                 )
             }
             buildJsExecutionErrorPayload(failureReason)
-        } finally {
-            preTimeoutTimer.cancel()
         }
     }
 
@@ -963,7 +964,8 @@ class JsEngine(private val context: Context) {
                 script = buildComposeDslRuntimeWrappedScript(script),
                 functionName = "__operit_render_compose_dsl",
                 params = runtimeOptions,
-                envOverrides = envOverrides
+                envOverrides = envOverrides,
+                timeoutSec = null
         )
     }
 
@@ -988,7 +990,8 @@ class JsEngine(private val context: Context) {
                 functionName = "__operit_dispatch_compose_dsl_action",
                 params = params,
                 envOverrides = envOverrides,
-                onIntermediateResult = onIntermediateResult
+                onIntermediateResult = onIntermediateResult,
+                timeoutSec = null
         )
     }
 
@@ -1000,7 +1003,8 @@ class JsEngine(private val context: Context) {
                 script = "",
                 functionName = "__operit_rerender_compose_dsl",
                 params = runtimeOptions,
-                envOverrides = envOverrides
+                envOverrides = envOverrides,
+                timeoutSec = null
         )
     }
 

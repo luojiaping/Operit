@@ -419,9 +419,11 @@ internal fun buildExecutionRuntimeBridgeScript(): String {
                     );
                     return;
                 }
-
-                var safeTimeoutSec = Math.max(1, Number(timeoutSec) || 1);
-                var safePreTimeoutMs = Math.max(1000, Number(preTimeoutMs) || 1000);
+                var hasTimeout = timeoutSec !== null && typeof timeoutSec !== 'undefined';
+                var safeTimeoutSec = hasTimeout ? Math.max(1, Number(timeoutSec) || 1) : null;
+                var safePreTimeoutMs = hasTimeout
+                    ? Math.max(1000, Number(preTimeoutMs) || 1000)
+                    : null;
                 var callState = registerCallSession(callId, params);
                 var previousCallId = root.__operitCurrentCallId;
                 var previousCallRuntime = root.__operit_call_runtime_ref;
@@ -533,14 +535,16 @@ internal fun buildExecutionRuntimeBridgeScript(): String {
                     return value == null || value === '' ? fallbackValue : text(value);
                 }
 
-                callState.safetyTimeout = setTimeout(function() {
-                    if (!isActive()) {
-                        return;
-                    }
-                    callState.safetyTimeoutFinal = setTimeout(function() {
-                        emitError('Script execution timed out after ' + safeTimeoutSec + ' seconds');
-                    }, 5000);
-                }, safePreTimeoutMs);
+                if (hasTimeout) {
+                    callState.safetyTimeout = setTimeout(function() {
+                        if (!isActive()) {
+                            return;
+                        }
+                        callState.safetyTimeoutFinal = setTimeout(function() {
+                            emitError('Script execution timed out after ' + safeTimeoutSec + ' seconds');
+                        }, 5000);
+                    }, safePreTimeoutMs);
+                }
 
                 function callRuntimeReport(error, context) {
                     if (typeof root.__operitReportDetailedErrorForCall === 'function') {
