@@ -329,11 +329,11 @@ function buildLargeOutputFilename(prefix: string, extension: string): string {
 }
 
 async function maybePersistLargeBrowserResponse(
-    result: unknown,
+    result: string,
     prefix: string,
     extension: string = "md"
 ) {
-    if (typeof result !== "string" || result.length <= MAX_INLINE_BROWSER_TEXT_CHARS) {
+    if (result.length <= MAX_INLINE_BROWSER_TEXT_CHARS) {
         return result;
     }
     await Tools.Files.mkdir(OPERIT_CLEAN_ON_EXIT_DIR, true);

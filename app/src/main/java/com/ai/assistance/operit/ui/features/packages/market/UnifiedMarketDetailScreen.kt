@@ -173,6 +173,9 @@ data class UnifiedMarketDetailCommentsState(
     val canPost: Boolean,
     val postHint: String? = null,
     val currentUserLogin: String? = null,
+    val currentUserAuthorId: String? = null,
+    val entryOwnerLogin: String? = null,
+    val entryOwnerAuthorId: String? = null,
     val onRefresh: () -> Unit,
     val onRequestPost: () -> Unit,
     val onReplyToComment: (MarketV2Comment) -> Unit = {},
@@ -262,7 +265,10 @@ fun UnifiedMarketDetailScreen(
                         onReply = { comments.onReplyToComment(comment) },
                         onEdit = { comments.onEditComment(comment) },
                         onDelete = { comments.onDeleteComment(comment) },
-                        currentUserLogin = comments.currentUserLogin
+                        currentUserLogin = comments.currentUserLogin,
+                        currentUserAuthorId = comments.currentUserAuthorId,
+                        entryOwnerLogin = comments.entryOwnerLogin,
+                        entryOwnerAuthorId = comments.entryOwnerAuthorId
                     )
                 }
             }
@@ -1073,13 +1079,23 @@ private fun UnifiedMarketDetailCommentCard(
     onReply: () -> Unit,
     onEdit: () -> Unit = {},
     onDelete: () -> Unit = {},
-    currentUserLogin: String? = null
+    currentUserLogin: String? = null,
+    currentUserAuthorId: String? = null,
+    entryOwnerLogin: String? = null,
+    entryOwnerAuthorId: String? = null
 ) {
     val body = comment.body.trim()
     var bodyExpanded by remember(comment.id) { mutableStateOf(false) }
     var bodyOverflowed by remember(comment.id) { mutableStateOf(false) }
     var menuExpanded by remember(comment.id) { mutableStateOf(false) }
-    val canEditComment = currentUserLogin != null && comment.author.login.equals(currentUserLogin, ignoreCase = true)
+    val isCommentAuthor =
+        currentUserAuthorId != null && comment.author.id.equals(currentUserAuthorId, ignoreCase = true) ||
+            currentUserLogin != null && comment.author.login.equals(currentUserLogin, ignoreCase = true)
+    val isEntryOwner =
+        currentUserAuthorId != null && entryOwnerAuthorId?.equals(currentUserAuthorId, ignoreCase = true) == true ||
+            currentUserLogin != null && entryOwnerLogin?.equals(currentUserLogin, ignoreCase = true) == true
+    val canEditComment = isCommentAuthor
+    val canDeleteComment = isCommentAuthor || isEntryOwner
 
     Column(
         modifier =
@@ -1181,6 +1197,8 @@ private fun UnifiedMarketDetailCommentCard(
                             onEdit()
                         }
                     )
+                }
+                if (canDeleteComment) {
                     DropdownMenuItem(
                         text = { Text(text = stringResource(R.string.delete)) },
                         onClick = {

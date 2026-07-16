@@ -3,7 +3,7 @@
  */
 
 import {
-    StringResultData, SleepResultData, SystemSettingData, AppOperationData, AppListData,
+    SleepResultData, SystemSettingData, AppOperationData, AppListData,
     AppUsageTimeResultData, DeviceInfoResultData, NotificationData, LocationData,
     BluetoothStateData, BluetoothBondedDevicesData, BluetoothScanResultData, BluetoothSessionData,
     BluetoothTransferData, BluetoothReadData, BluetoothBleServicesData, BluetoothBleNotificationData,
@@ -47,14 +47,14 @@ export namespace System {
      * Show a toast message on device.
      * @param message - The message to show
      */
-    function toast(message: string): Promise<StringResultData>;
+    function toast(message: string): Promise<string>;
 
     /**
      * Send a notification using the same channel as AI reply completion.
      * @param message - Notification content
      * @param title - Optional notification title
      */
-    function sendNotification(message: string, title?: string): Promise<StringResultData>;
+    function sendNotification(message: string, title?: string): Promise<string>;
 
     /**
      * Use a tool package
@@ -125,13 +125,13 @@ export namespace System {
      */
     namespace bluetooth {
         /** Request Bluetooth nearby devices permission. */
-        function requestPermission(): Promise<StringResultData>;
+        function requestPermission(): Promise<string>;
 
         /** Get Bluetooth adapter state. */
         function getState(): Promise<BluetoothStateData>;
 
         /** Open the system dialog to enable Bluetooth. */
-        function requestEnable(): Promise<StringResultData>;
+        function requestEnable(): Promise<string>;
 
         /** List bonded Bluetooth devices. */
         function listBondedDevices(): Promise<BluetoothBondedDevicesData>;
@@ -178,7 +178,7 @@ export namespace System {
         }): Promise<BluetoothReadData>;
 
         /** Close a Bluetooth classic, listener, or BLE session. */
-        function close(sessionId: string): Promise<StringResultData>;
+        function close(sessionId: string): Promise<string>;
 
         namespace ble {
             /** Connect to a BLE device. */
@@ -335,7 +335,7 @@ export namespace System {
         function input(sessionId: string, options?: {
             input?: string;
             control?: string;
-        }): Promise<StringResultData>;
+        }): Promise<string>;
     }
 
     /**

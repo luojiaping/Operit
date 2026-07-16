@@ -20,8 +20,7 @@ import {
     TriggerType,
     TriggerNode,
     ExecuteNode,
-    NodePosition,
-    StringResultData
+    NodePosition
 } from './results';
 
 /**
@@ -280,9 +279,9 @@ export namespace Workflow {
 
         disable(workflowId: string): Promise<WorkflowDetailResultData>;
 
-        'delete'(workflowId: string): Promise<StringResultData>;
+        'delete'(workflowId: string): Promise<string>;
 
-        trigger(workflowId: string): Promise<StringResultData>;
+        trigger(workflowId: string): Promise<string>;
     }
 }
 

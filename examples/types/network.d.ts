@@ -2,7 +2,7 @@
  * Network operation type definitions for Assistance Package Tools
  */
 
-import { HttpResponseData, VisitWebResultData, StringResultData } from './results';
+import { HttpResponseData, VisitWebResultData } from './results';
 
 /**
  * Network operations namespace
@@ -40,23 +40,23 @@ export namespace Net {
 
     /**
      * Start a persistent browser session (floating window WebView).
-     * Returns StringResultData whose `value` is a JSON string payload.
+     * Returns the browser session payload as a JSON string.
      */
     function startBrowser(options?: {
         url?: string;
         headers?: Record<string, string> | string;
         user_agent?: string;
         session_name?: string;
-    }): Promise<StringResultData>;
+    }): Promise<string>;
 
     /**
      * Stop one browser session or all browser sessions.
-     * Returns StringResultData whose `value` is a JSON string payload.
+     * Returns the browser session payload as a JSON string.
      */
     function stopBrowser(sessionIdOrOptions?: string | {
         session_id?: string;
         close_all?: boolean;
-    }): Promise<StringResultData>;
+    }): Promise<string>;
 
     /**
      * Navigate a browser session to a target URL.
@@ -66,12 +66,12 @@ export namespace Net {
             url: string;
             headers?: Record<string, string> | string;
         }
-    ): Promise<StringResultData>;
+    ): Promise<string>;
 
     /**
      * Go back in browser history.
      */
-    function browserNavigateBack(options?: Record<string, unknown>): Promise<StringResultData>;
+    function browserNavigateBack(options?: Record<string, unknown>): Promise<string>;
 
     /**
      * Click an element by snapshot ref or selector.
@@ -85,17 +85,17 @@ export namespace Net {
         button?: 'left' | 'right' | 'middle';
         modifiers?: Array<'Alt' | 'Control' | 'ControlOrMeta' | 'Meta' | 'Shift'>;
         doubleClick?: boolean;
-    }): Promise<StringResultData>;
+    }): Promise<string>;
 
     /**
      * Close the current browser tab.
      */
-    function browserClose(options?: Record<string, unknown>): Promise<StringResultData>;
+    function browserClose(options?: Record<string, unknown>): Promise<string>;
 
     /**
      * Close all browser tabs.
      */
-    function browserCloseAll(options?: Record<string, unknown>): Promise<StringResultData>;
+    function browserCloseAll(options?: Record<string, unknown>): Promise<string>;
 
     /**
      * Read console messages from the browser session.
@@ -103,7 +103,7 @@ export namespace Net {
     function browserConsoleMessages(options?: {
         level?: string;
         filename?: string;
-    }): Promise<StringResultData>;
+    }): Promise<string>;
 
     /**
      * Drag between two elements by snapshot refs.
@@ -113,7 +113,7 @@ export namespace Net {
         startRef: string;
         endElement: string;
         endRef: string;
-    }): Promise<StringResultData>;
+    }): Promise<string>;
 
     /**
      * Evaluate JavaScript in the browser session.
@@ -122,7 +122,7 @@ export namespace Net {
         function: string;
         ref?: string;
         element?: string;
-    }): Promise<StringResultData>;
+    }): Promise<string>;
 
     /**
      * Resolve an active file chooser in the browser session.
@@ -130,7 +130,7 @@ export namespace Net {
      */
     function browserFileUpload(options?: {
         paths?: string[];
-    }): Promise<StringResultData>;
+    }): Promise<string>;
 
     /**
      * Fill multiple form fields in the browser session.
@@ -143,7 +143,7 @@ export namespace Net {
             ref?: string;
             selector?: string;
         }>;
-    }): Promise<StringResultData>;
+    }): Promise<string>;
 
     /**
      * Handle an active dialog.
@@ -151,7 +151,7 @@ export namespace Net {
     function browserHandleDialog(options: {
         accept: boolean;
         promptText?: string;
-    }): Promise<StringResultData>;
+    }): Promise<string>;
 
     /**
      * Hover over an element by snapshot ref.
@@ -159,7 +159,7 @@ export namespace Net {
     function browserHover(options: {
         ref: string;
         element?: string;
-    }): Promise<StringResultData>;
+    }): Promise<string>;
 
     /**
      * Read network requests from the browser session.
@@ -167,14 +167,14 @@ export namespace Net {
     function browserNetworkRequests(options?: {
         includeStatic?: boolean;
         filename?: string;
-    }): Promise<StringResultData>;
+    }): Promise<string>;
 
     /**
      * Press a keyboard key in the browser session.
      */
     function browserPressKey(keyOrOptions: string | {
         key: string;
-    }): Promise<StringResultData>;
+    }): Promise<string>;
 
     /**
      * Resize the browser viewport.
@@ -182,14 +182,14 @@ export namespace Net {
     function browserResize(options: {
         width: number;
         height: number;
-    }): Promise<StringResultData>;
+    }): Promise<string>;
 
     /**
      * Run Playwright-style code in the browser session.
      */
     function browserRunCode(options: {
         code: string;
-    }): Promise<StringResultData>;
+    }): Promise<string>;
 
     /**
      * Select options in a dropdown by snapshot ref.
@@ -198,7 +198,7 @@ export namespace Net {
         ref: string;
         values: string[];
         element?: string;
-    }): Promise<StringResultData>;
+    }): Promise<string>;
 
     /**
      * Capture a text snapshot of current page.
@@ -207,7 +207,7 @@ export namespace Net {
         filename?: string;
         selector?: string;
         depth?: number;
-    }): Promise<StringResultData>;
+    }): Promise<string>;
 
     /**
      * Manage browser tabs.
@@ -215,7 +215,7 @@ export namespace Net {
     function browserTabs(options: {
         action: string;
         index?: number;
-    }): Promise<StringResultData>;
+    }): Promise<string>;
 
     /**
      * Type text into an element by snapshot ref.
@@ -226,7 +226,7 @@ export namespace Net {
         element?: string;
         submit?: boolean;
         slowly?: boolean;
-    }): Promise<StringResultData>;
+    }): Promise<string>;
 
     /**
      * Wait for text or time in the browser session.
@@ -235,14 +235,14 @@ export namespace Net {
         time?: number;
         text?: string;
         textGone?: string;
-    }): Promise<StringResultData>;
+    }): Promise<string>;
 
     /**
      * List installed browser session userscripts.
      */
     function browserUserscriptList(options?: {
         include_disabled?: boolean;
-    }): Promise<StringResultData>;
+    }): Promise<string>;
 
     /**
      * Install a browser session userscript from a remote URL, local file path, or inline source text.
@@ -254,7 +254,7 @@ export namespace Net {
         source?: string;
         source_url?: string;
         source_display?: string;
-    }): Promise<StringResultData>;
+    }): Promise<string>;
 
     /**
      * Enable an installed browser session userscript.
@@ -264,7 +264,7 @@ export namespace Net {
         name?: string;
         namespace?: string;
         source_url?: string;
-    }): Promise<StringResultData>;
+    }): Promise<string>;
 
     /**
      * Disable an installed browser session userscript.
@@ -274,7 +274,7 @@ export namespace Net {
         name?: string;
         namespace?: string;
         source_url?: string;
-    }): Promise<StringResultData>;
+    }): Promise<string>;
 
     /**
      * Uninstall an installed browser session userscript.
@@ -284,7 +284,7 @@ export namespace Net {
         name?: string;
         namespace?: string;
         source_url?: string;
-    }): Promise<StringResultData>;
+    }): Promise<string>;
 
     /**
      * Enhanced HTTP request with flexible options

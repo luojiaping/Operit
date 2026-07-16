@@ -381,6 +381,9 @@ fun UnifiedMarketDetailEntryScreen(
                 canPost = currentUser != null,
                 postHint = if (currentUser == null) stringResource(R.string.mcp_plugin_login_required) else null,
                 currentUserLogin = currentUser?.login,
+                currentUserAuthorId = currentUser?.id?.let { "gh_$it" },
+                entryOwnerLogin = entry.marketPublisherName(),
+                entryOwnerAuthorId = entry.marketPublisherId(),
                 onRefresh = { viewModel.loadEntryComments(entryId) },
                 onRequestPost = {
                     replyingCommentId = null

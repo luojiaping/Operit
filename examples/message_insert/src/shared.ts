@@ -899,16 +899,8 @@ async function buildRecentAppUsageContent(): Promise<string> {
   return lines.join("\n");
 }
 
-function extractScreenshotPath(result: any): string {
-  if (typeof result === "string") {
-    return result.trim();
-  }
-  if (!result || typeof result !== "object") {
-    return "";
-  }
-
-  const value = String(result?.value || result?.path || "").trim();
-  return value;
+function extractScreenshotPath(result: string): string {
+  return result.trim();
 }
 
 async function readScreenTextFromScreenshot(screenshotPath: string): Promise<string> {

@@ -3,7 +3,7 @@
  */
 
 import {
-    UIPageResultData, UIActionResultData, CombinedOperationResultData, SimplifiedUINode, StringResultData
+    UIPageResultData, UIActionResultData, CombinedOperationResultData, SimplifiedUINode
 } from './results';
 
 /**
@@ -18,7 +18,7 @@ export namespace UI {
     /**
      * Capture the current screen and return the saved file path.
      */
-    function captureScreenshot(): Promise<StringResultData>;
+    function captureScreenshot(): Promise<string>;
 
     /**
      * Tap at coordinates

@@ -8,14 +8,14 @@ import {
     DirectoryListingData, FileContentData, BinaryFileContentData, FileOperationData, FileExistsData,
     FindFilesResultData, FileInfoData, FileConversionResultData, FileFormatConversionsResultData,
     HttpResponseData, VisitWebResultData,
-    SleepResultData, StringResultData, SystemSettingData, AppOperationData, AppListData,
+    SleepResultData, SystemSettingData, AppOperationData, AppListData,
     DeviceInfoResultData, NotificationData, LocationData, BluetoothStateData, BluetoothBondedDevicesData,
     BluetoothScanResultData, BluetoothSessionData, BluetoothTransferData, BluetoothReadData,
     BluetoothBleServicesData, BluetoothBleNotificationData,
     UIPageResultData, UIActionResultData, CombinedOperationResultData, AutomationExecutionResultData,
     CalculationResultData, FFmpegResultData, ADBResultData, IntentResultData, TerminalCommandResultData, HiddenTerminalCommandResultData, TerminalSessionScreenResultData, MusicPlaybackResultData,
     FilePartContentData, FileApplyResultData, WorkflowListResultData, WorkflowResultData, WorkflowDetailResultData,
-    StringResultData, ChatServiceStartResultData, ChatCreationResultData, ChatListResultData, ChatFindResultData, AgentStatusResultData,
+    ChatServiceStartResultData, ChatCreationResultData, ChatListResultData, ChatFindResultData, AgentStatusResultData,
     ChatSwitchResultData, ChatTitleUpdateResultData, ChatDeleteResultData, MessageSendResultData, MemoryQueryResultData, MemoryLinkResultData, MemoryLinkQueryResultData, GrepResultData,
     ChatMessagesResultData, CharacterCardListResultData,
     EnvironmentVariableReadResultData, EnvironmentVariableWriteResultData,
@@ -60,28 +60,28 @@ export interface ToolResultMap {
     // Network operations
     'http_request': HttpResponseData;
     'visit_web': VisitWebResultData;
-    'browser_click': StringResultData;
-    'browser_close': StringResultData;
-    'browser_close_all': StringResultData;
-    'browser_console_messages': StringResultData;
-    'browser_drag': StringResultData;
-    'browser_evaluate': StringResultData;
-    'browser_file_upload': StringResultData;
-    'browser_fill_form': StringResultData;
-    'browser_handle_dialog': StringResultData;
-    'browser_hover': StringResultData;
-    'browser_navigate': StringResultData;
-    'browser_navigate_back': StringResultData;
-    'browser_network_requests': StringResultData;
-    'browser_press_key': StringResultData;
-    'browser_resize': StringResultData;
-    'browser_run_code': StringResultData;
-    'browser_select_option': StringResultData;
-    'browser_wait_for': StringResultData;
-    'browser_snapshot': StringResultData;
-    'browser_take_screenshot': StringResultData;
-    'browser_type': StringResultData;
-    'browser_tabs': StringResultData;
+    'browser_click': string;
+    'browser_close': string;
+    'browser_close_all': string;
+    'browser_console_messages': string;
+    'browser_drag': string;
+    'browser_evaluate': string;
+    'browser_file_upload': string;
+    'browser_fill_form': string;
+    'browser_handle_dialog': string;
+    'browser_hover': string;
+    'browser_navigate': string;
+    'browser_navigate_back': string;
+    'browser_network_requests': string;
+    'browser_press_key': string;
+    'browser_resize': string;
+    'browser_run_code': string;
+    'browser_select_option': string;
+    'browser_wait_for': string;
+    'browser_snapshot': string;
+    'browser_take_screenshot': string;
+    'browser_type': string;
+    'browser_tabs': string;
     'multipart_request': HttpResponseData;
     'manage_cookies': HttpResponseData;
 
@@ -89,8 +89,8 @@ export interface ToolResultMap {
     'sleep': SleepResultData;
     'get_system_setting': SystemSettingData;
     'modify_system_setting': SystemSettingData;
-    'toast': StringResultData;
-    'send_notification': StringResultData;
+    'toast': string;
+    'send_notification': string;
     'install_app': AppOperationData;
     'uninstall_app': AppOperationData;
     'list_installed_apps': AppListData;
@@ -99,9 +99,9 @@ export interface ToolResultMap {
     'device_info': DeviceInfoResultData;
     'get_notifications': NotificationData;
     'get_device_location': LocationData;
-    'request_bluetooth_permission': StringResultData;
+    'request_bluetooth_permission': string;
     'get_bluetooth_state': BluetoothStateData;
-    'request_enable_bluetooth': StringResultData;
+    'request_enable_bluetooth': string;
     'list_bluetooth_bonded_devices': BluetoothBondedDevicesData;
     'scan_bluetooth_devices': BluetoothScanResultData;
     'bluetooth_connect': BluetoothSessionData;
@@ -110,7 +110,7 @@ export interface ToolResultMap {
     'bluetooth_send': BluetoothTransferData;
     'bluetooth_read': BluetoothReadData;
     'bluetooth_send_and_read': BluetoothReadData;
-    'bluetooth_close': StringResultData;
+    'bluetooth_close': string;
     'bluetooth_ble_connect': BluetoothSessionData;
     'bluetooth_ble_discover_services': BluetoothBleServicesData;
     'bluetooth_ble_read_characteristic': BluetoothReadData;
@@ -138,7 +138,7 @@ export interface ToolResultMap {
 
     // UI operations
     'get_page_info': UIPageResultData;
-    'capture_screenshot': StringResultData;
+    'capture_screenshot': string;
     'click_element': UIActionResultData;
     'tap': UIActionResultData;
     'set_input_text': UIActionResultData;
@@ -188,8 +188,8 @@ export interface ToolResultMap {
     'get_workflow': WorkflowDetailResultData;
     'update_workflow': WorkflowDetailResultData;
     'patch_workflow': WorkflowDetailResultData;
-    'delete_workflow': StringResultData;
-    'trigger_workflow': StringResultData;
+    'delete_workflow': string;
+    'trigger_workflow': string;
 
     // Chat Manager operations
     'start_chat_service': ChatServiceStartResultData;

@@ -133,7 +133,7 @@ const ExtendedMemoryTools = (function () {
             tags: params.tags,
             callerCardId: resolveCallerCardId(),
         });
-        return { success: typeof result === 'string' && result.length > 0, message: '记忆创建完成', data: result };
+        return { success: result.length > 0, message: '记忆创建完成', data: result };
     }
     async function update_memory(params) {
         const result = await Tools.Memory.update({
@@ -148,14 +148,14 @@ const ExtendedMemoryTools = (function () {
             tags: params.tags,
             callerCardId: resolveCallerCardId(),
         });
-        return { success: typeof result === 'string' && result.length > 0, message: '记忆更新完成', data: result };
+        return { success: result.length > 0, message: '记忆更新完成', data: result };
     }
     async function delete_memory(params) {
         const result = await Tools.Memory.deleteMemory({
             title: params.title,
             callerCardId: resolveCallerCardId(),
         });
-        return { success: typeof result === 'string' && result.length > 0, message: '记忆删除完成', data: result };
+        return { success: result.length > 0, message: '记忆删除完成', data: result };
     }
     async function move_memory(params) {
         const titles = params.titles
@@ -167,7 +167,7 @@ const ExtendedMemoryTools = (function () {
             sourceFolderPath: params.source_folder_path,
             callerCardId: resolveCallerCardId(),
         });
-        return { success: typeof result === 'string' && result.length > 0, message: '记忆移动完成', data: result };
+        return { success: result.length > 0, message: '记忆移动完成', data: result };
     }
     async function link_memories(params) {
         const result = await Tools.Memory.link({
@@ -212,7 +212,7 @@ const ExtendedMemoryTools = (function () {
             linkType: params.link_type,
             callerCardId: resolveCallerCardId(),
         });
-        return { success: typeof result === 'string' ? result.length > 0 : !!result, message: '记忆链接删除完成', data: result };
+        return { success: result.length > 0, message: '记忆链接删除完成', data: result };
     }
     async function update_user_preferences(params) {
         const toolParams = {};
@@ -229,7 +229,7 @@ const ExtendedMemoryTools = (function () {
         if (params.ai_style !== undefined)
             toolParams.ai_style = params.ai_style;
         const result = await toolCall({ name: "update_user_preferences", params: toolParams });
-        const success = typeof result === 'string' ? result.length > 0 : !!result;
+        const success = result.length > 0;
         return { success, message: '用户偏好更新完成', data: result };
     }
     async function wrapToolExecution(func, params) {

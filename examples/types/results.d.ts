@@ -1186,7 +1186,7 @@ export interface WorkflowDetailResultData {
 }
 
 /**
- * 字符串结果数据
+ * 工具运行时内部的字符串包装；JavaScript toolCall 会收到 primitive string。
  */
 export interface StringResultData {
     /** 字符串值 */

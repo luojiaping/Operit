@@ -667,14 +667,7 @@ async function buildRecentAppUsageContent() {
     return lines.join("\n");
 }
 function extractScreenshotPath(result) {
-    if (typeof result === "string") {
-        return result.trim();
-    }
-    if (!result || typeof result !== "object") {
-        return "";
-    }
-    const value = String(result?.value || result?.path || "").trim();
-    return value;
+    return result.trim();
 }
 async function readScreenTextFromScreenshot(screenshotPath) {
     const normalizedPath = String(screenshotPath || "").trim();
