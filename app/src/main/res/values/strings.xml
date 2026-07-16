@@ -3722,6 +3722,8 @@
     <string name="chat_style_preview_title">样式预览</string>
     <string name="chat_style_preview_user_message">这是用户消息预览</string>
     <string name="chat_style_preview_ai_message">这是AI消息预览</string>
+    <string name="chat_accessibility_user_message">用户消息</string>
+    <string name="chat_accessibility_ai_reply">AI 回复</string>
     <string name="chat_style_preview_user_name">用户名称</string>
     <string name="chat_style_preview_ai_name">角色名称</string>
     <string name="chat_style_preview_ai_meta">示例模型 by 示例供应商</string>

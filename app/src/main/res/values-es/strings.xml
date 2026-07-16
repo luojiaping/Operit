@@ -3705,6 +3705,8 @@ Ahora puede usar el modo AutoGLM en la interfaz de conversación.</string>
     <string name="chat_style_preview_title">Vista previa de estilo</string>
     <string name="chat_style_preview_user_message">Esta es una vista previa del mensaje de usuario</string>
     <string name="chat_style_preview_ai_message">Esta es una vista previa del mensaje de IA</string>
+    <string name="chat_accessibility_user_message">Mensaje del usuario</string>
+    <string name="chat_accessibility_ai_reply">Respuesta de la IA</string>
     <string name="chat_style_preview_user_source_title">Vista previa de cuadrícula de 9 imágenes original del usuario</string>
     <string name="chat_style_preview_ai_source_title">Vista previa de cuadrícula de 9 imágenes original de IA</string>
     <string name="chat_style_bubble_image_saved">Imagen de burbuja guardada</string>

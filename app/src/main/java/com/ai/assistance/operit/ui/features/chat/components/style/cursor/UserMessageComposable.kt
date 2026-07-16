@@ -55,6 +55,8 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.text
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
@@ -66,6 +68,7 @@ import com.ai.assistance.operit.data.model.ChatMessageDisplayMode
 import com.ai.assistance.operit.ui.features.chat.components.attachments.AttachmentViewerDialog
 import com.ai.assistance.operit.ui.features.chat.components.attachments.ChatAttachment
 import com.ai.assistance.operit.ui.features.chat.components.style.common.HiddenUserMessagePlaceholderContent
+import com.ai.assistance.operit.ui.features.chat.components.userMessageAccessibilityHeading
 import com.ai.assistance.operit.api.chat.llmprovider.MediaLinkParser
 import com.ai.assistance.operit.ui.theme.isLiquidGlassSupported
 import com.ai.assistance.operit.ui.theme.isWaterGlassSupported
@@ -137,9 +140,13 @@ fun UserMessageComposable(
             else -> textColor
         }
 
-    Column(modifier = Modifier
-        .fillMaxWidth()
-        .padding(horizontal = 16.dp, vertical = if (isHiddenPlaceholder) 0.dp else 4.dp)) {
+    Column(
+        modifier =
+            Modifier
+                .userMessageAccessibilityHeading()
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = if (isHiddenPlaceholder) 0.dp else 4.dp)
+    ) {
         // Display reply info above attachments if present
         replyInfo?.let { reply ->
             Surface(
@@ -299,7 +306,14 @@ fun UserMessageComposable(
                         },
                         style = MaterialTheme.typography.labelSmall,
                         color = effectiveTextColor.copy(alpha = 0.7f),
-                        modifier = Modifier.padding(bottom = 8.dp)
+                        modifier =
+                            Modifier
+                                .padding(bottom = 8.dp)
+                                .clearAndSetSemantics {
+                                    proxySenderName?.let { senderName ->
+                                        text = AnnotatedString(senderName)
+                                    }
+                                },
                     )
 
                     Text(

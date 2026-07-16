@@ -3208,6 +3208,8 @@ Sekarang Anda dapat menggunakan mode AutoGLM di antarmuka percakapan.</string>
     <string name="chat_style_preview_title">Pratinjau Gaya</string>
     <string name="chat_style_preview_user_message">Ini adalah pratinjau pesan pengguna</string>
     <string name="chat_style_preview_ai_message">Ini adalah pratinjau pesan AI</string>
+    <string name="chat_accessibility_user_message">Pesan pengguna</string>
+    <string name="chat_accessibility_ai_reply">Balasan AI</string>
     <string name="chat_style_preview_user_name">Nama Pengguna</string>
     <string name="chat_style_preview_ai_name">Nama Karakter</string>
     <string name="chat_style_preview_ai_meta">Model contoh oleh penyedia contoh</string>

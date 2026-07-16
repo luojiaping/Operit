@@ -54,6 +54,7 @@ import com.ai.assistance.operit.data.preferences.UserPreferencesManager
 import com.ai.assistance.operit.ui.features.chat.components.attachments.AttachmentViewerDialog
 import com.ai.assistance.operit.ui.features.chat.components.attachments.ChatAttachment
 import com.ai.assistance.operit.ui.features.chat.components.style.common.HiddenUserMessagePlaceholderContent
+import com.ai.assistance.operit.ui.features.chat.components.userMessageAccessibilityHeading
 import com.ai.assistance.operit.api.chat.llmprovider.MediaLinkParser
 import com.ai.assistance.operit.util.ImageBitmapLimiter
 import com.ai.assistance.operit.util.ImagePoolManager
@@ -220,6 +221,7 @@ fun BubbleUserMessageComposable(
     MaterialTheme(typography = bubbleTypography) {
     Column(
         modifier = Modifier
+            .userMessageAccessibilityHeading()
             .fillMaxWidth()
             .padding(horizontal = 0.dp, vertical = if (isHiddenPlaceholder) 0.dp else 4.dp)
     ) {
@@ -378,7 +380,7 @@ fun BubbleUserMessageComposable(
                         if (!avatarUri.isNullOrEmpty()) {
                             Image(
                                 painter = rememberAsyncImagePainter(model = Uri.parse(avatarUri)),
-                                contentDescription = "User Avatar",
+                                contentDescription = null,
                                 modifier = Modifier
                                     .size(32.dp)
                                     .clip(avatarShape),
@@ -387,7 +389,7 @@ fun BubbleUserMessageComposable(
                         } else {
                             Icon(
                                 imageVector = if (isProxySender) Icons.Default.Assistant else Icons.Default.Person,
-                                contentDescription = "User Avatar",
+                                contentDescription = null,
                                 modifier = Modifier
                                     .size(32.dp)
                                     .clip(avatarShape),
@@ -659,7 +661,7 @@ fun BubbleUserMessageComposable(
                 if (!avatarUri.isNullOrEmpty()) {
                     Image(
                         painter = rememberAsyncImagePainter(model = Uri.parse(avatarUri)),
-                        contentDescription = "User Avatar",
+                        contentDescription = null,
                         modifier = Modifier
                             .size(32.dp)
                             .clip(avatarShape),
@@ -668,7 +670,7 @@ fun BubbleUserMessageComposable(
                 } else {
                     Icon(
                         imageVector = if (isProxySender) Icons.Default.Assistant else Icons.Default.Person,
-                        contentDescription = "User Avatar",
+                        contentDescription = null,
                         modifier = Modifier
                             .size(32.dp)
                             .clip(avatarShape),

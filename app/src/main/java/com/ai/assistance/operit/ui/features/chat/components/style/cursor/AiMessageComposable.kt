@@ -15,10 +15,12 @@ import com.ai.assistance.operit.ui.common.markdown.StreamMarkdownRendererState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.dp
 import com.ai.assistance.operit.data.model.ChatMessage
 import com.ai.assistance.operit.ui.common.markdown.StreamMarkdownRenderer
 import com.ai.assistance.operit.ui.features.chat.components.ChatMessageHeightMemory
+import com.ai.assistance.operit.ui.features.chat.components.aiReplyAccessibilityHeading
 import com.ai.assistance.operit.ui.features.chat.components.rememberRevisableTextStream
 import com.ai.assistance.operit.ui.features.chat.components.part.CustomXmlRenderer
 import com.ai.assistance.operit.ui.features.chat.components.part.ThinkToolsXmlNodeGrouper
@@ -119,6 +121,7 @@ fun AiMessageComposable(
         Column(
             modifier =
                 Modifier
+                    .aiReplyAccessibilityHeading()
                     .fillMaxWidth()
                     .padding(vertical = 2.dp)
                     .onSizeChanged { size ->
@@ -137,7 +140,8 @@ fun AiMessageComposable(
             Text(
                 text = "Response",
                 style = MaterialTheme.typography.labelSmall,
-                color = textColor.copy(alpha = 0.7f)
+                color = textColor.copy(alpha = 0.7f),
+                modifier = Modifier.clearAndSetSemantics {},
             )
             
             // 右侧：详细信息（角色名、模型信息）

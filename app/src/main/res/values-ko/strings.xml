@@ -3351,6 +3351,8 @@
     <string name="chat_style_preview_title">스타일 미리보기</string>
     <string name="chat_style_preview_user_message">사용자 메시지 미리보기입니다.</string>
     <string name="chat_style_preview_ai_message">AI 메시지 미리보기입니다.</string>
+    <string name="chat_accessibility_user_message">사용자 메시지</string>
+    <string name="chat_accessibility_ai_reply">AI 답변</string>
     <string name="chat_style_preview_user_name">사용자 이름</string>
     <string name="chat_style_preview_ai_name">역할 이름</string>
     <string name="chat_style_preview_ai_meta">샘플 제공자의 샘플 모델</string>

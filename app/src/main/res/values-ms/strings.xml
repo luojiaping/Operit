@@ -3456,6 +3456,8 @@ Kini anda boleh menggunakan mod AutoGLM di antara muka perbualan.</string>
     <string name="chat_style_preview_title">Pratonton Gaya</string>
     <string name="chat_style_preview_user_message">Ini adalah pratonton mesej pengguna</string>
     <string name="chat_style_preview_ai_message">Ini adalah pratonton mesej AI</string>
+    <string name="chat_accessibility_user_message">Mesej pengguna</string>
+    <string name="chat_accessibility_ai_reply">Balasan AI</string>
 
     <string name="must_be_float">Mesti nombor perpuluhan</string>
     <string name="must_be_valid_json">Mesti JSON yang sah</string>

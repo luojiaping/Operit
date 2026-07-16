@@ -67,6 +67,8 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.hideFromAccessibility
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -625,6 +627,13 @@ private fun MessageItem(
                         shape = RoundedCornerShape(8.dp)
                     )
                 } else Modifier
+            )
+            .then(
+                if (isHidden) {
+                    Modifier.semantics { hideFromAccessibility() }
+                } else {
+                    Modifier
+                }
             )
             .combinedClickable(
                 interactionSource = messageInteractionSource,

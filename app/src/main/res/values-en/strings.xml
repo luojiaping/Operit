@@ -3776,6 +3776,8 @@
     <string name="chat_style_preview_title">Style preview</string>
     <string name="chat_style_preview_user_message">This is a user message preview</string>
     <string name="chat_style_preview_ai_message">This is an AI message preview</string>
+    <string name="chat_accessibility_user_message">User message</string>
+    <string name="chat_accessibility_ai_reply">AI reply</string>
     <string name="chat_style_preview_user_name">User Name</string>
     <string name="chat_style_preview_ai_name">Role Name</string>
     <string name="chat_style_preview_ai_meta">Sample Model by Sample Provider</string>

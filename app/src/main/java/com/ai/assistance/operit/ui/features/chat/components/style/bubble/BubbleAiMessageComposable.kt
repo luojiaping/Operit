@@ -28,11 +28,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.dp
 import com.ai.assistance.operit.data.model.ChatMessage
 import com.ai.assistance.operit.ui.common.markdown.StreamMarkdownRenderer
 import com.ai.assistance.operit.ui.common.markdown.StreamMarkdownRendererState
 import com.ai.assistance.operit.ui.features.chat.components.ChatMessageHeightMemory
+import com.ai.assistance.operit.ui.features.chat.components.aiReplyAccessibilityHeading
 import com.ai.assistance.operit.ui.features.chat.components.rememberRevisableTextStream
 import com.ai.assistance.operit.ui.features.chat.components.part.CustomXmlRenderer
 import com.ai.assistance.operit.ui.features.chat.components.part.ThinkToolsXmlNodeGrouper
@@ -275,6 +277,7 @@ fun BubbleAiMessageComposable(
         val avatarModifier = Modifier
             .size(32.dp)
             .clip(avatarShape)
+            .clearAndSetSemantics {}
             .combinedClickable(
                 onClick = {},
                 onLongClick = {
@@ -287,6 +290,7 @@ fun BubbleAiMessageComposable(
 
         Column(
             modifier = Modifier
+                .aiReplyAccessibilityHeading()
                 .fillMaxWidth()
                 .padding(
                     start = if (bubbleShowAvatar) 0.dp else 8.dp,
@@ -307,14 +311,14 @@ fun BubbleAiMessageComposable(
                         if (!aiAvatarUri.isNullOrEmpty()) {
                             Image(
                                 painter = rememberAsyncImagePainter(model = Uri.parse(aiAvatarUri)),
-                                contentDescription = "AI Avatar",
+                                contentDescription = null,
                                 modifier = avatarModifier,
                                 contentScale = androidx.compose.ui.layout.ContentScale.Crop,
                             )
                         } else {
                             Icon(
                                 imageVector = Icons.Default.Assistant,
-                                contentDescription = "AI Avatar",
+                                contentDescription = null,
                                 modifier = avatarModifier,
                                 tint = MaterialTheme.colorScheme.secondary,
                             )
@@ -473,6 +477,7 @@ fun BubbleAiMessageComposable(
     } else {
     Row(
         modifier = Modifier
+            .aiReplyAccessibilityHeading()
             .padding(horizontal = 0.dp, vertical = 4.dp)
             .then(sizeTrackingModifier)
             .alpha(alpha)
@@ -484,6 +489,7 @@ fun BubbleAiMessageComposable(
             val avatarModifier = Modifier
                 .size(32.dp)
                 .clip(avatarShape)
+                .clearAndSetSemantics {}
                 .combinedClickable(
                     onClick = {},
                     onLongClick = {
@@ -497,14 +503,14 @@ fun BubbleAiMessageComposable(
             if (!aiAvatarUri.isNullOrEmpty()) {
                 Image(
                     painter = rememberAsyncImagePainter(model = Uri.parse(aiAvatarUri)),
-                    contentDescription = "AI Avatar",
+                    contentDescription = null,
                     modifier = avatarModifier,
                     contentScale = androidx.compose.ui.layout.ContentScale.Crop
                 )
             } else {
                 Icon(
                     imageVector = Icons.Default.Assistant,
-                    contentDescription = "AI Avatar",
+                    contentDescription = null,
                     modifier = avatarModifier,
                     tint = MaterialTheme.colorScheme.secondary
                 )

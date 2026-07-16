@@ -3215,6 +3215,8 @@ Agora é possível usar o modo AutoGLM na interface de diálogo.</string>
     <string name="chat_style_preview_title">Visualização de estilo</string>
     <string name="chat_style_preview_user_message">Esta é uma visualização da mensagem do usuário</string>
     <string name="chat_style_preview_ai_message">Esta é uma prévia das mensagens de IA</string>
+    <string name="chat_accessibility_user_message">Mensagem do usuário</string>
+    <string name="chat_accessibility_ai_reply">Resposta da IA</string>
     <string name="chat_style_preview_user_name">Nome de usuário</string>
     <string name="chat_style_preview_ai_name">Nome do personagem</string>
     <string name="chat_style_preview_ai_meta">Modelo de amostra por fornecedor de amostra</string>
