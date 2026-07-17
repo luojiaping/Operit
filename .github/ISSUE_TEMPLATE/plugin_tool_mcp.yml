@@ -75,7 +75,7 @@ body:
     id: transport_config
     attributes:
       label: 连接与相关配置 / Transport and configuration
-      description: MCP 请填写 transport 类型、请求方法和必要的非敏感配置；普通插件或 Skill 请说明“不适用”。
+      description: MCP 请填写 transport 类型、请求方法和必要的非敏感配置；普通插件或 Skill 请说明“不适用”。不相关内容可忽略或仅文字补充。 / Ignore unrelated details; text-only is fine.
       placeholder: |
         Transport / 连接类型：
         相关开关或非敏感配置：
@@ -87,7 +87,7 @@ body:
     id: tool_context
     attributes:
       label: Provider、模型与工具 / Provider, model and tool
-      description: 请填写相关 Provider、模型、工具名、工具调用模式或工作流节点；不相关时说明“不适用”。
+      description: 请填写相关 Provider、模型、工具名、工具调用模式或工作流节点；不相关时说明“不适用”。不相关内容可忽略或仅文字补充。 / Ignore unrelated details; text-only is fine.
     validations:
       required: true
 
@@ -104,17 +104,10 @@ body:
       required: true
 
   - type: textarea
-    id: actual
+    id: main_problem
     attributes:
-      label: 实际表现 / Actual behavior
-      description: 请粘贴错误文本或描述工具返回结果。
-    validations:
-      required: true
-
-  - type: textarea
-    id: expected
-    attributes:
-      label: 预期表现 / Expected behavior
+      label: 主要问题描述 / Main problem description
+      description: 请将实际表现、预期表现、差异和影响合并描述；只用文字即可。 / Combine actual behavior, expected behavior, differences, and impact; text-only is fine.
     validations:
       required: true
 
@@ -122,7 +115,7 @@ body:
     id: evidence
     attributes:
       label: 截图或录屏 / Screenshot or recording
-      description: 请至少上传一张能说明配置、错误或结果的截图，或粘贴录屏链接。
+      description: 请至少上传一张能说明配置、错误或结果的截图，或粘贴录屏链接；也可以忽略上传，直接用文字补充。 / Please add a screenshot or recording link; you may skip the upload and provide text only.
       placeholder: 将截图拖到这里，或粘贴图片/录屏链接
     validations:
       required: true
@@ -131,7 +124,7 @@ body:
     id: logs
     attributes:
       label: 日志、请求或响应 / Logs, request or response
-      description: 请粘贴相关日志或脱敏后的请求/响应；无法获取时请说明原因。
+      description: 可忽略，或仅粘贴文字、请求/响应或说明原因。 / Optional; text-only details are fine. Please redact sensitive data.
       placeholder: |
         ```text
         在这里粘贴日志、请求或响应

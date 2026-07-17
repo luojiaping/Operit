@@ -79,7 +79,7 @@ body:
     id: related_context
     attributes:
       label: 相关配置 / Related context
-      description: 请填写 Provider、模型、工具、插件或相关开关；不相关时说明“不适用”。
+      description: 请填写 Provider、模型、工具、插件或相关开关；不相关内容可忽略或说明“不适用”。 / Ignore unrelated details; text-only is fine.
     validations:
       required: true
 
@@ -95,7 +95,7 @@ body:
     id: evidence
     attributes:
       label: 截图或参考图 / Screenshot or reference
-      description: 请至少上传一张能说明当前状态的截图，或粘贴相关参考图链接。
+      description: 请至少上传一张能说明当前状态的截图，或粘贴相关参考图链接；也可以忽略图片，直接用文字补充。 / Please add a screenshot or reference link; you may skip the image and provide text only.
       placeholder: 将截图拖到这里，或粘贴图片链接
     validations:
       required: true

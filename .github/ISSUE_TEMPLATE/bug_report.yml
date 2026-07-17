@@ -75,18 +75,10 @@ body:
       required: true
 
   - type: textarea
-    id: description
+    id: main_problem
     attributes:
-      label: 实际表现 / What happened
-      description: 清楚描述发生了什么，包括错误文本或异常结果。
-    validations:
-      required: true
-
-  - type: textarea
-    id: expected
-    attributes:
-      label: 预期表现 / Expected behavior
-      description: 你原本期望系统如何工作？
+      label: 主要问题描述 / Main problem description
+      description: 请将实际表现、预期表现、差异和影响合并描述；只用文字即可。 / Combine actual behavior, expected behavior, differences, and impact; text-only is fine.
     validations:
       required: true
 
@@ -120,7 +112,7 @@ body:
     id: related_context
     attributes:
       label: 相关配置 / Related context
-      description: 模型问题请填写 Provider、模型、接口类型和思考/工具调用设置；工具问题请填写工具名；不相关时说明“不适用”。
+      description: 模型问题请填写 Provider、模型、接口类型和思考/工具调用设置；工具问题请填写工具名；不相关内容可忽略或说明“不适用”。 / Ignore unrelated details; text-only is fine.
       placeholder: |
         Provider / 模型：
         接口类型或相关开关：
@@ -133,7 +125,7 @@ body:
     id: evidence
     attributes:
       label: 截图或录屏 / Screenshot or recording
-      description: 请至少上传一张能说明问题的截图，或粘贴录屏链接。截图不能替代上面的文字信息。
+      description: 请至少上传一张能说明问题的截图，或粘贴录屏链接；也可以忽略上传，直接用文字补充。 / Please add a screenshot or recording link; you may skip the upload and provide text only.
       placeholder: 将截图拖到这里，或粘贴图片/录屏链接
     validations:
       required: true
@@ -142,7 +134,7 @@ body:
     id: logs
     attributes:
       label: 日志或错误信息 / Logs or error output
-      description: 请粘贴相关日志、完整错误文本或堆栈；无法获取时请说明原因。提交前请脱敏。
+      description: 可忽略，或仅粘贴文字、错误文本或说明原因。 / Optional; text-only details are fine. Please redact sensitive data.
       placeholder: |
         ```text
         在这里粘贴日志或错误信息

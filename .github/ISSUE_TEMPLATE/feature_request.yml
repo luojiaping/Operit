@@ -99,7 +99,7 @@ body:
     id: evidence
     attributes:
       label: 截图、草图或参考图 / Screenshot, mockup or reference
-      description: 请至少上传一张截图、草图或参考图，帮助说明期望效果。
+      description: 请至少上传一张截图、草图或参考图；也可以忽略图片，直接用文字补充。 / Please add a screenshot, mockup or reference; you may skip the image and provide text only.
       placeholder: 将图片拖到这里，或粘贴图片/参考链接
     validations:
       required: true
@@ -108,4 +108,4 @@ body:
     id: alternatives
     attributes:
       label: 替代方案与补充信息 / Alternatives and context
-      description: 当前如何绕过这个问题？是否有相关 Issue、实现建议或参考链接？
+      description: 可忽略，或仅用文字补充当前绕过方式、相关 Issue、实现建议或参考链接。 / Optional; text-only details are fine.
