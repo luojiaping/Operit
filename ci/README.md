@@ -10,10 +10,12 @@
 python3 ci/script/check_repo_hygiene.py
 python3 ci/script/check_markdown_links.py
 python3 ci/script/check_localizations.py
+npm --prefix web-chat install --no-audit --no-fund
 npm --prefix web-chat run typecheck
 ```
 
 CI 在 PR 中会使用目标分支和 PR head 的 commit 对比，只检查本次改动相关的文件；不传 commit 参数时，脚本检查当前工作树。
+字符串资源工具的用途和写入行为见 [tools/string README](../tools/string/README.md)。
 
 ## CI layers
 
