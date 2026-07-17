@@ -15,7 +15,7 @@ import type {
   WebUploadedAttachment
 } from './chatTypes';
 
-type JsonValue = Record<string, unknown> | unknown[] | null;
+type JsonValue = object | null;
 
 export class ApiError extends Error {
   status: number;

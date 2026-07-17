@@ -37,30 +37,30 @@ jobs:
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           BEFORE_SHA: ${{ github.event.before }}
-          HEAD_SHA: ${{ github.sha }}
+          CURRENT_SHA: ${{ github.sha }}
         shell: bash
         run: |
           set -euo pipefail
 
           case "$EVENT_NAME" in
             pull_request)
-              base_sha="$PR_BASE_SHA"
-              head_sha="$PR_HEAD_SHA"
+              resolved_base_sha="$PR_BASE_SHA"
+              resolved_head_sha="$PR_HEAD_SHA"
               ;;
             workflow_dispatch)
-              base_sha=""
-              head_sha="$HEAD_SHA"
+              resolved_base_sha=""
+              resolved_head_sha="$CURRENT_SHA"
               ;;
             *)
-              base_sha="$BEFORE_SHA"
-              head_sha="$HEAD_SHA"
+              resolved_base_sha="$BEFORE_SHA"
+              resolved_head_sha="$CURRENT_SHA"
               ;;
           esac
 
-          if [[ -z "$base_sha" || "$base_sha" =~ ^0+$ ]]; then
+          if [[ -z "$resolved_base_sha" || "$resolved_base_sha" =~ ^0+$ ]]; then
             changed_files="$(git ls-files)"
           else
-            changed_files="$(git diff --name-only "$base_sha" "$head_sha")"
+            changed_files="$(git diff --name-only "$resolved_base_sha" "$resolved_head_sha")"
           fi
 
           android=false
@@ -86,16 +86,14 @@ jobs:
                 localization=true
                 ;;
             esac
-            case "$path" in
-              *.md|*.mdx|docs/*|ci/README.md)
-                docs=true
-                ;;
-            esac
+            if [[ "$path" == *.md || "$path" == *.mdx || "$path" == docs/* ]]; then
+              docs=true
+            fi
           done <<< "$changed_files"
 
           {
-            echo "base_sha=$base_sha"
-            echo "head_sha=$head_sha"
+            echo "base_sha=$resolved_base_sha"
+            echo "head_sha=$resolved_head_sha"
             echo "android=$android"
             echo "localization=$localization"
             echo "web=$web"
