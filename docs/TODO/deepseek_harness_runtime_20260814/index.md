@@ -40,4 +40,3 @@ status: in_progress
 - 静态确认 Runtime 固定 `@deepseek-ai/dsh@0.1.0-rc.6`、监听 `127.0.0.1`，且 WebView 不暴露原生桥。
 - 静态确认示例被 ToolPkg 打包器识别为独立 TypeScript ToolPkg。
 - 未运行编译、构建或设备测试，遵守本任务的执行约束。
-
