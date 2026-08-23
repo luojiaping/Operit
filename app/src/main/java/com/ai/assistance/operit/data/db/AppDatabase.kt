@@ -6,12 +6,17 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.ai.assistance.operit.data.dao.AgentExecutionDao
 import com.ai.assistance.operit.data.dao.ChatContentDao
 import com.ai.assistance.operit.data.dao.ChatDao
 import com.ai.assistance.operit.data.dao.MessageDao
 import com.ai.assistance.operit.data.dao.MessageVariantDao
 import com.ai.assistance.operit.data.dao.TokenUsageDao
 import com.ai.assistance.operit.data.model.ChatEntity
+import com.ai.assistance.operit.data.model.AgentMessageOwnerEntity
+import com.ai.assistance.operit.data.model.AgentRunEntity
+import com.ai.assistance.operit.data.model.AgentSessionEntity
+import com.ai.assistance.operit.data.model.AgentToolCallEntity
 import com.ai.assistance.operit.data.model.MessageEntity
 import com.ai.assistance.operit.data.model.MessageVariantEntity
 import com.ai.assistance.operit.data.model.TokenStatsModelEntity
@@ -22,11 +27,15 @@ import com.ai.assistance.operit.data.model.TokenUsageRecordEntity
         ChatEntity::class,
         MessageEntity::class,
         MessageVariantEntity::class,
+        AgentSessionEntity::class,
+        AgentRunEntity::class,
+        AgentToolCallEntity::class,
+        AgentMessageOwnerEntity::class,
         TokenUsageRecordEntity::class,
         TokenStatsModelEntity::class,
     ],
-    version = 21,
-    exportSchema = false
+    version = 22,
+    exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
     /** 获取聊天DAO */
@@ -35,6 +44,7 @@ abstract class AppDatabase : RoomDatabase() {
     /** 获取消息DAO */
     abstract fun messageDao(): MessageDao
     abstract fun messageVariantDao(): MessageVariantDao
+    abstract fun agentExecutionDao(): AgentExecutionDao
     abstract fun chatContentDao(): ChatContentDao
     abstract fun tokenUsageDao(): TokenUsageDao
 
@@ -332,6 +342,308 @@ abstract class AppDatabase : RoomDatabase() {
                 }
             }
 
+        /** v21 -> v22: normalize published v21 token schemas and add Agent records. */
+        private val MIGRATION_21_22 =
+            object : Migration(21, 22) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    migrateTokenUsageRecords(
+                        db.tokenUsageRecordColumns()
+                    ) { sql -> db.execSQL(sql) }
+                    runSql { db.execSQL(it) }
+                }
+
+                override fun migrate(connection: androidx.sqlite.SQLiteConnection) {
+                    migrateTokenUsageRecords(
+                        connection.tokenUsageRecordColumns()
+                    ) { sql ->
+                        val statement = connection.prepare(sql)
+                        try {
+                            statement.step()
+                        } finally {
+                            statement.close()
+                        }
+                    }
+                    runSql { sql ->
+                        val statement = connection.prepare(sql)
+                        try {
+                            statement.step()
+                        } finally {
+                            statement.close()
+                        }
+                    }
+                }
+
+                private fun SupportSQLiteDatabase.tokenUsageRecordColumns(): Set<String> {
+                    val columns = linkedSetOf<String>()
+                    query("PRAGMA table_info(`token_usage_records`)").use { cursor ->
+                        val nameIndex = cursor.getColumnIndexOrThrow("name")
+                        while (cursor.moveToNext()) {
+                            columns += cursor.getString(nameIndex)
+                        }
+                    }
+                    return columns
+                }
+
+                private fun androidx.sqlite.SQLiteConnection.tokenUsageRecordColumns(): Set<String> {
+                    val columns = linkedSetOf<String>()
+                    val statement = prepare("PRAGMA table_info(`token_usage_records`)")
+                    try {
+                        while (statement.step()) {
+                            columns += statement.getText(1)
+                        }
+                    } finally {
+                        statement.close()
+                    }
+                    return columns
+                }
+
+                private fun migrateTokenUsageRecords(
+                    columns: Set<String>,
+                    exec: (String) -> Unit,
+                ) {
+                    val tableExists = columns.isNotEmpty()
+                    if (tableExists) {
+                        TOKEN_USAGE_INDEX_NAMES.forEach { indexName ->
+                            exec("DROP INDEX IF EXISTS `$indexName`")
+                        }
+                        exec(
+                            "ALTER TABLE `token_usage_records` " +
+                                "RENAME TO `token_usage_records_v21_legacy`"
+                        )
+                    }
+
+                    exec(
+                        """
+                        CREATE TABLE `token_usage_records` (
+                            `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                            `importKey` TEXT,
+                            `occurredAtMs` INTEGER,
+                            `configId` TEXT NOT NULL,
+                            `provider` TEXT NOT NULL,
+                            `model` TEXT NOT NULL,
+                            `requestCount` INTEGER NOT NULL,
+                            `uncachedInputTokens` INTEGER,
+                            `cachedInputTokens` INTEGER,
+                            `cacheWriteTokens` INTEGER,
+                            `totalInputTokens` INTEGER,
+                            `outputTokens` INTEGER
+                        )
+                        """.trimIndent()
+                    )
+
+                    if (tableExists) {
+                        val importKey = legacyColumn(columns, "importKey", "legacy.`importKey`", "NULL")
+                        val occurredAtMs = legacyColumn(columns, "occurredAtMs", "legacy.`occurredAtMs`", "NULL")
+                        val configId = legacyColumn(columns, "configId", "COALESCE(legacy.`configId`, '')", "''")
+                        val provider = legacyColumn(columns, "provider", "COALESCE(legacy.`provider`, '')", "''")
+                        val model = legacyColumn(columns, "model", "COALESCE(legacy.`model`, '')", "''")
+                        val requestCount = legacyColumn(
+                            columns,
+                            "requestCount",
+                            "COALESCE(legacy.`requestCount`, 1)",
+                            "1"
+                        )
+                        val uncachedInputTokens = legacyColumn(
+                            columns,
+                            "uncachedInputTokens",
+                            "legacy.`uncachedInputTokens`",
+                            "NULL"
+                        )
+                        val cachedInputTokens = legacyColumn(
+                            columns,
+                            "cachedInputTokens",
+                            "legacy.`cachedInputTokens`",
+                            "NULL"
+                        )
+                        val cacheWriteTokens = legacyColumn(
+                            columns,
+                            "cacheWriteTokens",
+                            "legacy.`cacheWriteTokens`",
+                            "NULL"
+                        )
+                        val totalInputTokens = legacyColumn(
+                            columns,
+                            "totalInputTokens",
+                            "legacy.`totalInputTokens`",
+                            "NULL"
+                        )
+                        val outputTokens = legacyColumn(
+                            columns,
+                            "outputTokens",
+                            "legacy.`outputTokens`",
+                            "NULL"
+                        )
+                        val id = legacyColumn(columns, "id", "legacy.`id`", "NULL")
+                        exec(
+                            """
+                            INSERT INTO `token_usage_records` (
+                                `id`, `importKey`, `occurredAtMs`, `configId`, `provider`, `model`,
+                                `requestCount`, `uncachedInputTokens`, `cachedInputTokens`,
+                                `cacheWriteTokens`, `totalInputTokens`, `outputTokens`
+                            )
+                            SELECT
+                                $id, $importKey, $occurredAtMs, $configId, $provider, $model,
+                                $requestCount, $uncachedInputTokens, $cachedInputTokens,
+                                $cacheWriteTokens, $totalInputTokens, $outputTokens
+                            FROM `token_usage_records_v21_legacy` AS legacy
+                            """.trimIndent()
+                        )
+                        exec("DROP TABLE `token_usage_records_v21_legacy`")
+                    }
+
+                    exec(
+                        "CREATE INDEX `index_token_usage_records_occurredAtMs` " +
+                            "ON `token_usage_records` (`occurredAtMs`)"
+                    )
+                    exec(
+                        "CREATE INDEX `index_token_usage_records_provider_model_configId_occurredAtMs` " +
+                            "ON `token_usage_records` " +
+                            "(`provider`, `model`, `configId`, `occurredAtMs`)"
+                    )
+                    exec(
+                        "CREATE UNIQUE INDEX `index_token_usage_records_importKey` " +
+                            "ON `token_usage_records` (`importKey`)"
+                    )
+                }
+
+                private fun legacyColumn(
+                    columns: Set<String>,
+                    name: String,
+                    presentExpression: String,
+                    absentExpression: String,
+                ): String = if (name in columns) presentExpression else absentExpression
+
+                private val TOKEN_USAGE_INDEX_NAMES =
+                    listOf(
+                        "index_token_usage_records_occurredAtMs",
+                        "index_token_usage_records_provider_model_configId_occurredAtMs",
+                        "index_token_usage_records_source_occurredAtMs",
+                        "index_token_usage_records_category_status_occurredAtMs",
+                        "index_token_usage_records_importKey",
+                    )
+
+                private fun runSql(exec: (String) -> Unit) {
+                    exec(
+                        """
+                        CREATE TABLE IF NOT EXISTS `agent_sessions` (
+                            `sessionId` TEXT NOT NULL,
+                            `chatId` TEXT NOT NULL,
+                            `pluginId` TEXT NOT NULL,
+                            `agentId` TEXT NOT NULL,
+                            `displayName` TEXT NOT NULL,
+                            `profileVersion` TEXT NOT NULL,
+                            `mode` TEXT NOT NULL,
+                            `parentSessionId` TEXT,
+                            `depth` INTEGER NOT NULL,
+                            `status` TEXT NOT NULL,
+                            `createdAt` INTEGER NOT NULL,
+                            `startedAt` INTEGER,
+                            `finishedAt` INTEGER,
+                            `updatedAt` INTEGER NOT NULL,
+                            PRIMARY KEY(`sessionId`),
+                            FOREIGN KEY(`chatId`) REFERENCES `chats`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
+                        )
+                        """.trimIndent()
+                    )
+                    exec("CREATE INDEX IF NOT EXISTS `index_agent_sessions_chatId` ON `agent_sessions` (`chatId`)")
+                    exec(
+                        "CREATE INDEX IF NOT EXISTS `index_agent_sessions_parentSessionId` " +
+                            "ON `agent_sessions` (`parentSessionId`)"
+                    )
+                    exec(
+                        "CREATE INDEX IF NOT EXISTS `index_agent_sessions_chatId_updatedAt` " +
+                            "ON `agent_sessions` (`chatId`, `updatedAt`)"
+                    )
+                    exec(
+                        """
+                        CREATE TABLE IF NOT EXISTS `agent_runs` (
+                            `runId` TEXT NOT NULL,
+                            `sessionId` TEXT NOT NULL,
+                            `parentRunId` TEXT,
+                            `parentMessageId` INTEGER,
+                            `promptSnapshot` TEXT NOT NULL,
+                            `modelSnapshotJson` TEXT NOT NULL,
+                            `permissionSnapshotJson` TEXT NOT NULL,
+                            `status` TEXT NOT NULL,
+                            `summary` TEXT,
+                            `errorMessage` TEXT,
+                            `createdAt` INTEGER NOT NULL,
+                            `startedAt` INTEGER,
+                            `finishedAt` INTEGER,
+                            `updatedAt` INTEGER NOT NULL,
+                            PRIMARY KEY(`runId`),
+                            FOREIGN KEY(`sessionId`) REFERENCES `agent_sessions`(`sessionId`) ON UPDATE NO ACTION ON DELETE CASCADE
+                        )
+                        """.trimIndent()
+                    )
+                    exec("CREATE INDEX IF NOT EXISTS `index_agent_runs_sessionId` ON `agent_runs` (`sessionId`)")
+                    exec("CREATE INDEX IF NOT EXISTS `index_agent_runs_parentRunId` ON `agent_runs` (`parentRunId`)")
+                    exec(
+                        "CREATE INDEX IF NOT EXISTS `index_agent_runs_parentMessageId` " +
+                            "ON `agent_runs` (`parentMessageId`)"
+                    )
+                    exec(
+                        "CREATE INDEX IF NOT EXISTS `index_agent_runs_sessionId_updatedAt` " +
+                            "ON `agent_runs` (`sessionId`, `updatedAt`)"
+                    )
+                    exec(
+                        """
+                        CREATE TABLE IF NOT EXISTS `agent_tool_calls` (
+                            `callId` TEXT NOT NULL,
+                            `runId` TEXT NOT NULL,
+                            `parentCallId` TEXT,
+                            `sequence` INTEGER NOT NULL,
+                            `toolName` TEXT NOT NULL,
+                            `parametersJson` TEXT NOT NULL,
+                            `status` TEXT NOT NULL,
+                            `resultText` TEXT,
+                            `errorMessage` TEXT,
+                            `startedAt` INTEGER,
+                            `finishedAt` INTEGER,
+                            `updatedAt` INTEGER NOT NULL,
+                            PRIMARY KEY(`callId`),
+                            FOREIGN KEY(`runId`) REFERENCES `agent_runs`(`runId`) ON UPDATE NO ACTION ON DELETE CASCADE
+                        )
+                        """.trimIndent()
+                    )
+                    exec("CREATE INDEX IF NOT EXISTS `index_agent_tool_calls_runId` ON `agent_tool_calls` (`runId`)")
+                    exec(
+                        "CREATE INDEX IF NOT EXISTS `index_agent_tool_calls_parentCallId` " +
+                            "ON `agent_tool_calls` (`parentCallId`)"
+                    )
+                    exec(
+                        "CREATE INDEX IF NOT EXISTS `index_agent_tool_calls_runId_sequence` " +
+                            "ON `agent_tool_calls` (`runId`, `sequence`)"
+                    )
+                    exec(
+                        """
+                        CREATE TABLE IF NOT EXISTS `agent_message_owners` (
+                            `messageId` INTEGER NOT NULL,
+                            `chatId` TEXT NOT NULL,
+                            `pluginId` TEXT NOT NULL,
+                            `agentId` TEXT NOT NULL,
+                            `agentSessionId` TEXT NOT NULL,
+                            PRIMARY KEY(`messageId`),
+                            FOREIGN KEY(`chatId`) REFERENCES `chats`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE,
+                            FOREIGN KEY(`messageId`) REFERENCES `messages`(`messageId`) ON UPDATE NO ACTION ON DELETE CASCADE
+                        )
+                        """.trimIndent()
+                    )
+                    exec(
+                        "CREATE INDEX IF NOT EXISTS `index_agent_message_owners_chatId` " +
+                            "ON `agent_message_owners` (`chatId`)"
+                    )
+                    exec(
+                        "CREATE INDEX IF NOT EXISTS `index_agent_message_owners_agentSessionId` " +
+                            "ON `agent_message_owners` (`agentSessionId`)"
+                    )
+                    exec(
+                        "CREATE INDEX IF NOT EXISTS `index_agent_message_owners_chatId_agentSessionId` " +
+                            "ON `agent_message_owners` (`chatId`, `agentSessionId`)"
+                    )
+                }
+            }
+
         // 定义从版本2到3的迁移
         private val MIGRATION_2_3 =
             object : Migration(2, 3) {
@@ -449,7 +761,8 @@ abstract class AppDatabase : RoomDatabase() {
                                 MIGRATION_17_18,
                                 MIGRATION_18_19,
                                 MIGRATION_19_20,
-                                MIGRATION_20_21
+                                MIGRATION_20_21,
+                                MIGRATION_21_22
                             ) // 添加新的迁移
                             .build()
                     INSTANCE = instance
