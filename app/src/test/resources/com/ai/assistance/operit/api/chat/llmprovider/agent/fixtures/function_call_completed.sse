@@ -1,0 +1,5 @@
+data: {"type":"response.output_item.added","output_index":0,"item":{"type":"function_call","call_id":"call_server_1","name":"read_file"}}
+
+data: {"type":"response.function_call_arguments.done","output_index":0,"arguments":"{\"path\":\"/tmp/a\"}"}
+
+data: {"type":"response.completed","response":{"status":"completed"}}

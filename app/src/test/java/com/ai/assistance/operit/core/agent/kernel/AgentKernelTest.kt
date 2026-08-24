@@ -244,7 +244,7 @@ private class RecordingModelClient(
     }
 }
 
-private class RecordingKernelStore : AgentKernelStore {
+internal class RecordingKernelStore : AgentKernelStore {
     var active = false
     var completedRequest: AgentRunCompleteRequest? = null
     var failedRequest: AgentRunFailRequest? = null
@@ -422,7 +422,7 @@ private class RecordingKernelStore : AgentKernelStore {
     }
 }
 
-private class IncrementingClock : AgentKernelClock {
+internal class IncrementingClock : AgentKernelClock {
     private var value = 1_000L
 
     override fun now(): Long {
