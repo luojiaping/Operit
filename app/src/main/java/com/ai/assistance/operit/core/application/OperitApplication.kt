@@ -23,6 +23,7 @@ import java.util.concurrent.TimeUnit
 import com.ai.assistance.operit.BuildConfig
 import com.ai.assistance.operit.R
 import com.ai.assistance.operit.core.chat.AIMessageManager
+import com.ai.assistance.operit.core.agent.runtime.AgentRuntimeStartupCoordinator
 import com.ai.assistance.operit.api.chat.AIForegroundService
 import com.ai.assistance.operit.api.chat.library.MemoryAutoSaveScheduler
 import com.ai.assistance.operit.plugins.PluginRegistry
@@ -45,6 +46,7 @@ import com.ai.assistance.operit.data.preferences.initAndroidPermissionPreference
 import com.ai.assistance.operit.data.preferences.initUserPreferencesManager
 import com.ai.assistance.operit.data.preferences.preferencesManager
 import com.ai.assistance.operit.data.repository.CustomEmojiRepository
+import com.ai.assistance.operit.data.repository.AgentExecutionRepository
 import com.ai.assistance.operit.data.stats.TokenUsageRepository
 import com.ai.assistance.operit.ui.features.chat.webview.LocalWebServer
 import com.ai.assistance.operit.ui.features.chat.webview.workspace.editor.language.LanguageFactory
@@ -100,6 +102,13 @@ class OperitApplication : Application(), ImageLoaderFactory, WorkConfiguration.P
 
     // 应用级协程作用域
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val agentRuntimeStartupCoordinator by lazy {
+        AgentRuntimeStartupCoordinator {
+            AgentExecutionRepository.getInstance(applicationContext).recoverInterruptedRuns(
+                System.currentTimeMillis()
+            )
+        }
+    }
     private var memoryAutoSaveScheduler: MemoryAutoSaveScheduler? = null
     private val mainInitializationLock = Any()
     @Volatile
@@ -164,6 +173,9 @@ class OperitApplication : Application(), ImageLoaderFactory, WorkConfiguration.P
         }
 
         ensureWorkManagerInitialized()
+        // Recover stale Agent leases before any internal invocation can reserve a new run.
+        agentRuntimeStartupCoordinator.start(applicationScope)
+        AppLogger.d(TAG, "Agent runtime startup recovery submitted")
 
         if (isCrashReportRecoveryStartup) {
             AppLogger.w(TAG, "检测到崩溃报告启动，保留上一轮日志供崩溃页导出")
@@ -402,6 +414,10 @@ class OperitApplication : Application(), ImageLoaderFactory, WorkConfiguration.P
         
         val totalTime = System.currentTimeMillis() - startTime
         AppLogger.d(TAG, "【启动计时】应用启动全部完成 - 总耗时: ${totalTime}ms")
+    }
+
+    internal fun getAgentRuntimeStartupCoordinator(): AgentRuntimeStartupCoordinator {
+        return agentRuntimeStartupCoordinator
     }
 
     /**

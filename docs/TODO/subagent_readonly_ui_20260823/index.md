@@ -54,6 +54,8 @@ opencode_commit: 9d466cd8497d02db40010077201e07bd10ac33b4
 9. [`09_agent_router_history_boundary.md`](09_agent_router_history_boundary.md)：显式 root session 路由、稳定消息身份和 owner-aware history reader
 10. [`10_agent_kernel_text_slice.md`](10_agent_kernel_text_slice.md)：Room 24、typed model events 和 text-only AgentKernel 纵向切片
 11. [`11_openai_responses_typed_adapter.md`](11_openai_responses_typed_adapter.md)：官方 OpenAI Responses request-scoped typed adapter
+12. [`12_context_compression_stage_summary.md`](12_context_compression_stage_summary.md)：上下文压缩恢复入口和当前验证/未决事项
+13. [`13_agent_invocation_entry_and_startup_recovery.md`](13_agent_invocation_entry_and_startup_recovery.md)：内部 Agent invocation entry 与启动恢复协调器
 
 上一轮接口的移植记录仍保留在 [`chat_view_slot_plugin`](../chat_view_slot_plugin/index.md)。
 

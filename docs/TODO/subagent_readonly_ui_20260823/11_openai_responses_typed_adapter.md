@@ -1,7 +1,7 @@
 ---
 fork: https://github.com/luojiaping/Operit.git
 scope: official OpenAI Responses typed AgentModelClient
-status: in_progress
+status: verified_with_remaining_gates
 ---
 
 # OpenAI Responses Typed Adapter
@@ -102,14 +102,22 @@ Responses output without entering the Legacy XML path.
 
 - Static contract, SSE lifecycle, credential boundary, and change-scope review completed.
 - `git diff --check` completed.
-- Gradle build and JVM tests are pending the requested remote build or explicit test command.
+- Targeted Agent/Kernel/Responses JVM tests passed on the isolated server worktree with
+  `:app:testDebugUnitTest`.
+- The full Debug JVM suite executed 1214 tests; 1212 passed and two unrelated baseline tests
+  failed: `XaiProviderReasoningTest.defaultConfigUsesTheOfficialXaiEndpointAndModel` due to
+  unmocked `android.util.Log.d`, and
+  `ReleasedProviderModelKeyDecoderTest.pre provider model function key is skipped` due to an
+  existing expected-null/data-decoder mismatch.
+- Remote `development` dev build passed for commit `3615e37c0`.
+- Device APK, Room 24, data retention, and Legacy regression verification passed.
+- No Android instrumentation ran because the test server had no connected `adb` device.
 - No production sender, Router, `EnhancedAIService`, ToolPkg, or public API integration exists.
 
 ## 8. Remaining Gates
 
 Before production routing:
 
-- execute the new JVM tests
 - add real request cancellation fixture coverage
 - add Adapter-to-Kernel integration coverage with the real Repository test seam
 - add Room 23-to-24 migration tests and submit Room schema JSON baselines

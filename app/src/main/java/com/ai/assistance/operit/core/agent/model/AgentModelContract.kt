@@ -119,3 +119,16 @@ sealed interface AgentModelEvent {
 interface AgentModelClient {
     fun execute(request: AgentModelRequest): Flow<AgentModelEvent>
 }
+
+data class AgentModelResolution(
+    val modelSnapshotJson: String,
+    val client: AgentModelClient,
+) {
+    init {
+        require(modelSnapshotJson.isNotBlank()) { "Agent model snapshot must not be blank" }
+    }
+}
+
+fun interface AgentModelResolver {
+    suspend fun resolve(modelConfigId: String, modelIndex: Int): AgentModelResolution
+}
