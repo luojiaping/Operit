@@ -202,9 +202,17 @@ Full Debug JVM suite:
 The temporary worktree was removed after testing. No Android device/`adb` was available on the
 server, so instrumentation and real Room Repository tests were not run.
 
-Stage 13 added JVM tests for the startup coordinator and internal invocation entry, but those new
-tests have not been executed in the current working tree because the repository instructions
-require explicit permission before running Gradle.
+Stage 13 JVM tests were executed in an isolated server worktree after explicit user permission:
+
+```text
+./gradlew :app:testDebugUnitTest --no-daemon --max-workers=1 \
+  --tests "com.ai.assistance.operit.core.agent.*" \
+  --tests "com.ai.assistance.operit.api.chat.llmprovider.agent.*" \
+  --stacktrace
+```
+
+Result: `BUILD SUCCESSFUL in 19m 57s`; 33 tests executed, 33 passed, 0 failures, 0 errors.
+The temporary worktree was removed after the report was collected.
 
 ## 7. Remaining Gates
 
@@ -214,7 +222,7 @@ Before production Agent routing:
 2. Add Room 23→24 migration tests and commit schema JSON baselines.
 3. Add an injectable test database seam and run real Repository reserve/complete/fail/cancel/
    recovery integration tests.
-4. Execute and review the new startup/invocation JVM tests.
+4. Add Android instrumentation or a real Repository test seam for persistent run settlement.
 5. Only after those gates, connect `AgentRouter` before group orchestration and role-card parsing.
 
 Do not implement ToolPkg Agent registration, permissions, tool materialization, Plan/Build UI, or

@@ -1,7 +1,7 @@
 ---
 fork: https://github.com/luojiaping/Operit.git
 scope: internal Agent invocation entry and process-start recovery
-status: build_verified_pending_tests
+status: build_and_jvm_verified_pending_integration
 base_commit: 3615e37c0
 implementation_commit: d87481a78
 ---
@@ -94,8 +94,18 @@ startup coordinator. The generic runtime entry itself has no OpenAI dependency.
   - plugin route resolves the requested model and reaches Kernel completion
   - Legacy route is rejected before model resolution
 
-These tests are added but have not been executed yet. The repository instructions require
-explicit permission before running Gradle.
+The tests were executed in an isolated server worktree after explicit user permission:
+
+```text
+./gradlew :app:testDebugUnitTest --no-daemon --max-workers=1 \
+  --tests "com.ai.assistance.operit.core.agent.*" \
+  --tests "com.ai.assistance.operit.api.chat.llmprovider.agent.*" \
+  --stacktrace
+```
+
+Result: `BUILD SUCCESSFUL in 19m 57s`; 33 tests executed, 33 passed, 0 failures, 0 errors.
+The report included both new runtime tests, the Kernel suite, Responses adapter fixtures, the
+adapter-to-Kernel integration test, and existing Agent contract/history/router tests.
 
 Remote `development` sync and `build_dev` passed for `d87481a78`:
 
@@ -109,6 +119,6 @@ Remote `development` sync and `build_dev` passed for `d87481a78`:
 - Add Room 23→24 migration tests and schema JSON baselines.
 - Inject an in-memory `AppDatabase` into `AgentExecutionRepository` and
   `AgentHistoryRepository`, then run real reserve/settlement/recovery integration tests.
-- Execute and review this stage's JVM tests.
+- Add Android instrumentation or a real Repository test seam for persistent run settlement.
 - Only after the gates pass, connect `AgentRouter` to an internal host entry. Legacy messages must
   continue through the existing LegacyPipeline.
