@@ -8,8 +8,8 @@ current_commit: 3615e37c0
 # Agent Workstream Stage Summary
 
 This document is the recovery entry point after context compression. Read it before changing
-Agent, Room, provider, ToolPkg, ChatView, or Legacy chat code. Stage 13 is implemented in the
-working tree after `3615e37c0` and is not committed yet.
+Agent, Room, provider, ToolPkg, ChatView, or Legacy chat code. Stage 13 is implemented in commit
+`d87481a78` after `3615e37c0`.
 
 ## 1. Current Repository State
 
@@ -163,6 +163,12 @@ Device result:
 - artifact: `operit-dev-development-3615e37c.apk`
 - size: `403216031`
 - SHA-256: `6a85735168164b30404b894a148004f5a7f9953fdf40248154131e3cc1141855`
+
+Stage 13 remote sync and dev build passed for `d87481a78`:
+
+- artifact: `operit-dev-development-d87481a7.apk`
+- size: `403216031`
+- SHA-256: `d47f960f79d46532d5a8858a6cfa5586c88a8bce8f88425d4be6b6ac5fd54500`
 
 ### Server JVM Tests
 

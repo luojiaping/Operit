@@ -1,8 +1,9 @@
 ---
 fork: https://github.com/luojiaping/Operit.git
 scope: internal Agent invocation entry and process-start recovery
-status: implemented_pending_verification
+status: build_verified_pending_tests
 base_commit: 3615e37c0
+implementation_commit: d87481a78
 ---
 
 # Internal Agent Invocation Entry
@@ -93,8 +94,14 @@ startup coordinator. The generic runtime entry itself has no OpenAI dependency.
   - plugin route resolves the requested model and reaches Kernel completion
   - Legacy route is rejected before model resolution
 
-These tests are added but have not been executed yet in the current working tree. The repository
-instructions require explicit permission before running Gradle.
+These tests are added but have not been executed yet. The repository instructions require
+explicit permission before running Gradle.
+
+Remote `development` sync and `build_dev` passed for `d87481a78`:
+
+- artifact: `operit-dev-development-d87481a7.apk`
+- size: `403216031`
+- SHA-256: `d47f960f79d46532d5a8858a6cfa5586c88a8bce8f88425d4be6b6ac5fd54500`
 
 ## 5. Remaining Gates
 
