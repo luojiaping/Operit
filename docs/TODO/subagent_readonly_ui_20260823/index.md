@@ -56,6 +56,7 @@ opencode_commit: 9d466cd8497d02db40010077201e07bd10ac33b4
 11. [`11_openai_responses_typed_adapter.md`](11_openai_responses_typed_adapter.md)：官方 OpenAI Responses request-scoped typed adapter
 12. [`12_context_compression_stage_summary.md`](12_context_compression_stage_summary.md)：上下文压缩恢复入口和当前验证/未决事项
 13. [`13_agent_invocation_entry_and_startup_recovery.md`](13_agent_invocation_entry_and_startup_recovery.md)：内部 Agent invocation entry 与启动恢复协调器
+14. [`14_room_repository_acceptance_and_cancellation.md`](14_room_repository_acceptance_and_cancellation.md)：真实 Repository、Room migration 与 SSE cancellation 验收覆盖
 
 上一轮接口的移植记录仍保留在 [`chat_view_slot_plugin`](../chat_view_slot_plugin/index.md)。
 

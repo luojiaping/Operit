@@ -202,7 +202,7 @@ Full Debug JVM suite:
 The temporary worktree was removed after testing. No Android device/`adb` was available on the
 server, so instrumentation and real Room Repository tests were not run.
 
-Stage 13 JVM tests were executed in an isolated server worktree after explicit user permission:
+Stage 13 and 14 JVM tests were executed in an isolated server worktree after explicit user permission:
 
 ```text
 ./gradlew :app:testDebugUnitTest --no-daemon --max-workers=1 \
@@ -211,19 +211,26 @@ Stage 13 JVM tests were executed in an isolated server worktree after explicit u
   --stacktrace
 ```
 
-Result: `BUILD SUCCESSFUL in 19m 57s`; 33 tests executed, 33 passed, 0 failures, 0 errors.
+Result for the initial Stage 13 run: `BUILD SUCCESSFUL in 19m 57s`; 33 tests executed, 33 passed,
+0 failures, 0 errors.
+
+After the Room/Repository seam and real-socket cancellation fixture were added, the targeted
+suite was rerun on functional commit `fcaf21970`: `BUILD SUCCESSFUL in 29s`; 34 tests executed,
+34 passed, 0 failures, 0 errors. The cancellation test also passed alone in `1m 38s`.
+
+The Android test source compiled on commit `73b99d052` with
+`:app:compileDebugAndroidTestKotlin`: `BUILD SUCCESSFUL in 1m 16s`. No adb device was available,
+so the Android migration and Repository tests were not executed.
+
 The temporary worktree was removed after the report was collected.
 
 ## 7. Remaining Gates
 
 Before production Agent routing:
 
-1. Add and run real request-in-flight SSE cancellation isolation coverage.
-2. Add Room 23→24 migration tests and commit schema JSON baselines.
-3. Add an injectable test database seam and run real Repository reserve/complete/fail/cancel/
-   recovery integration tests.
-4. Add Android instrumentation or a real Repository test seam for persistent run settlement.
-5. Only after those gates, connect `AgentRouter` before group orchestration and role-card parsing.
+1. Run Android migration and Repository instrumentation when an adb device is available.
+2. Add Room schema JSON baselines if the project enables Room schema export.
+3. Only after those gates, connect `AgentRouter` before group orchestration and role-card parsing.
 
 Do not implement ToolPkg Agent registration, permissions, tool materialization, Plan/Build UI, or
 production MessageCoordinationDelegate routing in the next small change unless the corresponding

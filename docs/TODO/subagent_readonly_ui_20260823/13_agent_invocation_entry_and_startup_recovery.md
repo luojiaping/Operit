@@ -1,7 +1,7 @@
 ---
 fork: https://github.com/luojiaping/Operit.git
 scope: internal Agent invocation entry and process-start recovery
-status: build_and_jvm_verified_pending_integration
+status: build_jvm_android_source_verified_pending_instrumentation
 base_commit: 3615e37c0
 implementation_commit: d87481a78
 ---
@@ -107,6 +107,10 @@ Result: `BUILD SUCCESSFUL in 19m 57s`; 33 tests executed, 33 passed, 0 failures,
 The report included both new runtime tests, the Kernel suite, Responses adapter fixtures, the
 adapter-to-Kernel integration test, and existing Agent contract/history/router tests.
 
+The suite was rerun after the persistence and cancellation additions on functional commit
+`fcaf21970`: `BUILD SUCCESSFUL in 29s`; 34 tests executed, 34 passed, 0 failures, 0 errors.
+The new real-socket cancellation test also passed independently in `1m 38s`.
+
 Remote `development` sync and `build_dev` passed for `d87481a78`:
 
 - artifact: `operit-dev-development-d87481a7.apk`
@@ -116,9 +120,7 @@ Remote `development` sync and `build_dev` passed for `d87481a78`:
 ## 5. Remaining Gates
 
 - Add a real in-flight SSE cancellation isolation fixture.
-- Add Room 23→24 migration tests and schema JSON baselines.
-- Inject an in-memory `AppDatabase` into `AgentExecutionRepository` and
-  `AgentHistoryRepository`, then run real reserve/settlement/recovery integration tests.
-- Add Android instrumentation or a real Repository test seam for persistent run settlement.
+- Run the new migration and Repository instrumentation tests when an adb device is available.
+- Add Room schema JSON baselines if the project enables Room schema export.
 - Only after the gates pass, connect `AgentRouter` to an internal host entry. Legacy messages must
   continue through the existing LegacyPipeline.
