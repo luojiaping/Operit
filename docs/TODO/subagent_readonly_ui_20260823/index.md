@@ -51,6 +51,7 @@ opencode_commit: 9d466cd8497d02db40010077201e07bd10ac33b4
 6. [`06_opencode_ui_contract.md`](06_opencode_ui_contract.md)：Todo、Plan/Build 胶囊和子代理 UI contract
 7. [`07_agent_architecture_conclusions.md`](07_agent_architecture_conclusions.md)：本窗口完整调研证据、架构结论和后续边界
 8. [`08_agent_boundary_foundation.md`](08_agent_boundary_foundation.md)：第一阶段 Agent contract、执行记录和历史 owner projection 实现记录
+9. [`09_agent_router_history_boundary.md`](09_agent_router_history_boundary.md)：显式 root session 路由、稳定消息身份和 owner-aware history reader
 
 上一轮接口的移植记录仍保留在 [`chat_view_slot_plugin`](../chat_view_slot_plugin/index.md)。
 

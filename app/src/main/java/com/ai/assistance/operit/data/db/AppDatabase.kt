@@ -12,11 +12,12 @@ import com.ai.assistance.operit.data.dao.ChatDao
 import com.ai.assistance.operit.data.dao.MessageDao
 import com.ai.assistance.operit.data.dao.MessageVariantDao
 import com.ai.assistance.operit.data.dao.TokenUsageDao
-import com.ai.assistance.operit.data.model.ChatEntity
+import com.ai.assistance.operit.data.model.AgentChatBindingEntity
 import com.ai.assistance.operit.data.model.AgentMessageOwnerEntity
 import com.ai.assistance.operit.data.model.AgentRunEntity
 import com.ai.assistance.operit.data.model.AgentSessionEntity
 import com.ai.assistance.operit.data.model.AgentToolCallEntity
+import com.ai.assistance.operit.data.model.ChatEntity
 import com.ai.assistance.operit.data.model.MessageEntity
 import com.ai.assistance.operit.data.model.MessageVariantEntity
 import com.ai.assistance.operit.data.model.TokenStatsModelEntity
@@ -31,10 +32,11 @@ import com.ai.assistance.operit.data.model.TokenUsageRecordEntity
         AgentRunEntity::class,
         AgentToolCallEntity::class,
         AgentMessageOwnerEntity::class,
+        AgentChatBindingEntity::class,
         TokenUsageRecordEntity::class,
         TokenStatsModelEntity::class,
     ],
-    version = 22,
+    version = 23,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -644,6 +646,154 @@ abstract class AppDatabase : RoomDatabase() {
                 }
             }
 
+        /** v22 -> v23: explicit root-session routing and owner/chat consistency. */
+        private val MIGRATION_22_23 =
+            object : Migration(22, 23) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    val invalidOwnerCount =
+                        db.query(AGENT_OWNER_INTEGRITY_QUERY).use { cursor ->
+                            check(cursor.moveToFirst()) { "Agent owner integrity query returned no row" }
+                            cursor.getLong(0)
+                        }
+                    require(invalidOwnerCount == 0L) {
+                        "Cannot migrate inconsistent Agent message owners: $invalidOwnerCount"
+                    }
+                    runSql { sql -> db.execSQL(sql) }
+                }
+
+                override fun migrate(connection: androidx.sqlite.SQLiteConnection) {
+                    val statement = connection.prepare(AGENT_OWNER_INTEGRITY_QUERY)
+                    val invalidOwnerCount =
+                        try {
+                            check(statement.step()) { "Agent owner integrity query returned no row" }
+                            statement.getLong(0)
+                        } finally {
+                            statement.close()
+                        }
+                    require(invalidOwnerCount == 0L) {
+                        "Cannot migrate inconsistent Agent message owners: $invalidOwnerCount"
+                    }
+                    runSql { sql ->
+                        val migrationStatement = connection.prepare(sql)
+                        try {
+                            migrationStatement.step()
+                        } finally {
+                            migrationStatement.close()
+                        }
+                    }
+                }
+
+                private fun runSql(exec: (String) -> Unit) {
+                    exec(
+                        "CREATE UNIQUE INDEX IF NOT EXISTS `index_messages_chatId_messageId` " +
+                            "ON `messages` (`chatId`, `messageId`)"
+                    )
+                    exec(
+                        "CREATE UNIQUE INDEX IF NOT EXISTS `index_agent_sessions_chatId_sessionId` " +
+                            "ON `agent_sessions` (`chatId`, `sessionId`)"
+                    )
+                    exec("DROP INDEX IF EXISTS `index_agent_tool_calls_runId_sequence`")
+                    exec(
+                        "CREATE UNIQUE INDEX `index_agent_tool_calls_runId_sequence` " +
+                            "ON `agent_tool_calls` (`runId`, `sequence`)"
+                    )
+                    exec("DROP INDEX IF EXISTS `index_agent_message_owners_chatId`")
+                    exec("DROP INDEX IF EXISTS `index_agent_message_owners_agentSessionId`")
+                    exec("DROP INDEX IF EXISTS `index_agent_message_owners_chatId_agentSessionId`")
+                    exec(
+                        "ALTER TABLE `agent_message_owners` " +
+                            "RENAME TO `agent_message_owners_v22_legacy`"
+                    )
+                    exec(
+                        """
+                        CREATE TABLE `agent_message_owners` (
+                            `messageId` INTEGER NOT NULL,
+                            `chatId` TEXT NOT NULL,
+                            `agentSessionId` TEXT NOT NULL,
+                            PRIMARY KEY(`messageId`),
+                            FOREIGN KEY(`chatId`, `messageId`)
+                                REFERENCES `messages`(`chatId`, `messageId`)
+                                ON UPDATE NO ACTION ON DELETE CASCADE,
+                            FOREIGN KEY(`chatId`, `agentSessionId`)
+                                REFERENCES `agent_sessions`(`chatId`, `sessionId`)
+                                ON UPDATE NO ACTION ON DELETE CASCADE
+                        )
+                        """.trimIndent()
+                    )
+                    exec(
+                        """
+                        INSERT INTO `agent_message_owners` (
+                            `messageId`, `chatId`, `agentSessionId`
+                        )
+                        SELECT
+                            owner.`messageId`, session.`chatId`, owner.`agentSessionId`
+                        FROM `agent_message_owners_v22_legacy` AS owner
+                        INNER JOIN `messages` AS message
+                            ON message.`messageId` = owner.`messageId`
+                        INNER JOIN `agent_sessions` AS session
+                            ON session.`sessionId` = owner.`agentSessionId`
+                        WHERE message.`chatId` = session.`chatId`
+                        """.trimIndent()
+                    )
+                    exec("DROP TABLE `agent_message_owners_v22_legacy`")
+                    exec(
+                        "CREATE INDEX `index_agent_message_owners_chatId` " +
+                            "ON `agent_message_owners` (`chatId`)"
+                    )
+                    exec(
+                        "CREATE INDEX `index_agent_message_owners_agentSessionId` " +
+                            "ON `agent_message_owners` (`agentSessionId`)"
+                    )
+                    exec(
+                        "CREATE UNIQUE INDEX `index_agent_message_owners_chatId_messageId` " +
+                            "ON `agent_message_owners` (`chatId`, `messageId`)"
+                    )
+                    exec(
+                        "CREATE INDEX `index_agent_message_owners_chatId_agentSessionId` " +
+                            "ON `agent_message_owners` (`chatId`, `agentSessionId`)"
+                    )
+                    exec(
+                        """
+                        CREATE TABLE `agent_chat_bindings` (
+                            `chatId` TEXT NOT NULL,
+                            `activeSessionId` TEXT NOT NULL,
+                            `updatedAt` INTEGER NOT NULL,
+                            PRIMARY KEY(`chatId`),
+                            FOREIGN KEY(`chatId`, `activeSessionId`)
+                                REFERENCES `agent_sessions`(`chatId`, `sessionId`)
+                                ON UPDATE NO ACTION ON DELETE CASCADE
+                        )
+                        """.trimIndent()
+                    )
+                    exec(
+                        "CREATE UNIQUE INDEX `index_agent_chat_bindings_chatId_activeSessionId` " +
+                            "ON `agent_chat_bindings` (`chatId`, `activeSessionId`)"
+                    )
+                    exec(
+                        "CREATE UNIQUE INDEX `index_agent_chat_bindings_activeSessionId` " +
+                            "ON `agent_chat_bindings` (`activeSessionId`)"
+                    )
+                }
+
+                private val AGENT_OWNER_INTEGRITY_QUERY =
+                    """
+                    SELECT COUNT(*)
+                    FROM `agent_message_owners` AS owner
+                    LEFT JOIN `messages` AS message
+                        ON message.`messageId` = owner.`messageId`
+                    LEFT JOIN `agent_sessions` AS session
+                        ON session.`sessionId` = owner.`agentSessionId`
+                    WHERE message.`messageId` IS NULL
+                        OR session.`sessionId` IS NULL
+                        OR owner.`chatId` <> message.`chatId`
+                        OR owner.`chatId` <> session.`chatId`
+                        OR message.`chatId` <> session.`chatId`
+                        OR owner.`pluginId` <> session.`pluginId`
+                        OR owner.`agentId` <> session.`agentId`
+                        OR message.`sender` NOT IN ('ai', 'summary')
+                    """.trimIndent()
+            }
+
         // 定义从版本2到3的迁移
         private val MIGRATION_2_3 =
             object : Migration(2, 3) {
@@ -762,7 +912,8 @@ abstract class AppDatabase : RoomDatabase() {
                                 MIGRATION_18_19,
                                 MIGRATION_19_20,
                                 MIGRATION_20_21,
-                                MIGRATION_21_22
+                                MIGRATION_21_22,
+                                MIGRATION_22_23
                             ) // 添加新的迁移
                             .build()
                     INSTANCE = instance

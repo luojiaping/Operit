@@ -28,4 +28,11 @@ an overlay install.
 - [DONE] Rebuild the token table with the current entity shape and preserve shared data.
 - [DONE] Add the Agent tables to the same `21 -> 22` migration.
 - [DONE] Enable Room schema export configuration.
-- [TODO] Verify the migration on a device with the reported database and complete remote dev build.
+- [DONE] Verify the migration on the reported device database and complete remote dev build.
+
+## Device Verification
+
+The installed `c295a4d2` dev APK migrated the retained database to Room 22. The APK
+and `room_master_table` both reported identity hash
+`eb465fd160e68a6872d1872fd0da74af`. Integrity, quick, and foreign-key checks passed;
+chat and token usage rows remained present.

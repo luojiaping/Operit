@@ -81,6 +81,16 @@ abstract class ChatContentDao {
 
     @Query(
         MESSAGE_CONTENT_ROW_QUERY +
+            " WHERE chatId = :chatId AND messageId IN (:messageIds)" +
+            " ORDER BY orderIndex ASC, messageId ASC"
+    )
+    protected abstract suspend fun queryMessagesForChatByIds(
+        chatId: String,
+        messageIds: List<Long>,
+    ): List<MessageContentRow>
+
+    @Query(
+        MESSAGE_CONTENT_ROW_QUERY +
             " WHERE chatId = :chatId AND timestamp >= :startTimestampInclusive ORDER BY timestamp ASC"
     )
     protected abstract suspend fun queryMessagesForChatFromTimestampAsc(
@@ -273,6 +283,17 @@ abstract class ChatContentDao {
     @Transaction
     open suspend fun getMessagesForChat(chatId: String): List<MessageEntity> =
         materializeMessages(queryMessagesForChat(chatId))
+
+    @Transaction
+    open suspend fun getMessagesForChatByIds(
+        chatId: String,
+        messageIds: List<Long>,
+    ): List<MessageEntity> {
+        if (messageIds.isEmpty()) {
+            return emptyList()
+        }
+        return materializeMessages(queryMessagesForChatByIds(chatId, messageIds))
+    }
 
     @Transaction
     open suspend fun getMessagesForChatFromTimestampAsc(

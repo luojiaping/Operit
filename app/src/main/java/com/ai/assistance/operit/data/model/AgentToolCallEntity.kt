@@ -23,7 +23,7 @@ import com.ai.assistance.operit.core.agent.contract.AgentToolCallStatus
     indices = [
         Index("runId"),
         Index("parentCallId"),
-        Index(value = ["runId", "sequence"]),
+        Index(value = ["runId", "sequence"], unique = true),
     ],
 )
 data class AgentToolCallEntity(

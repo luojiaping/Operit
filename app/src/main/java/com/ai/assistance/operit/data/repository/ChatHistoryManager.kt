@@ -2,11 +2,11 @@ package com.ai.assistance.operit.data.repository
 
 import android.content.Context
 import android.net.Uri
-import com.ai.assistance.operit.util.AppLogger
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import androidx.room.withTransaction
 import com.ai.assistance.operit.R
 import com.ai.assistance.operit.data.backup.OperitBackupDirs
 import com.ai.assistance.operit.data.db.AppDatabase
@@ -23,6 +23,7 @@ import com.ai.assistance.operit.data.model.OperitArchivedMessage
 import com.ai.assistance.operit.data.model.OperitArchivedMessageVariant
 import com.ai.assistance.operit.data.model.OperitChatArchive
 import com.ai.assistance.operit.data.model.WorkspaceRenameResult
+import com.ai.assistance.operit.util.AppLogger
 import com.ai.assistance.operit.util.LocaleUtils
 import com.ai.assistance.operit.data.converter.*
 import com.ai.assistance.operit.data.exporter.*
@@ -111,6 +112,7 @@ class ChatHistoryManager private constructor(private val context: Context) {
     private val messageDao = database.messageDao()
     private val messageVariantDao = database.messageVariantDao()
     private val chatContentDao = database.chatContentDao()
+    private val agentExecutionDao = database.agentExecutionDao()
     private val operitArchiveJson =
         Json {
             prettyPrint = true
@@ -179,21 +181,26 @@ class ChatHistoryManager private constructor(private val context: Context) {
     }
 
     private suspend fun buildOperitArchivedChat(chatHistory: ChatHistory): OperitArchivedChat {
-        val messageEntities = chatContentDao.getMessagesForChat(chatHistory.id)
-        val variantsByTimestamp =
-            chatContentDao.getVariantsForChat(chatHistory.id).groupBy { it.messageTimestamp }
-        val archivedMessages =
-            messageEntities.map { messageEntity ->
-                val messageVariants = variantsByTimestamp[messageEntity.timestamp].orEmpty()
-                OperitArchivedMessage(
-                    baseMessage =
-                        messageEntity.toChatMessage().copy(
-                            variantCount = messageVariants.size + 1,
-                        ),
-                    variants = messageVariants.map(OperitArchivedMessageVariant::fromEntity),
-                )
+        return database.withTransaction {
+            require(agentExecutionDao.countSessions(chatHistory.id) == 0) {
+                "Chats with Agent sessions require the Agent archive format"
             }
-        return OperitArchivedChat.fromChatHistory(chatHistory, archivedMessages)
+            val messageEntities = chatContentDao.getMessagesForChat(chatHistory.id)
+            val variantsByTimestamp =
+                chatContentDao.getVariantsForChat(chatHistory.id).groupBy { it.messageTimestamp }
+            val archivedMessages =
+                messageEntities.map { messageEntity ->
+                    val messageVariants = variantsByTimestamp[messageEntity.timestamp].orEmpty()
+                    OperitArchivedMessage(
+                        baseMessage =
+                            messageEntity.toChatMessage().copy(
+                                variantCount = messageVariants.size + 1,
+                            ),
+                        variants = messageVariants.map(OperitArchivedMessageVariant::fromEntity),
+                    )
+                }
+            OperitArchivedChat.fromChatHistory(chatHistory, archivedMessages)
+        }
     }
 
     private suspend fun exportOperitArchiveJsonStream(
@@ -567,52 +574,57 @@ class ChatHistoryManager private constructor(private val context: Context) {
     ) {
         chatMutex(history.id).withLock {
             try {
-                // 创建聊天实体
-                val chatEntity = ChatEntity.fromChatHistory(history)
+                database.withTransaction {
+                    require(agentExecutionDao.countSessions(history.id) == 0) {
+                        "Replacing a chat with Agent sessions requires the Agent archive format"
+                    }
+                    // 创建聊天实体
+                    val chatEntity = ChatEntity.fromChatHistory(history)
 
-                // 保存聊天实体
-                chatDao.insertChat(chatEntity)
+                    // 保存聊天实体
+                    chatDao.insertChat(chatEntity)
 
-                // 先删除该聊天的所有现有消息
-                messageDao.deleteAllMessagesForChat(chatEntity.id)
-                messageVariantDao.deleteAllVariantsForChat(chatEntity.id)
+                    // 先删除该聊天的所有现有消息
+                    messageDao.deleteAllMessagesForChat(chatEntity.id)
+                    messageVariantDao.deleteAllVariantsForChat(chatEntity.id)
 
-                // 批量插入所有消息
-                val messageEntities =
-                    history.messages.mapIndexed { index, message ->
-                        val archivedVariants =
+                    // 批量插入所有消息
+                    val messageEntities =
+                        history.messages.mapIndexed { index, message ->
+                            val archivedVariants =
+                                variantsByTimestamp[message.timestamp]
+                                    .orEmpty()
+                                    .sortedBy { it.variantIndex }
+                            if (archivedVariants.isNotEmpty()) {
+                                validateArchivedMessageVariants(message, archivedVariants)
+                            }
+                            MessageEntity.fromChatMessage(
+                                chatEntity.id,
+                                if (archivedVariants.isEmpty()) {
+                                    message.copy(selectedVariantIndex = 0, variantCount = 1)
+                                } else {
+                                    message.copy(variantCount = archivedVariants.size + 1)
+                                },
+                                index,
+                            )
+                        }
+                    messageDao.insertMessages(messageEntities)
+
+                    val variantEntities =
+                        history.messages.flatMap { message ->
                             variantsByTimestamp[message.timestamp]
                                 .orEmpty()
                                 .sortedBy { it.variantIndex }
-                        if (archivedVariants.isNotEmpty()) {
-                            validateArchivedMessageVariants(message, archivedVariants)
+                                .map { variant ->
+                                    variant.toEntity(
+                                        chatId = chatEntity.id,
+                                        messageTimestamp = message.timestamp,
+                                    )
+                                }
                         }
-                        MessageEntity.fromChatMessage(
-                            chatEntity.id,
-                            if (archivedVariants.isEmpty()) {
-                                message.copy(selectedVariantIndex = 0, variantCount = 1)
-                            } else {
-                                message.copy(variantCount = archivedVariants.size + 1)
-                            },
-                            index,
-                        )
+                    if (variantEntities.isNotEmpty()) {
+                        messageVariantDao.insertVariants(variantEntities)
                     }
-                messageDao.insertMessages(messageEntities)
-
-                val variantEntities =
-                    history.messages.flatMap { message ->
-                        variantsByTimestamp[message.timestamp]
-                            .orEmpty()
-                            .sortedBy { it.variantIndex }
-                            .map { variant ->
-                                variant.toEntity(
-                                    chatId = chatEntity.id,
-                                    messageTimestamp = message.timestamp,
-                                )
-                            }
-                    }
-                if (variantEntities.isNotEmpty()) {
-                    messageVariantDao.insertVariants(variantEntities)
                 }
             } catch (e: Exception) {
                 throw e
@@ -979,97 +991,102 @@ class ChatHistoryManager private constructor(private val context: Context) {
     ) {
         chatMutex(chatId).withLock {
             try {
-                val baseMessage =
-                    chatContentDao.getMessageByTimestamp(chatId, messageTimestamp)
-                        ?: throw IllegalArgumentException(
-                            "Message $messageTimestamp does not exist in chat $chatId",
-                        )
-                if (baseMessage.sender != "ai") {
-                    throw IllegalArgumentException("Only AI messages can delete variants")
-                }
-
-                val variants =
-                    chatContentDao.getVariantsForMessage(chatId, messageTimestamp)
-                        .sortedBy { it.variantIndex }
-                if (variants.isEmpty()) {
-                    throw IllegalStateException("Message $messageTimestamp has no deletable variants")
-                }
-
-                if (variantIndex == 0) {
-                    val replacementVariant =
-                        variants.firstOrNull()
-                            ?: throw IllegalStateException(
-                                "Message $messageTimestamp has no replacement variant",
-                            )
-                    val promotedBaseMessage =
-                        baseMessage.copy(
-                            content = replacementVariant.content,
-                            roleName = replacementVariant.roleName.ifBlank { baseMessage.roleName },
-                            selectedVariantIndex = 0,
-                            provider = replacementVariant.provider,
-                            modelName = replacementVariant.modelName,
-                            inputTokens = replacementVariant.inputTokens,
-                            outputTokens = replacementVariant.outputTokens,
-                            cachedInputTokens = replacementVariant.cachedInputTokens,
-                            sentAt = replacementVariant.sentAt,
-                            outputDurationMs = replacementVariant.outputDurationMs,
-                            waitDurationMs = replacementVariant.waitDurationMs,
-                            completedAt = replacementVariant.completedAt,
-                        )
-                    messageDao.updateMessage(promotedBaseMessage)
-                    messageVariantDao.deleteVariant(
-                        chatId = chatId,
-                        messageTimestamp = messageTimestamp,
-                        variantIndex = replacementVariant.variantIndex,
-                    )
-                    variants
-                        .asSequence()
-                        .filter { it.variantIndex > replacementVariant.variantIndex }
-                        .forEach { variant ->
-                            messageVariantDao.updateVariant(
-                                variant.copy(variantIndex = variant.variantIndex - 1),
-                            )
-                        }
-                } else {
-                    val targetVariant =
-                        variants.firstOrNull { it.variantIndex == variantIndex }
+                database.withTransaction {
+                    require(!agentExecutionDao.hasMessageOwner(chatId, messageTimestamp)) {
+                        "Agent-owned messages do not use Legacy message variants"
+                    }
+                    val baseMessage =
+                        chatContentDao.getMessageByTimestamp(chatId, messageTimestamp)
                             ?: throw IllegalArgumentException(
-                                "Variant $variantIndex does not exist for message $messageTimestamp",
+                                "Message $messageTimestamp does not exist in chat $chatId",
                             )
-                    messageVariantDao.deleteVariant(
-                        chatId = chatId,
-                        messageTimestamp = messageTimestamp,
-                        variantIndex = targetVariant.variantIndex,
-                    )
-                    variants
-                        .asSequence()
-                        .filter { it.variantIndex > targetVariant.variantIndex }
-                        .forEach { variant ->
-                            messageVariantDao.updateVariant(
-                                variant.copy(variantIndex = variant.variantIndex - 1),
-                            )
-                        }
-                    val newSelectedVariantIndex =
-                        when {
-                            variants.any { it.variantIndex > targetVariant.variantIndex } -> targetVariant.variantIndex
-                            else -> (targetVariant.variantIndex - 1).coerceAtLeast(0)
-                        }
-                    messageDao.updateSelectedVariantIndex(
-                        chatId = chatId,
-                        timestamp = messageTimestamp,
-                        selectedVariantIndex = newSelectedVariantIndex,
-                    )
-                }
+                    if (baseMessage.sender != "ai") {
+                        throw IllegalArgumentException("Only AI messages can delete variants")
+                    }
 
-                chatDao.getChatById(chatId)?.let { chat ->
-                    chatDao.updateChatMetadata(
-                        chatId = chatId,
-                        title = chat.title,
-                        timestamp = System.currentTimeMillis(),
-                        inputTokens = chat.inputTokens,
-                        outputTokens = chat.outputTokens,
-                        currentWindowSize = chat.currentWindowSize,
-                    )
+                    val variants =
+                        chatContentDao.getVariantsForMessage(chatId, messageTimestamp)
+                            .sortedBy { it.variantIndex }
+                    if (variants.isEmpty()) {
+                        throw IllegalStateException("Message $messageTimestamp has no deletable variants")
+                    }
+
+                    if (variantIndex == 0) {
+                        val replacementVariant =
+                            variants.firstOrNull()
+                                ?: throw IllegalStateException(
+                                    "Message $messageTimestamp has no replacement variant",
+                                )
+                        val promotedBaseMessage =
+                            baseMessage.copy(
+                                content = replacementVariant.content,
+                                roleName = replacementVariant.roleName.ifBlank { baseMessage.roleName },
+                                selectedVariantIndex = 0,
+                                provider = replacementVariant.provider,
+                                modelName = replacementVariant.modelName,
+                                inputTokens = replacementVariant.inputTokens,
+                                outputTokens = replacementVariant.outputTokens,
+                                cachedInputTokens = replacementVariant.cachedInputTokens,
+                                sentAt = replacementVariant.sentAt,
+                                outputDurationMs = replacementVariant.outputDurationMs,
+                                waitDurationMs = replacementVariant.waitDurationMs,
+                                completedAt = replacementVariant.completedAt,
+                            )
+                        messageDao.updateMessage(promotedBaseMessage)
+                        messageVariantDao.deleteVariant(
+                            chatId = chatId,
+                            messageTimestamp = messageTimestamp,
+                            variantIndex = replacementVariant.variantIndex,
+                        )
+                        variants
+                            .asSequence()
+                            .filter { it.variantIndex > replacementVariant.variantIndex }
+                            .forEach { variant ->
+                                messageVariantDao.updateVariant(
+                                    variant.copy(variantIndex = variant.variantIndex - 1),
+                                )
+                            }
+                    } else {
+                        val targetVariant =
+                            variants.firstOrNull { it.variantIndex == variantIndex }
+                                ?: throw IllegalArgumentException(
+                                    "Variant $variantIndex does not exist for message $messageTimestamp",
+                                )
+                        messageVariantDao.deleteVariant(
+                            chatId = chatId,
+                            messageTimestamp = messageTimestamp,
+                            variantIndex = targetVariant.variantIndex,
+                        )
+                        variants
+                            .asSequence()
+                            .filter { it.variantIndex > targetVariant.variantIndex }
+                            .forEach { variant ->
+                                messageVariantDao.updateVariant(
+                                    variant.copy(variantIndex = variant.variantIndex - 1),
+                                )
+                            }
+                        val newSelectedVariantIndex =
+                            when {
+                                variants.any { it.variantIndex > targetVariant.variantIndex } -> targetVariant.variantIndex
+                                else -> (targetVariant.variantIndex - 1).coerceAtLeast(0)
+                            }
+                        messageDao.updateSelectedVariantIndex(
+                            chatId = chatId,
+                            timestamp = messageTimestamp,
+                            selectedVariantIndex = newSelectedVariantIndex,
+                        )
+                    }
+
+                    chatDao.getChatById(chatId)?.let { chat ->
+                        chatDao.updateChatMetadata(
+                            chatId = chatId,
+                            title = chat.title,
+                            timestamp = System.currentTimeMillis(),
+                            inputTokens = chat.inputTokens,
+                            outputTokens = chat.outputTokens,
+                            currentWindowSize = chat.currentWindowSize,
+                        )
+                    }
                 }
             } catch (e: Exception) {
                 AppLogger.e(
@@ -1086,60 +1103,87 @@ class ChatHistoryManager private constructor(private val context: Context) {
     suspend fun updateMessage(chatId: String, message: ChatMessage) {
         chatMutex(chatId).withLock {
             try {
-                // 找到相应的消息实体
-                val existingMessage = chatContentDao.getMessageByTimestamp(chatId, message.timestamp)
+                database.withTransaction {
+                    require(!agentExecutionDao.hasMessageOwner(chatId, message.timestamp)) {
+                        "Agent-owned messages must be updated through AgentExecutionRepository"
+                    }
+                    // 找到相应的消息实体
+                    val existingMessage = chatContentDao.getMessageByTimestamp(chatId, message.timestamp)
 
-                if (existingMessage != null) {
-                    if (message.selectedVariantIndex > 0) {
-                        val existingVariant =
-                            chatContentDao.getVariantForMessage(
+                    if (existingMessage != null) {
+                        if (message.selectedVariantIndex > 0) {
+                            val existingVariant =
+                                chatContentDao.getVariantForMessage(
+                                    chatId,
+                                    message.timestamp,
+                                    message.selectedVariantIndex,
+                                ) ?: throw IllegalStateException(
+                                    "Missing variant ${message.selectedVariantIndex} for message ${message.timestamp}",
+                                )
+                            messageVariantDao.updateVariant(
+                                MessageVariantEntity.fromChatMessage(
+                                    chatId = chatId,
+                                    messageTimestamp = message.timestamp,
+                                    variantIndex = message.selectedVariantIndex,
+                                    message = message,
+                                    variantId = existingVariant.variantId,
+                                )
+                            )
+                            messageDao.updateSelectedVariantIndex(
                                 chatId,
                                 message.timestamp,
                                 message.selectedVariantIndex,
-                            ) ?: throw IllegalStateException(
-                                "Missing variant ${message.selectedVariantIndex} for message ${message.timestamp}",
                             )
-                        messageVariantDao.updateVariant(
-                            MessageVariantEntity.fromChatMessage(
-                                chatId = chatId,
-                                messageTimestamp = message.timestamp,
-                                variantIndex = message.selectedVariantIndex,
-                                message = message,
-                                variantId = existingVariant.variantId,
-                            )
-                        )
-                        messageDao.updateSelectedVariantIndex(
-                            chatId,
-                            message.timestamp,
-                            message.selectedVariantIndex,
-                        )
-                        chatDao.getChatById(chatId)?.let { chat ->
-                            chatDao.updateChatMetadata(
-                                chatId = chatId,
-                                title = chat.title,
-                                timestamp = System.currentTimeMillis(),
-                                inputTokens = chat.inputTokens,
-                                outputTokens = chat.outputTokens,
-                                currentWindowSize = chat.currentWindowSize
-                            )
+                            chatDao.getChatById(chatId)?.let { chat ->
+                                chatDao.updateChatMetadata(
+                                    chatId = chatId,
+                                    title = chat.title,
+                                    timestamp = System.currentTimeMillis(),
+                                    inputTokens = chat.inputTokens,
+                                    outputTokens = chat.outputTokens,
+                                    currentWindowSize = chat.currentWindowSize
+                                )
+                            }
+                            return@withTransaction
                         }
-                        return@withLock
-                    }
 
-                    val shouldUpdateChatMetadata =
-                        message.contentStream == null ||
-                            (existingMessage.content.isEmpty() && message.content.isNotEmpty())
-                    val updatedMessageEntity =
-                        MessageEntity.fromChatMessage(
+                        val shouldUpdateChatMetadata =
+                            message.contentStream == null ||
+                                (existingMessage.content.isEmpty() && message.content.isNotEmpty())
+                        val updatedMessageEntity =
+                            MessageEntity.fromChatMessage(
+                                chatId = chatId,
+                                message = message,
+                                orderIndex = existingMessage.orderIndex,
+                                messageId = existingMessage.messageId
+                            )
+                        messageDao.updateMessage(updatedMessageEntity)
+
+                        if (shouldUpdateChatMetadata) {
+                            // 更新聊天元数据时间戳
+                            val chat = chatDao.getChatById(chatId)
+                            if (chat != null) {
+                                chatDao.updateChatMetadata(
+                                    chatId = chatId,
+                                    title = chat.title,
+                                    timestamp = System.currentTimeMillis(),
+                                    inputTokens = chat.inputTokens,
+                                    outputTokens = chat.outputTokens,
+                                    currentWindowSize = chat.currentWindowSize
+                                )
+                            }
+                        }
+                    } else {
+                        // 如果找不到现有消息，则插入新消息（避免在同一互斥锁下递归调用 addMessage）
+                        val nextOrderIndex = (messageDao.getMaxOrderIndex(chatId) ?: -1) + 1
+                        val messageEntity = MessageEntity.fromChatMessage(
                             chatId = chatId,
                             message = message,
-                            orderIndex = existingMessage.orderIndex,
-                            messageId = existingMessage.messageId
+                            orderIndex = nextOrderIndex,
                         )
-                    messageDao.updateMessage(updatedMessageEntity)
+                        messageDao.insertMessage(messageEntity)
 
-                    if (shouldUpdateChatMetadata) {
-                        // 更新聊天元数据时间戳
+                        // 更新聊天元数据
                         val chat = chatDao.getChatById(chatId)
                         if (chat != null) {
                             chatDao.updateChatMetadata(
@@ -1151,28 +1195,6 @@ class ChatHistoryManager private constructor(private val context: Context) {
                                 currentWindowSize = chat.currentWindowSize
                             )
                         }
-                    }
-                } else {
-                    // 如果找不到现有消息，则插入新消息（避免在同一互斥锁下递归调用 addMessage）
-                    val nextOrderIndex = (messageDao.getMaxOrderIndex(chatId) ?: -1) + 1
-                    val messageEntity = MessageEntity.fromChatMessage(
-                        chatId = chatId,
-                        message = message,
-                        orderIndex = nextOrderIndex,
-                    )
-                    messageDao.insertMessage(messageEntity)
-
-                    // 更新聊天元数据
-                    val chat = chatDao.getChatById(chatId)
-                    if (chat != null) {
-                        chatDao.updateChatMetadata(
-                            chatId = chatId,
-                            title = chat.title,
-                            timestamp = System.currentTimeMillis(),
-                            inputTokens = chat.inputTokens,
-                            outputTokens = chat.outputTokens,
-                            currentWindowSize = chat.currentWindowSize
-                        )
                     }
                 }
             } catch (e: Exception) {
@@ -1207,34 +1229,39 @@ class ChatHistoryManager private constructor(private val context: Context) {
         message: ChatMessage,
     ): Int {
         return chatMutex(chatId).withLock {
-            val baseMessage =
-                chatContentDao.getMessageByTimestamp(chatId, messageTimestamp)
-                    ?: throw IllegalArgumentException("Message $messageTimestamp does not exist in chat $chatId")
-            if (baseMessage.sender != "ai") {
-                throw IllegalArgumentException("Only AI messages can have regenerated variants")
-            }
-            val nextVariantIndex =
-                chatContentDao.getVariantsForMessage(chatId, messageTimestamp).size + 1
-            messageVariantDao.insertVariant(
-                MessageVariantEntity.fromChatMessage(
-                    chatId = chatId,
-                    messageTimestamp = messageTimestamp,
-                    variantIndex = nextVariantIndex,
-                    message = message.copy(selectedVariantIndex = nextVariantIndex, variantCount = 1),
+            database.withTransaction {
+                require(!agentExecutionDao.hasMessageOwner(chatId, messageTimestamp)) {
+                    "Agent-owned messages do not use Legacy message variants"
+                }
+                val baseMessage =
+                    chatContentDao.getMessageByTimestamp(chatId, messageTimestamp)
+                        ?: throw IllegalArgumentException("Message $messageTimestamp does not exist in chat $chatId")
+                if (baseMessage.sender != "ai") {
+                    throw IllegalArgumentException("Only AI messages can have regenerated variants")
+                }
+                val nextVariantIndex =
+                    chatContentDao.getVariantsForMessage(chatId, messageTimestamp).size + 1
+                messageVariantDao.insertVariant(
+                    MessageVariantEntity.fromChatMessage(
+                        chatId = chatId,
+                        messageTimestamp = messageTimestamp,
+                        variantIndex = nextVariantIndex,
+                        message = message.copy(selectedVariantIndex = nextVariantIndex, variantCount = 1),
+                    )
                 )
-            )
-            messageDao.updateSelectedVariantIndex(chatId, messageTimestamp, nextVariantIndex)
-            chatDao.getChatById(chatId)?.let { chat ->
-                chatDao.updateChatMetadata(
-                    chatId = chatId,
-                    title = chat.title,
-                    timestamp = System.currentTimeMillis(),
-                    inputTokens = chat.inputTokens,
-                    outputTokens = chat.outputTokens,
-                    currentWindowSize = chat.currentWindowSize
-                )
+                messageDao.updateSelectedVariantIndex(chatId, messageTimestamp, nextVariantIndex)
+                chatDao.getChatById(chatId)?.let { chat ->
+                    chatDao.updateChatMetadata(
+                        chatId = chatId,
+                        title = chat.title,
+                        timestamp = System.currentTimeMillis(),
+                        inputTokens = chat.inputTokens,
+                        outputTokens = chat.outputTokens,
+                        currentWindowSize = chat.currentWindowSize
+                    )
+                }
+                nextVariantIndex
             }
-            nextVariantIndex
         }
     }
 
@@ -1244,15 +1271,20 @@ class ChatHistoryManager private constructor(private val context: Context) {
         selectedVariantIndex: Int,
     ) {
         chatMutex(chatId).withLock {
-            chatContentDao.getMessageByTimestamp(chatId, messageTimestamp)
-                ?: throw IllegalArgumentException("Message $messageTimestamp does not exist in chat $chatId")
-            if (selectedVariantIndex > 0) {
-                chatContentDao.getVariantForMessage(chatId, messageTimestamp, selectedVariantIndex)
-                    ?: throw IllegalArgumentException(
-                        "Variant $selectedVariantIndex does not exist for message $messageTimestamp",
-                    )
+            database.withTransaction {
+                require(!agentExecutionDao.hasMessageOwner(chatId, messageTimestamp)) {
+                    "Agent-owned messages do not use Legacy message variants"
+                }
+                chatContentDao.getMessageByTimestamp(chatId, messageTimestamp)
+                    ?: throw IllegalArgumentException("Message $messageTimestamp does not exist in chat $chatId")
+                if (selectedVariantIndex > 0) {
+                    chatContentDao.getVariantForMessage(chatId, messageTimestamp, selectedVariantIndex)
+                        ?: throw IllegalArgumentException(
+                            "Variant $selectedVariantIndex does not exist for message $messageTimestamp",
+                        )
+                }
+                messageDao.updateSelectedVariantIndex(chatId, messageTimestamp, selectedVariantIndex)
             }
-            messageDao.updateSelectedVariantIndex(chatId, messageTimestamp, selectedVariantIndex)
         }
     }
 
@@ -1701,44 +1733,57 @@ class ChatHistoryManager private constructor(private val context: Context) {
     ): ChatHistory {
         return globalMutex.withLock {
             try {
-                // 获取父对话
-                val parentChat = chatDao.getChatById(parentChatId)
-                    ?: throw IllegalArgumentException(context.getString(R.string.chat_history_parent_not_exist, parentChatId))
+                val (branchHistory, copiedMessageCount) =
+                    database.withTransaction {
+                        // 获取父对话
+                        val parentChat =
+                            chatDao.getChatById(parentChatId)
+                                ?: throw IllegalArgumentException(
+                                    context.getString(R.string.chat_history_parent_not_exist, parentChatId)
+                                )
+                        require(
+                            agentExecutionDao.countMessageOwnersUpToTimestamp(
+                                chatId = parentChatId,
+                                upToTimestampInclusive = upToMessageTimestamp,
+                            ) == 0
+                        ) {
+                            "Branching Agent-owned messages requires explicit session remapping"
+                        }
 
-                val branchEntity =
-                    ChatEntity(
-                        title = parentChat.title,
-                        inputTokens = parentChat.inputTokens,
-                        outputTokens = parentChat.outputTokens,
-                        currentWindowSize = parentChat.currentWindowSize,
-                        group = parentChat.group,
-                        workspace = parentChat.workspace,
-                        workspaceEnv = parentChat.workspaceEnv,
-                        parentChatId = parentChatId,
-                        characterCardName = parentChat.characterCardName,
-                        characterGroupId = parentChat.characterGroupId,
-                        locked = false,
-                        pinned = false,
-                    )
+                        val branchEntity =
+                            ChatEntity(
+                                title = parentChat.title,
+                                inputTokens = parentChat.inputTokens,
+                                outputTokens = parentChat.outputTokens,
+                                currentWindowSize = parentChat.currentWindowSize,
+                                group = parentChat.group,
+                                workspace = parentChat.workspace,
+                                workspaceEnv = parentChat.workspaceEnv,
+                                parentChatId = parentChatId,
+                                characterCardName = parentChat.characterCardName,
+                                characterGroupId = parentChat.characterGroupId,
+                                locked = false,
+                                pinned = false,
+                            )
 
-                chatDao.insertChat(branchEntity)
+                        chatDao.insertChat(branchEntity)
 
-                val copiedMessageCount =
-                    messageDao.countMessagesForChatUpToTimestamp(parentChatId, upToMessageTimestamp)
-                if (copiedMessageCount > 0) {
-                    messageDao.copyMessagesToChat(
-                        sourceChatId = parentChatId,
-                        targetChatId = branchEntity.id,
-                        upToTimestampInclusive = upToMessageTimestamp,
-                    )
-                    messageVariantDao.copyVariantsToChat(
-                        sourceChatId = parentChatId,
-                        targetChatId = branchEntity.id,
-                        upToTimestampInclusive = upToMessageTimestamp,
-                    )
-                }
-
-                val branchHistory = branchEntity.toChatHistory(emptyList())
+                        val copiedCount =
+                            messageDao.countMessagesForChatUpToTimestamp(parentChatId, upToMessageTimestamp)
+                        if (copiedCount > 0) {
+                            messageDao.copyMessagesToChat(
+                                sourceChatId = parentChatId,
+                                targetChatId = branchEntity.id,
+                                upToTimestampInclusive = upToMessageTimestamp,
+                            )
+                            messageVariantDao.copyVariantsToChat(
+                                sourceChatId = parentChatId,
+                                targetChatId = branchEntity.id,
+                                upToTimestampInclusive = upToMessageTimestamp,
+                            )
+                        }
+                        branchEntity.toChatHistory(emptyList()) to copiedCount
+                    }
 
                 // 设置为当前聊天
                 setCurrentChatId(branchHistory.id)

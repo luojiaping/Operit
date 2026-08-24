@@ -25,6 +25,7 @@ import com.ai.assistance.operit.core.agent.contract.AgentStatus
         Index("chatId"),
         Index("parentSessionId"),
         Index(value = ["chatId", "updatedAt"]),
+        Index(value = ["chatId", "sessionId"], unique = true),
     ],
 )
 data class AgentSessionEntity(

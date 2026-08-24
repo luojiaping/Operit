@@ -126,6 +126,38 @@ data class AgentSessionSnapshot(
     val updatedAt: Long
 )
 
+data class AgentChatBindingSnapshot(
+    val chatId: String,
+    val activeSessionId: AgentSessionId,
+    val updatedAt: Long,
+) {
+    init {
+        require(chatId.isNotBlank()) { "chatId must not be blank" }
+    }
+}
+
+data class AgentMessageOwnerSnapshot(
+    val messageId: Long,
+    val chatId: String,
+    val owner: AgentOwner.PluginAgent,
+) {
+    init {
+        require(messageId > 0L) { "messageId must be positive" }
+        require(chatId.isNotBlank()) { "chatId must not be blank" }
+    }
+}
+
+data class PersistedAgentMessageRef(
+    val messageId: Long,
+    val chatId: String,
+    val timestamp: Long,
+) {
+    init {
+        require(messageId > 0L) { "messageId must be positive" }
+        require(chatId.isNotBlank()) { "chatId must not be blank" }
+    }
+}
+
 data class AgentRunSnapshot(
     val runId: AgentRunId,
     val sessionId: AgentSessionId,
