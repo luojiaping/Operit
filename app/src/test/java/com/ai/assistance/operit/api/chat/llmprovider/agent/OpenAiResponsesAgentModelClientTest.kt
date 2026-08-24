@@ -19,6 +19,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -268,7 +269,7 @@ class OpenAiResponsesAgentModelClientTest {
         }
         firstStarted.await()
 
-        val secondEvents = async { collect(client, request("second")) }.await()
+        val secondEvents = async(Dispatchers.IO) { collect(client, request("second")) }.await()
 
         assertTrue(secondEvents.any { event -> event is AgentModelEvent.Completed })
         withTimeout(5_000L) {
