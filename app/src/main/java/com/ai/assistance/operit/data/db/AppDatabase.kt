@@ -1057,5 +1057,7 @@ abstract class AppDatabase : RoomDatabase() {
                 }
             }
         }
+
+        internal fun migration23To24ForTesting(): Migration = MIGRATION_23_24
     }
 }

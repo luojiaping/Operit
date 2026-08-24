@@ -10,7 +10,9 @@ import com.ai.assistance.operit.core.agent.history.AgentHistorySourceMessage
 import com.ai.assistance.operit.data.db.AppDatabase
 import com.ai.assistance.operit.data.model.MessageEntity
 
-class AgentHistoryRepository private constructor(context: Context) {
+class AgentHistoryRepository internal constructor(
+    private val database: AppDatabase,
+) {
     companion object {
         private const val SQLITE_IN_QUERY_BATCH_SIZE = 500
 
@@ -19,12 +21,13 @@ class AgentHistoryRepository private constructor(context: Context) {
 
         fun getInstance(context: Context): AgentHistoryRepository {
             return instance ?: synchronized(this) {
-                instance ?: AgentHistoryRepository(context.applicationContext).also { instance = it }
+                instance ?: AgentHistoryRepository(
+                    AppDatabase.getDatabase(context.applicationContext)
+                ).also { instance = it }
             }
         }
     }
 
-    private val database = AppDatabase.getDatabase(context)
     private val chatContentDao = database.chatContentDao()
     private val agentExecutionDao = database.agentExecutionDao()
 

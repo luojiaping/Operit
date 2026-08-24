@@ -14,15 +14,28 @@ import com.ai.assistance.operit.core.agent.model.AgentModelStopReason
 import com.ai.assistance.operit.data.model.ApiProviderType
 import com.ai.assistance.operit.data.model.ApiKeyInfo
 import com.ai.assistance.operit.data.model.ModelConfigData
+import java.io.IOException
+import java.util.concurrent.atomic.AtomicInteger
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
+import okhttp3.MediaType
 import okhttp3.Interceptor
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Protocol
 import okhttp3.Response
+import okhttp3.ResponseBody
 import okhttp3.ResponseBody.Companion.toResponseBody
 import okio.Buffer
+import okio.BufferedSource
+import okio.Source
+import okio.Timeout
+import okio.buffer
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -214,6 +227,56 @@ class OpenAiResponsesAgentModelClientTest {
         assertEquals(AgentModelErrorCode.PROVIDER, failure.error.code)
     }
 
+    @Test
+    fun cancellingOneRequestClosesOnlyItsSseCall() = runBlocking {
+        val firstStarted = CompletableDeferred<Unit>()
+        val firstClosed = CompletableDeferred<Unit>()
+        val requestCount = AtomicInteger()
+        val firstBody = BlockingSseResponseBody(firstStarted, firstClosed)
+        val httpClient =
+            OkHttpClient.Builder()
+                .addInterceptor(
+                    Interceptor { chain ->
+                        val responseBody =
+                            if (requestCount.getAndIncrement() == 0) {
+                                firstBody
+                            } else {
+                                fixture("text_reasoning_usage_completed.sse")
+                                    .toResponseBody("text/event-stream".toMediaType())
+                            }
+                        Response.Builder()
+                            .request(chain.request())
+                            .protocol(Protocol.HTTP_1_1)
+                            .code(200)
+                            .message("OK")
+                            .header("Content-Type", "text/event-stream")
+                            .body(responseBody)
+                            .build()
+                    },
+                )
+                .build()
+        val client =
+            OpenAiResponsesAgentModelClient(
+                credentialProvider = OpenAiResponsesAgentCredentialProvider {
+                    OpenAiResponsesAgentCredential("test-key")
+                },
+                httpClient = httpClient,
+            )
+
+        val firstJob = launch {
+            client.execute(request("first")).collect { }
+        }
+        firstStarted.await()
+
+        val secondEvents = async { collect(client, request("second")) }.await()
+
+        assertTrue(secondEvents.any { event -> event is AgentModelEvent.Completed })
+        withTimeout(5_000L) {
+            firstJob.cancelAndJoin()
+            firstClosed.await()
+        }
+    }
+
     private suspend fun collect(
         client: AgentModelClient,
         request: AgentModelRequest,
@@ -223,7 +286,10 @@ class OpenAiResponsesAgentModelClientTest {
         return events
     }
 
-    private fun request(maxOutputTokens: Int? = null): AgentModelRequest {
+    private fun request(
+        requestId: String = "request",
+        maxOutputTokens: Int? = null,
+    ): AgentModelRequest {
         val snapshot =
             OpenAiResponsesAgentSnapshot.fromModelConfig(
                 config(
@@ -233,7 +299,7 @@ class OpenAiResponsesAgentModelClientTest {
                 0,
             )
         return AgentModelRequest(
-            modelRequestId = AgentModelRequestId("request"),
+            modelRequestId = AgentModelRequestId(requestId),
             sessionId = AgentSessionId("session"),
             runId = AgentRunId("run"),
             stepId = AgentStepId("step"),
@@ -314,5 +380,54 @@ class OpenAiResponsesAgentModelClientTest {
         return requireNotNull(javaClass.classLoader?.getResourceAsStream(path)) {
             "Missing OpenAI Responses fixture: $path"
         }.bufferedReader().use { reader -> reader.readText() }
+    }
+}
+
+private class BlockingSseResponseBody(
+    private val started: CompletableDeferred<Unit>,
+    private val closed: CompletableDeferred<Unit>,
+) : ResponseBody() {
+    private val lock = java.lang.Object()
+    private var isClosed = false
+    private val source =
+        object : Source {
+            override fun read(sink: Buffer, byteCount: Long): Long {
+                if (byteCount == 0L) {
+                    return 0L
+                }
+                started.complete(Unit)
+                synchronized(lock) {
+                    while (!isClosed) {
+                        try {
+                            lock.wait()
+                        } catch (interrupted: InterruptedException) {
+                            Thread.currentThread().interrupt()
+                            throw IOException("SSE source interrupted", interrupted)
+                        }
+                    }
+                }
+                throw IOException("SSE source closed")
+            }
+
+            override fun timeout(): Timeout = Timeout.NONE
+
+            override fun close() {
+                synchronized(lock) {
+                    isClosed = true
+                    lock.notifyAll()
+                }
+                closed.complete(Unit)
+            }
+        }
+    private val bufferedSource: BufferedSource = source.buffer()
+
+    override fun contentType(): MediaType? = "text/event-stream".toMediaType()
+
+    override fun contentLength(): Long = -1L
+
+    override fun source(): BufferedSource = bufferedSource
+
+    override fun close() {
+        source.close()
     }
 }

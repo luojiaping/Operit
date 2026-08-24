@@ -44,23 +44,27 @@ import com.ai.assistance.operit.data.model.MessageEntity
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
-class AgentExecutionRepository private constructor(context: Context) : AgentKernelStore {
+class AgentExecutionRepository internal constructor(
+    private val database: AppDatabase,
+    private val historyRepository: AgentHistoryRepository,
+) : AgentKernelStore {
     companion object {
         @Volatile
         private var instance: AgentExecutionRepository? = null
 
         fun getInstance(context: Context): AgentExecutionRepository {
             return instance ?: synchronized(this) {
-                instance ?: AgentExecutionRepository(context.applicationContext).also { instance = it }
+                instance ?: AgentExecutionRepository(
+                    database = AppDatabase.getDatabase(context.applicationContext),
+                    historyRepository = AgentHistoryRepository.getInstance(context.applicationContext),
+                ).also { instance = it }
             }
         }
     }
 
-    private val database = AppDatabase.getDatabase(context)
     private val dao: AgentExecutionDao = database.agentExecutionDao()
     private val chatDao = database.chatDao()
     private val messageDao = database.messageDao()
-    private val historyRepository = AgentHistoryRepository.getInstance(context)
 
     suspend fun startSession(input: AgentSessionStart, now: Long = System.currentTimeMillis()): AgentSessionSnapshot {
         return database.withTransaction {
