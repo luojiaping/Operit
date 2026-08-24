@@ -222,6 +222,16 @@ The Android test source compiled on commit `73b99d052` with
 `:app:compileDebugAndroidTestKotlin`: `BUILD SUCCESSFUL in 1m 16s`. No adb device was available,
 so the Android migration and Repository tests were not executed.
 
+Remote `development` sync and `build_dev` passed for documentation head `2ff742ae9`, with the
+functional code from `73b99d052`:
+
+- artifact: `operit-dev-development-2ff742ae.apk`
+- size: `403216031`
+- SHA-256: `ef8de9d44ef1f055fdc788dcdf7e2bc56f03a0f216b1d9a04e47c5ca97805b64`
+
+The generated Room 24 baseline is now committed at
+`app/schemas/com.ai.assistance.operit.data.db.AppDatabase/24.json`.
+
 The temporary worktree was removed after the report was collected.
 
 ## 7. Remaining Gates
@@ -229,8 +239,7 @@ The temporary worktree was removed after the report was collected.
 Before production Agent routing:
 
 1. Run Android migration and Repository instrumentation when an adb device is available.
-2. Add Room schema JSON baselines if the project enables Room schema export.
-3. Only after those gates, connect `AgentRouter` before group orchestration and role-card parsing.
+2. Only after those gates, connect `AgentRouter` before group orchestration and role-card parsing.
 
 Do not implement ToolPkg Agent registration, permissions, tool materialization, Plan/Build UI, or
 production MessageCoordinationDelegate routing in the next small change unless the corresponding

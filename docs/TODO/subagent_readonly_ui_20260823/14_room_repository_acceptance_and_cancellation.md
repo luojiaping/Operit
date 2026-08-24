@@ -3,6 +3,7 @@ fork: https://github.com/luojiaping/Operit.git
 scope: Room persistence, migration, Repository settlement, and SSE cancellation coverage
 status: source_verified_pending_instrumentation
 implementation_commit: 73b99d052
+build_commit: 2ff742ae9
 ---
 
 # Persistence Acceptance Coverage
@@ -69,12 +70,21 @@ Android test source command:
 
 Result on `73b99d052`: `BUILD SUCCESSFUL in 1m 16s`.
 
+The generated Room 24 schema baseline is committed at
+`app/schemas/com.ai.assistance.operit.data.db.AppDatabase/24.json`.
+
+Remote `development` sync and `build_dev` passed for `2ff742ae9`:
+
+- artifact: `operit-dev-development-2ff742ae.apk`
+- size: `403216031`
+- SHA-256: `ef8de9d44ef1f055fdc788dcdf7e2bc56f03a0f216b1d9a04e47c5ca97805b64`
+
 No adb device was available on the build machine. The Android migration and Repository tests are
 compiled but remain pending instrumentation execution.
 
 ## 5. Next Gate
 
-Run:
+Run when an adb device is available:
 
 ```text
 ./gradlew :app:connectedDebugAndroidTest --no-daemon --max-workers=1
