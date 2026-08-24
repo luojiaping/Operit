@@ -7,16 +7,26 @@ import com.ai.assistance.operit.core.agent.contract.AgentMessageOwnerSnapshot
 import com.ai.assistance.operit.core.agent.contract.AgentRunId
 import com.ai.assistance.operit.core.agent.contract.AgentRunSnapshot
 import com.ai.assistance.operit.core.agent.contract.AgentRunStart
+import com.ai.assistance.operit.core.agent.contract.AgentRunStatus
+import com.ai.assistance.operit.core.agent.contract.AgentSessionStatus
 import com.ai.assistance.operit.core.agent.contract.AgentStateTransitions
 import com.ai.assistance.operit.core.agent.contract.AgentSessionId
 import com.ai.assistance.operit.core.agent.contract.AgentSessionSnapshot
 import com.ai.assistance.operit.core.agent.contract.AgentSessionStart
-import com.ai.assistance.operit.core.agent.contract.AgentStatus
+import com.ai.assistance.operit.core.agent.contract.AgentStepSnapshot
+import com.ai.assistance.operit.core.agent.contract.AgentStepStart
+import com.ai.assistance.operit.core.agent.contract.AgentStepStatus
 import com.ai.assistance.operit.core.agent.contract.AgentToolCallId
 import com.ai.assistance.operit.core.agent.contract.AgentToolCallSnapshot
 import com.ai.assistance.operit.core.agent.contract.AgentToolCallStart
 import com.ai.assistance.operit.core.agent.contract.AgentToolCallStatus
 import com.ai.assistance.operit.core.agent.contract.PersistedAgentMessageRef
+import com.ai.assistance.operit.core.agent.kernel.AgentKernelStore
+import com.ai.assistance.operit.core.agent.kernel.AgentRunCompleteRequest
+import com.ai.assistance.operit.core.agent.kernel.AgentRunFailRequest
+import com.ai.assistance.operit.core.agent.kernel.AgentRunReservation
+import com.ai.assistance.operit.core.agent.kernel.AgentRunReserveRequest
+import com.ai.assistance.operit.core.agent.kernel.AgentRunTerminalSnapshot
 import com.ai.assistance.operit.core.agent.routing.AgentRoute
 import com.ai.assistance.operit.core.agent.routing.AgentRouter
 import com.ai.assistance.operit.data.dao.AgentExecutionDao
@@ -24,14 +34,17 @@ import com.ai.assistance.operit.data.db.AppDatabase
 import com.ai.assistance.operit.data.model.AgentChatBindingEntity
 import com.ai.assistance.operit.data.model.AgentMessageOwnerEntity
 import com.ai.assistance.operit.data.model.AgentRunEntity
+import com.ai.assistance.operit.data.model.AgentRunLeaseEntity
 import com.ai.assistance.operit.data.model.AgentSessionEntity
+import com.ai.assistance.operit.data.model.AgentStepEntity
 import com.ai.assistance.operit.data.model.AgentToolCallEntity
+import com.ai.assistance.operit.data.model.ChatEntity
 import com.ai.assistance.operit.data.model.ChatMessage
 import com.ai.assistance.operit.data.model.MessageEntity
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
-class AgentExecutionRepository private constructor(context: Context) {
+class AgentExecutionRepository private constructor(context: Context) : AgentKernelStore {
     companion object {
         @Volatile
         private var instance: AgentExecutionRepository? = null
@@ -47,6 +60,7 @@ class AgentExecutionRepository private constructor(context: Context) {
     private val dao: AgentExecutionDao = database.agentExecutionDao()
     private val chatDao = database.chatDao()
     private val messageDao = database.messageDao()
+    private val historyRepository = AgentHistoryRepository.getInstance(context)
 
     suspend fun startSession(input: AgentSessionStart, now: Long = System.currentTimeMillis()): AgentSessionSnapshot {
         return database.withTransaction {
@@ -58,7 +72,7 @@ class AgentExecutionRepository private constructor(context: Context) {
                         "Parent Agent session not found: ${parentSessionId.value}"
                     }
                     require(parent.chatId == input.chatId) { "Parent Agent session belongs to another chat" }
-                    requireOpenStatus(AgentStatus.valueOf(parent.status), "Parent Agent session")
+                    requireOpenSessionStatus(AgentSessionStatus.valueOf(parent.status), "Parent Agent session")
                     require(input.depth == parent.depth + 1) { "Child Agent session depth must follow its parent" }
                 }
             }
@@ -82,7 +96,7 @@ class AgentExecutionRepository private constructor(context: Context) {
             require(session.parentSessionId == null && session.depth == 0) {
                 "Only a root Agent session can own a chat route"
             }
-            requireOpenStatus(AgentStatus.valueOf(session.status), "Agent session")
+            requireOpenSessionStatus(AgentSessionStatus.valueOf(session.status), "Agent session")
             val binding =
                 AgentChatBindingEntity(
                     chatId = chatId,
@@ -118,7 +132,7 @@ class AgentExecutionRepository private constructor(context: Context) {
 
     suspend fun updateSessionStatus(
         sessionId: AgentSessionId,
-        status: AgentStatus,
+        status: AgentSessionStatus,
         startedAt: Long? = null,
         finishedAt: Long? = null,
         now: Long = System.currentTimeMillis(),
@@ -127,9 +141,12 @@ class AgentExecutionRepository private constructor(context: Context) {
             val current = requireNotNull(dao.getSession(sessionId.value)) {
                 "Agent session not found: ${sessionId.value}"
             }
-            val currentStatus = AgentStatus.valueOf(current.status)
+            require(dao.getRunLease(current.sessionId) == null) {
+                "Agent session status is owned by an active run lease"
+            }
+            val currentStatus = AgentSessionStatus.valueOf(current.status)
             if (currentStatus == status) {
-                if (isTerminalStatus(status)) {
+                if (isTerminalSessionStatus(status)) {
                     dao.clearChatBindingForSession(current.chatId, current.sessionId)
                 }
                 return@withTransaction current.toSnapshot()
@@ -145,75 +162,9 @@ class AgentExecutionRepository private constructor(context: Context) {
                     updatedAt = now,
                 )
             dao.updateSession(updated)
-            if (isTerminalStatus(status)) {
+            if (isTerminalSessionStatus(status)) {
                 dao.clearChatBindingForSession(updated.chatId, updated.sessionId)
             }
-            updated.toSnapshot()
-        }
-    }
-
-    suspend fun startRun(input: AgentRunStart, now: Long = System.currentTimeMillis()): AgentRunSnapshot {
-        return database.withTransaction {
-            val session = requireNotNull(dao.getSession(input.sessionId.value)) {
-                "Agent session not found: ${input.sessionId.value}"
-            }
-            requireOpenStatus(AgentStatus.valueOf(session.status), "Agent session")
-            input.parentRunId?.let { parentRunId ->
-                val parentRun = requireNotNull(dao.getRun(parentRunId.value)) {
-                    "Parent Agent run not found: ${parentRunId.value}"
-                }
-                val allowedParentSessionIds =
-                    mutableSetOf(session.sessionId).apply {
-                        session.parentSessionId?.let { parentSessionId -> add(parentSessionId) }
-                    }
-                require(parentRun.sessionId in allowedParentSessionIds) {
-                    "Parent Agent run is outside the session lineage"
-                }
-            }
-            input.parentMessageId?.let { parentMessageId ->
-                val parentMessage = requireNotNull(dao.getMessageIdentity(parentMessageId)) {
-                    "Parent message not found: $parentMessageId"
-                }
-                require(parentMessage.chatId == session.chatId) {
-                    "Parent message belongs to another chat"
-                }
-            }
-            val entity = AgentRunEntity.fromStart(input, now)
-            dao.insertRun(entity)
-            entity.toSnapshot()
-        }
-    }
-
-    suspend fun updateRun(
-        runId: AgentRunId,
-        status: AgentStatus,
-        summary: String? = null,
-        errorMessage: String? = null,
-        startedAt: Long? = null,
-        finishedAt: Long? = null,
-        now: Long = System.currentTimeMillis(),
-    ): AgentRunSnapshot {
-        return database.withTransaction {
-            val current = requireNotNull(dao.getRun(runId.value)) {
-                "Agent run not found: ${runId.value}"
-            }
-            val currentStatus = AgentStatus.valueOf(current.status)
-            if (currentStatus == status) {
-                return@withTransaction current.toSnapshot()
-            }
-            require(AgentStateTransitions.canTransition(currentStatus, status)) {
-                "Invalid Agent run transition: ${currentStatus.name} -> ${status.name}"
-            }
-            val updated =
-                current.copy(
-                    status = status.name,
-                    summary = summary ?: current.summary,
-                    errorMessage = errorMessage ?: current.errorMessage,
-                    startedAt = startedAt ?: current.startedAt,
-                    finishedAt = finishedAt ?: current.finishedAt,
-                    updatedAt = now,
-                )
-            dao.updateRun(updated)
             updated.toSnapshot()
         }
     }
@@ -226,7 +177,7 @@ class AgentExecutionRepository private constructor(context: Context) {
             val run = requireNotNull(dao.getRun(input.runId.value)) {
                 "Agent run not found: ${input.runId.value}"
             }
-            require(AgentStatus.valueOf(run.status) == AgentStatus.RUNNING) {
+            require(AgentRunStatus.valueOf(run.status) == AgentRunStatus.RUNNING) {
                 "Agent tool calls require a running Agent run"
             }
             require(dao.getToolCallBySequence(input.runId.value, input.sequence) == null) {
@@ -295,7 +246,7 @@ class AgentExecutionRepository private constructor(context: Context) {
             val session = requireNotNull(dao.getSession(sessionId.value)) {
                 "Agent session not found: ${sessionId.value}"
             }
-            requireOpenStatus(AgentStatus.valueOf(session.status), "Agent session")
+            requireOpenSessionStatus(AgentSessionStatus.valueOf(session.status), "Agent session")
             require(message.chatId == session.chatId) { "Message and Agent session belong to different chats" }
             val owner = ownerEntity(messageId, session)
             when (val existing = dao.getMessageOwner(messageId)) {
@@ -318,7 +269,7 @@ class AgentExecutionRepository private constructor(context: Context) {
             val session = requireNotNull(dao.getSession(sessionId.value)) {
                 "Agent session not found: ${sessionId.value}"
             }
-            requireOpenStatus(AgentStatus.valueOf(session.status), "Agent session")
+            requireOpenSessionStatus(AgentSessionStatus.valueOf(session.status), "Agent session")
             val chat = requireNotNull(chatDao.getChatById(session.chatId)) {
                 "Chat not found: ${session.chatId}"
             }
@@ -360,7 +311,7 @@ class AgentExecutionRepository private constructor(context: Context) {
             val session = requireNotNull(dao.getSession(sessionId.value)) {
                 "Agent session not found: ${sessionId.value}"
             }
-            requireOpenStatus(AgentStatus.valueOf(session.status), "Agent session")
+            requireOpenSessionStatus(AgentSessionStatus.valueOf(session.status), "Agent session")
             require(session.chatId == ref.chatId) { "Persisted message belongs to another chat" }
             val current = requireNotNull(dao.getMessageIdentity(ref.messageId)) {
                 "Message not found: ${ref.messageId}"
@@ -393,6 +344,267 @@ class AgentExecutionRepository private constructor(context: Context) {
         }
     }
 
+    override suspend fun recoverInterruptedRuns(now: Long): Int {
+        return database.withTransaction {
+            val leases = dao.getRunLeases()
+            leases.forEach { lease ->
+                val session = requireNotNull(dao.getSession(lease.sessionId)) {
+                    "Leased Agent session not found: ${lease.sessionId}"
+                }
+                val run = requireNotNull(dao.getRun(lease.runId)) {
+                    "Leased Agent run not found: ${lease.runId}"
+                }
+                val step = requireNotNull(dao.getRunningStep(lease.runId)) {
+                    "Running Agent step not found: ${lease.runId}"
+                }
+                val errorCode = "PROCESS_INTERRUPTED"
+                val errorMessage = "Agent process ended before run settlement"
+                dao.updateStep(
+                    step.copy(
+                        status = AgentStepStatus.FAILED.name,
+                        errorCode = errorCode,
+                        errorMessage = errorMessage,
+                        finishedAt = now,
+                        updatedAt = now,
+                    )
+                )
+                dao.updateRun(
+                    run.copy(
+                        status = AgentRunStatus.FAILED.name,
+                        errorCode = errorCode,
+                        errorMessage = errorMessage,
+                        finishedAt = now,
+                        updatedAt = now,
+                    )
+                )
+                dao.deleteRunLease(lease.sessionId, lease.runId)
+                dao.updateSession(
+                    session.copy(
+                        status = AgentSessionStatus.IDLE.name,
+                        updatedAt = now,
+                    )
+                )
+            }
+            leases.size
+        }
+    }
+
+    override suspend fun reserveRun(request: AgentRunReserveRequest): AgentRunReservation {
+        val command = request.command
+        return database.withTransaction {
+            val session = requireNotNull(dao.getSession(command.sessionId.value)) {
+                "Agent session not found: ${command.sessionId.value}"
+            }
+            require(session.parentSessionId == null && session.depth == 0) {
+                "Text-only AgentKernel requires a root Agent session"
+            }
+            require(AgentSessionStatus.valueOf(session.status) == AgentSessionStatus.IDLE) {
+                "Agent session is not idle: ${session.status}"
+            }
+            require(dao.getRunLease(session.sessionId) == null) {
+                "Agent session already has an active run"
+            }
+            val binding = requireNotNull(dao.getChatBinding(session.chatId)) {
+                "Agent chat binding not found: ${session.chatId}"
+            }
+            require(binding.activeSessionId == session.sessionId) {
+                "Agent session is not the active root route"
+            }
+            val chat = requireNotNull(chatDao.getChatById(session.chatId)) {
+                "Chat not found: ${session.chatId}"
+            }
+            val inputMessage =
+                persistSharedUserMessageLocked(
+                    chat = chat,
+                    content = command.userText,
+                    timestamp = command.userTimestamp,
+                    now = request.now,
+                )
+            val run =
+                AgentRunEntity.fromStart(
+                    input =
+                        AgentRunStart(
+                            sessionId = command.sessionId,
+                            promptSnapshot = command.promptSnapshot,
+                            modelSnapshotJson = command.modelSnapshotJson,
+                            permissionSnapshotJson = command.permissionSnapshotJson,
+                            toolSnapshotJson = command.toolSnapshotJson,
+                            runId = command.runId,
+                            parentMessageId = inputMessage.messageId,
+                            inputMessageId = inputMessage.messageId,
+                        ),
+                    now = request.now,
+                ).copy(
+                    status = AgentRunStatus.RUNNING.name,
+                    startedAt = request.now,
+                )
+            dao.insertRun(run)
+            val step =
+                AgentStepEntity.fromStart(
+                    input =
+                        AgentStepStart(
+                            runId = command.runId,
+                            sequence = 0,
+                            modelRequestId = command.modelRequestId,
+                            stepId = command.stepId,
+                        ),
+                    now = request.now,
+                    status = AgentStepStatus.RUNNING,
+                )
+            dao.insertStep(step)
+            dao.insertRunLease(
+                AgentRunLeaseEntity(
+                    sessionId = session.sessionId,
+                    runId = run.runId,
+                    acquiredAt = request.now,
+                )
+            )
+            val sessionStartedAt =
+                when (val startedAt = session.startedAt) {
+                    null -> request.now
+                    else -> startedAt
+                }
+            val runningSession =
+                session.copy(
+                    status = AgentSessionStatus.RUNNING.name,
+                    startedAt = sessionStartedAt,
+                    updatedAt = request.now,
+                )
+            dao.updateSession(runningSession)
+            val history =
+                historyRepository.loadPluginHistory(
+                    chatId = runningSession.chatId,
+                    sessionId = command.sessionId,
+                )
+            AgentRunReservation(
+                session = runningSession.toSnapshot(),
+                run = run.toSnapshot(),
+                step = step.toSnapshot(),
+                inputMessage = inputMessage,
+                history = history,
+            )
+        }
+    }
+
+    override suspend fun completeRun(request: AgentRunCompleteRequest): AgentRunTerminalSnapshot {
+        require(request.assistantText.isNotBlank()) { "Agent assistant text must not be blank" }
+        require(request.assistantTimestamp > 0L) { "Agent assistant timestamp must be positive" }
+        return database.withTransaction {
+            val current = loadReservationStateLocked(request.reservation)
+            if (AgentRunStatus.valueOf(current.run.status) == AgentRunStatus.COMPLETED) {
+                requireCompletedPayloadMatches(current.step, request)
+                val outputMessageId = requireNotNull(current.run.outputMessageId) {
+                    "Completed Agent run has no output message"
+                }
+                val outputIdentity = requireNotNull(dao.getMessageIdentity(outputMessageId)) {
+                    "Completed Agent output message not found: $outputMessageId"
+                }
+                require(outputIdentity.chatId == current.session.chatId) {
+                    "Completed Agent output belongs to another chat"
+                }
+                require(outputIdentity.sender == "ai") {
+                    "Completed Agent output has an invalid sender"
+                }
+                require(outputIdentity.timestamp == request.assistantTimestamp) {
+                    "Agent completion timestamp conflicts with the persisted value"
+                }
+                require(dao.getMessageOwner(outputMessageId) == ownerEntity(outputMessageId, current.session)) {
+                    "Completed Agent output owner conflicts with the persisted value"
+                }
+                return@withTransaction AgentRunTerminalSnapshot(
+                    session = current.session.toSnapshot(),
+                    run = current.run.toSnapshot(),
+                    step = current.step.toSnapshot(),
+                    outputMessage =
+                        PersistedAgentMessageRef(
+                            messageId = outputIdentity.messageId,
+                            chatId = outputIdentity.chatId,
+                            timestamp = outputIdentity.timestamp,
+                        ),
+                )
+            }
+            requireActiveReservationLocked(current, request.reservation)
+            val chat = requireNotNull(chatDao.getChatById(current.session.chatId)) {
+                "Chat not found: ${current.session.chatId}"
+            }
+            val outputMessage =
+                persistAgentOutputLocked(
+                    session = current.session,
+                    chat = chat,
+                    content = request.assistantText,
+                    timestamp = request.assistantTimestamp,
+                    now = request.now,
+                )
+            val completedStep =
+                current.step.copy(
+                    status = AgentStepStatus.COMPLETED.name,
+                    assistantText = request.assistantText,
+                    reasoningText = request.reasoningText,
+                    usageJson = request.usageJson,
+                    finishReason = request.finishReason.name,
+                    errorCode = null,
+                    errorMessage = null,
+                    finishedAt = request.now,
+                    updatedAt = request.now,
+                )
+            dao.updateStep(completedStep)
+            val completedRun =
+                current.run.copy(
+                    outputMessageId = outputMessage.messageId,
+                    status = AgentRunStatus.COMPLETED.name,
+                    errorCode = null,
+                    errorMessage = null,
+                    finishedAt = request.now,
+                    updatedAt = request.now,
+                )
+            dao.updateRun(completedRun)
+            dao.deleteRunLease(current.session.sessionId, current.run.runId)
+            val idleSession =
+                current.session.copy(
+                    status = AgentSessionStatus.IDLE.name,
+                    updatedAt = request.now,
+                )
+            dao.updateSession(idleSession)
+            AgentRunTerminalSnapshot(
+                session = idleSession.toSnapshot(),
+                run = completedRun.toSnapshot(),
+                step = completedStep.toSnapshot(),
+                outputMessage = outputMessage,
+            )
+        }
+    }
+
+    override suspend fun failRun(request: AgentRunFailRequest): AgentRunTerminalSnapshot {
+        return settleRunFailure(
+            request = request,
+            runStatus = AgentRunStatus.FAILED,
+            stepStatus = AgentStepStatus.FAILED,
+        )
+    }
+
+    override suspend fun cancelRun(
+        reservation: AgentRunReservation,
+        assistantText: String,
+        reasoningText: String,
+        usageJson: String?,
+        now: Long,
+    ): AgentRunTerminalSnapshot {
+        return settleRunFailure(
+            request =
+                AgentRunFailRequest(
+                    reservation = reservation,
+                    errorCode = "CANCELLED",
+                    errorMessage = "Agent run cancelled",
+                    assistantText = assistantText,
+                    reasoningText = reasoningText,
+                    usageJson = usageJson,
+                    now = now,
+                ),
+            runStatus = AgentRunStatus.CANCELLED,
+            stepStatus = AgentStepStatus.CANCELLED,
+        )
+    }
+
     suspend fun getSession(sessionId: AgentSessionId): AgentSessionSnapshot? {
         return dao.getSession(sessionId.value)?.toSnapshot()
     }
@@ -413,6 +625,10 @@ class AgentExecutionRepository private constructor(context: Context) {
         return dao.observeRuns(sessionId.value).map { entities -> entities.map(AgentRunEntity::toSnapshot) }
     }
 
+    fun observeSteps(runId: AgentRunId): Flow<List<AgentStepSnapshot>> {
+        return dao.observeSteps(runId.value).map { entities -> entities.map(AgentStepEntity::toSnapshot) }
+    }
+
     fun observeToolCalls(runId: AgentRunId): Flow<List<AgentToolCallSnapshot>> {
         return dao.observeToolCalls(runId.value).map { entities -> entities.map(AgentToolCallEntity::toSnapshot) }
     }
@@ -428,6 +644,223 @@ class AgentExecutionRepository private constructor(context: Context) {
         )
     }
 
+    private suspend fun settleRunFailure(
+        request: AgentRunFailRequest,
+        runStatus: AgentRunStatus,
+        stepStatus: AgentStepStatus,
+    ): AgentRunTerminalSnapshot {
+        return database.withTransaction {
+            val current = loadReservationStateLocked(request.reservation)
+            val currentRunStatus = AgentRunStatus.valueOf(current.run.status)
+            if (currentRunStatus == runStatus) {
+                require(current.run.errorCode == request.errorCode) {
+                    "Agent run terminal error code conflicts with the persisted value"
+                }
+                require(current.run.errorMessage == request.errorMessage) {
+                    "Agent run terminal error message conflicts with the persisted value"
+                }
+                require(current.step.status == stepStatus.name) {
+                    "Agent step terminal status conflicts with the persisted value"
+                }
+                require(current.step.errorCode == request.errorCode) {
+                    "Agent step terminal error code conflicts with the persisted value"
+                }
+                require(current.step.errorMessage == request.errorMessage) {
+                    "Agent step terminal error message conflicts with the persisted value"
+                }
+                require(current.step.assistantText == request.assistantText) {
+                    "Agent step partial text conflicts with the persisted value"
+                }
+                require(current.step.reasoningText == request.reasoningText) {
+                    "Agent step partial reasoning conflicts with the persisted value"
+                }
+                require(current.step.usageJson == request.usageJson) {
+                    "Agent step partial usage conflicts with the persisted value"
+                }
+                return@withTransaction AgentRunTerminalSnapshot(
+                    session = current.session.toSnapshot(),
+                    run = current.run.toSnapshot(),
+                    step = current.step.toSnapshot(),
+                )
+            }
+            requireActiveReservationLocked(current, request.reservation)
+            val settledStep =
+                current.step.copy(
+                    status = stepStatus.name,
+                    assistantText = request.assistantText,
+                    reasoningText = request.reasoningText,
+                    usageJson = request.usageJson,
+                    errorCode = request.errorCode,
+                    errorMessage = request.errorMessage,
+                    finishedAt = request.now,
+                    updatedAt = request.now,
+                )
+            dao.updateStep(settledStep)
+            val settledRun =
+                current.run.copy(
+                    status = runStatus.name,
+                    errorCode = request.errorCode,
+                    errorMessage = request.errorMessage,
+                    finishedAt = request.now,
+                    updatedAt = request.now,
+                )
+            dao.updateRun(settledRun)
+            dao.deleteRunLease(current.session.sessionId, current.run.runId)
+            val idleSession =
+                current.session.copy(
+                    status = AgentSessionStatus.IDLE.name,
+                    updatedAt = request.now,
+                )
+            dao.updateSession(idleSession)
+            AgentRunTerminalSnapshot(
+                session = idleSession.toSnapshot(),
+                run = settledRun.toSnapshot(),
+                step = settledStep.toSnapshot(),
+            )
+        }
+    }
+
+    private suspend fun loadReservationStateLocked(
+        reservation: AgentRunReservation,
+    ): ReservationState {
+        val session = requireNotNull(dao.getSession(reservation.session.sessionId.value)) {
+            "Agent session not found: ${reservation.session.sessionId.value}"
+        }
+        val run = requireNotNull(dao.getRun(reservation.run.runId.value)) {
+            "Agent run not found: ${reservation.run.runId.value}"
+        }
+        val step = requireNotNull(dao.getStep(reservation.step.stepId.value)) {
+            "Agent step not found: ${reservation.step.stepId.value}"
+        }
+        require(run.sessionId == session.sessionId) { "Agent run belongs to another session" }
+        require(step.runId == run.runId) { "Agent step belongs to another run" }
+        require(reservation.run.runId.value == run.runId) { "Agent reservation run identity changed" }
+        require(reservation.step.stepId.value == step.stepId) { "Agent reservation step identity changed" }
+        return ReservationState(session = session, run = run, step = step)
+    }
+
+    private suspend fun requireActiveReservationLocked(
+        current: ReservationState,
+        reservation: AgentRunReservation,
+    ) {
+        require(current.run.sessionId == current.session.sessionId) {
+            "Agent run belongs to another session"
+        }
+        require(current.step.runId == current.run.runId) {
+            "Agent step belongs to another run"
+        }
+        require(AgentSessionStatus.valueOf(current.session.status) == AgentSessionStatus.RUNNING) {
+            "Agent session is not running"
+        }
+        require(AgentRunStatus.valueOf(current.run.status) == AgentRunStatus.RUNNING) {
+            "Agent run is not running"
+        }
+        require(AgentStepStatus.valueOf(current.step.status) == AgentStepStatus.RUNNING) {
+            "Agent step is not running"
+        }
+        val lease = requireNotNull(dao.getRunLease(current.session.sessionId)) {
+            "Agent run lease not found: ${current.session.sessionId}"
+        }
+        require(lease.runId == current.run.runId) { "Agent run lease points to another run" }
+        require(reservation.run.runId.value == current.run.runId) { "Agent reservation run identity changed" }
+        require(reservation.step.stepId.value == current.step.stepId) { "Agent reservation step identity changed" }
+    }
+
+    private fun requireCompletedPayloadMatches(
+        step: AgentStepEntity,
+        request: AgentRunCompleteRequest,
+    ) {
+        require(step.status == AgentStepStatus.COMPLETED.name) {
+            "Completed Agent run has a non-completed step"
+        }
+        require(step.assistantText == request.assistantText) {
+            "Agent completion text conflicts with the persisted value"
+        }
+        require(step.reasoningText == request.reasoningText) {
+            "Agent completion reasoning conflicts with the persisted value"
+        }
+        require(step.usageJson == request.usageJson) {
+            "Agent completion usage conflicts with the persisted value"
+        }
+        require(step.finishReason == request.finishReason.name) {
+            "Agent completion finish reason conflicts with the persisted value"
+        }
+    }
+
+    private suspend fun persistSharedUserMessageLocked(
+        chat: ChatEntity,
+        content: String,
+        timestamp: Long,
+        now: Long,
+    ): PersistedAgentMessageRef {
+        val orderIndex = (messageDao.getMaxOrderIndex(chat.id) ?: -1) + 1
+        val message =
+            ChatMessage(
+                sender = "user",
+                content = content,
+                timestamp = timestamp,
+            )
+        val messageId =
+            messageDao.insertMessage(
+                MessageEntity.fromChatMessage(
+                    chatId = chat.id,
+                    message = message,
+                    orderIndex = orderIndex,
+                )
+            )
+        require(messageId > 0L) { "Room did not return a persisted user messageId" }
+        updateChatMetadataLocked(chat, now)
+        return PersistedAgentMessageRef(messageId = messageId, chatId = chat.id, timestamp = timestamp)
+    }
+
+    private suspend fun persistAgentOutputLocked(
+        session: AgentSessionEntity,
+        chat: ChatEntity,
+        content: String,
+        timestamp: Long,
+        now: Long,
+    ): PersistedAgentMessageRef {
+        val orderIndex = (messageDao.getMaxOrderIndex(chat.id) ?: -1) + 1
+        val message =
+            ChatMessage(
+                sender = "ai",
+                content = content,
+                timestamp = timestamp,
+            )
+        val messageId =
+            messageDao.insertMessage(
+                MessageEntity.fromChatMessage(
+                    chatId = chat.id,
+                    message = message,
+                    orderIndex = orderIndex,
+                )
+            )
+        require(messageId > 0L) { "Room did not return a persisted Agent output messageId" }
+        dao.insertMessageOwner(ownerEntity(messageId, session))
+        updateChatMetadataLocked(chat, now)
+        return PersistedAgentMessageRef(messageId = messageId, chatId = chat.id, timestamp = timestamp)
+    }
+
+    private suspend fun updateChatMetadataLocked(
+        chat: ChatEntity,
+        now: Long,
+    ) {
+        chatDao.updateChatMetadata(
+            chatId = chat.id,
+            title = chat.title,
+            timestamp = now,
+            inputTokens = chat.inputTokens,
+            outputTokens = chat.outputTokens,
+            currentWindowSize = chat.currentWindowSize,
+        )
+    }
+
+    private data class ReservationState(
+        val session: AgentSessionEntity,
+        val run: AgentRunEntity,
+        val step: AgentStepEntity,
+    )
+
     private fun requireAgentOwnedSender(sender: String) {
         require(sender == "ai" || sender == "summary") {
             "Agent-owned messages must use sender 'ai' or 'summary'"
@@ -441,15 +874,15 @@ class AgentExecutionRepository private constructor(context: Context) {
         }
     }
 
-    private fun requireOpenStatus(status: AgentStatus, aggregate: String) {
-        require(!isTerminalStatus(status)) {
+    private fun requireOpenSessionStatus(status: AgentSessionStatus, aggregate: String) {
+        require(!isTerminalSessionStatus(status)) {
             "$aggregate is terminal: ${status.name}"
         }
     }
 
-    private fun isTerminalStatus(status: AgentStatus): Boolean {
-        return status == AgentStatus.COMPLETED ||
-            status == AgentStatus.FAILED ||
-            status == AgentStatus.CANCELLED
+    private fun isTerminalSessionStatus(status: AgentSessionStatus): Boolean {
+        return status == AgentSessionStatus.COMPLETED ||
+            status == AgentSessionStatus.FAILED ||
+            status == AgentSessionStatus.CANCELLED
     }
 }

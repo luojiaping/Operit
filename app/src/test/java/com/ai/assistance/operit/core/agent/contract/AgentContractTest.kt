@@ -10,11 +10,18 @@ class AgentContractTest {
         val sessionId = AgentSessionId.generate()
         val runId = AgentRunId.generate()
         val callId = AgentToolCallId.generate()
+        val stepId = AgentStepId.generate()
+        val modelRequestId = AgentModelRequestId.generate()
 
         assertTrue(sessionId.value.isNotBlank())
         assertTrue(runId.value.isNotBlank())
         assertTrue(callId.value.isNotBlank())
-        assertEquals(3, setOf(sessionId.value, runId.value, callId.value).size)
+        assertTrue(stepId.value.isNotBlank())
+        assertTrue(modelRequestId.value.isNotBlank())
+        assertEquals(
+            5,
+            setOf(sessionId.value, runId.value, callId.value, stepId.value, modelRequestId.value).size,
+        )
     }
 
     @Test
@@ -25,8 +32,14 @@ class AgentContractTest {
 
     @Test
     fun terminalStatesCannotResume() {
-        assertTrue(!AgentStateTransitions.canTransition(AgentStatus.COMPLETED, AgentStatus.RUNNING))
+        assertTrue(
+            !AgentStateTransitions.canTransition(
+                AgentSessionStatus.COMPLETED,
+                AgentSessionStatus.RUNNING,
+            )
+        )
         assertTrue(!AgentStateTransitions.canTransition(AgentToolCallStatus.CANCELLED, AgentToolCallStatus.RUNNING))
-        assertTrue(AgentStateTransitions.canTransition(AgentStatus.RUNNING, AgentStatus.RUNNING))
+        assertTrue(AgentStateTransitions.canTransition(AgentSessionStatus.RUNNING, AgentSessionStatus.IDLE))
+        assertTrue(!AgentStateTransitions.canTransition(AgentRunStatus.COMPLETED, AgentRunStatus.RUNNING))
     }
 }

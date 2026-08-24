@@ -14,8 +14,10 @@ import com.ai.assistance.operit.data.dao.MessageVariantDao
 import com.ai.assistance.operit.data.dao.TokenUsageDao
 import com.ai.assistance.operit.data.model.AgentChatBindingEntity
 import com.ai.assistance.operit.data.model.AgentMessageOwnerEntity
+import com.ai.assistance.operit.data.model.AgentRunLeaseEntity
 import com.ai.assistance.operit.data.model.AgentRunEntity
 import com.ai.assistance.operit.data.model.AgentSessionEntity
+import com.ai.assistance.operit.data.model.AgentStepEntity
 import com.ai.assistance.operit.data.model.AgentToolCallEntity
 import com.ai.assistance.operit.data.model.ChatEntity
 import com.ai.assistance.operit.data.model.MessageEntity
@@ -33,10 +35,12 @@ import com.ai.assistance.operit.data.model.TokenUsageRecordEntity
         AgentToolCallEntity::class,
         AgentMessageOwnerEntity::class,
         AgentChatBindingEntity::class,
+        AgentStepEntity::class,
+        AgentRunLeaseEntity::class,
         TokenUsageRecordEntity::class,
         TokenStatsModelEntity::class,
     ],
-    version = 23,
+    version = 24,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -794,6 +798,128 @@ abstract class AppDatabase : RoomDatabase() {
                     """.trimIndent()
             }
 
+        /** v23 -> v24: typed Agent run steps and one active run lease per session. */
+        private val MIGRATION_23_24 =
+            object : Migration(23, 24) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    runSql { sql -> db.execSQL(sql) }
+                }
+
+                override fun migrate(connection: androidx.sqlite.SQLiteConnection) {
+                    runSql { sql ->
+                        val statement = connection.prepare(sql)
+                        try {
+                            statement.step()
+                        } finally {
+                            statement.close()
+                        }
+                    }
+                }
+
+                private fun runSql(exec: (String) -> Unit) {
+                    exec(
+                        "ALTER TABLE `agent_sessions` ADD COLUMN " +
+                            "`profileKind` TEXT NOT NULL DEFAULT 'PRIMARY'"
+                    )
+                    exec(
+                        "UPDATE `agent_sessions` SET `profileKind` = 'SUBAGENT' " +
+                            "WHERE `parentSessionId` IS NOT NULL OR `depth` > 0"
+                    )
+                    exec(
+                        "UPDATE `agent_sessions` SET `status` = 'IDLE' " +
+                            "WHERE `status` IN (" +
+                            "'QUEUED', 'RUNNING', 'WAITING_PERMISSION', 'WAITING_CHILD', 'COMPACTING'" +
+                            ")"
+                    )
+                    exec(
+                        "ALTER TABLE `agent_runs` ADD COLUMN " +
+                            "`toolSnapshotJson` TEXT NOT NULL DEFAULT '[]'"
+                    )
+                    exec("ALTER TABLE `agent_runs` ADD COLUMN `inputMessageId` INTEGER")
+                    exec("ALTER TABLE `agent_runs` ADD COLUMN `outputMessageId` INTEGER")
+                    exec("ALTER TABLE `agent_runs` ADD COLUMN `errorCode` TEXT")
+                    exec(
+                        "UPDATE `agent_runs` SET " +
+                            "`status` = 'FAILED', " +
+                            "`errorCode` = 'MIGRATION_INTERRUPTED', " +
+                            "`errorMessage` = 'Run predates typed AgentKernel', " +
+                            "`finishedAt` = `updatedAt` " +
+                            "WHERE `status` IN (" +
+                            "'IDLE', 'QUEUED', 'RUNNING', 'WAITING_PERMISSION', " +
+                            "'WAITING_CHILD', 'COMPACTING'" +
+                            ")"
+                    )
+                    exec(
+                        "CREATE INDEX `index_agent_runs_inputMessageId` " +
+                            "ON `agent_runs` (`inputMessageId`)"
+                    )
+                    exec(
+                        "CREATE INDEX `index_agent_runs_outputMessageId` " +
+                            "ON `agent_runs` (`outputMessageId`)"
+                    )
+                    exec(
+                        "CREATE UNIQUE INDEX `index_agent_runs_sessionId_runId` " +
+                            "ON `agent_runs` (`sessionId`, `runId`)"
+                    )
+                    exec(
+                        """
+                        CREATE TABLE `agent_steps` (
+                            `stepId` TEXT NOT NULL,
+                            `runId` TEXT NOT NULL,
+                            `sequence` INTEGER NOT NULL,
+                            `modelRequestId` TEXT NOT NULL,
+                            `status` TEXT NOT NULL,
+                            `assistantText` TEXT,
+                            `reasoningText` TEXT,
+                            `usageJson` TEXT,
+                            `finishReason` TEXT,
+                            `errorCode` TEXT,
+                            `errorMessage` TEXT,
+                            `createdAt` INTEGER NOT NULL,
+                            `startedAt` INTEGER,
+                            `finishedAt` INTEGER,
+                            `updatedAt` INTEGER NOT NULL,
+                            PRIMARY KEY(`stepId`),
+                            FOREIGN KEY(`runId`) REFERENCES `agent_runs`(`runId`)
+                                ON UPDATE NO ACTION ON DELETE CASCADE
+                        )
+                        """.trimIndent()
+                    )
+                    exec("CREATE INDEX `index_agent_steps_runId` ON `agent_steps` (`runId`)")
+                    exec(
+                        "CREATE UNIQUE INDEX `index_agent_steps_runId_sequence` " +
+                            "ON `agent_steps` (`runId`, `sequence`)"
+                    )
+                    exec(
+                        "CREATE UNIQUE INDEX `index_agent_steps_modelRequestId` " +
+                            "ON `agent_steps` (`modelRequestId`)"
+                    )
+                    exec(
+                        """
+                        CREATE TABLE `agent_run_leases` (
+                            `sessionId` TEXT NOT NULL,
+                            `runId` TEXT NOT NULL,
+                            `acquiredAt` INTEGER NOT NULL,
+                            PRIMARY KEY(`sessionId`),
+                            FOREIGN KEY(`sessionId`) REFERENCES `agent_sessions`(`sessionId`)
+                                ON UPDATE NO ACTION ON DELETE CASCADE,
+                            FOREIGN KEY(`sessionId`, `runId`)
+                                REFERENCES `agent_runs`(`sessionId`, `runId`)
+                                ON UPDATE NO ACTION ON DELETE CASCADE
+                        )
+                        """.trimIndent()
+                    )
+                    exec(
+                        "CREATE UNIQUE INDEX `index_agent_run_leases_sessionId_runId` " +
+                            "ON `agent_run_leases` (`sessionId`, `runId`)"
+                    )
+                    exec(
+                        "CREATE UNIQUE INDEX `index_agent_run_leases_runId` " +
+                            "ON `agent_run_leases` (`runId`)"
+                    )
+                }
+            }
+
         // 定义从版本2到3的迁移
         private val MIGRATION_2_3 =
             object : Migration(2, 3) {
@@ -913,7 +1039,8 @@ abstract class AppDatabase : RoomDatabase() {
                                 MIGRATION_19_20,
                                 MIGRATION_20_21,
                                 MIGRATION_21_22,
-                                MIGRATION_22_23
+                                MIGRATION_22_23,
+                                MIGRATION_23_24
                             ) // 添加新的迁移
                             .build()
                     INSTANCE = instance

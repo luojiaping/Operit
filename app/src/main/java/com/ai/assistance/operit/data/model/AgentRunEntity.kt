@@ -1,5 +1,6 @@
 package com.ai.assistance.operit.data.model
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -7,8 +8,8 @@ import androidx.room.PrimaryKey
 import com.ai.assistance.operit.core.agent.contract.AgentRunId
 import com.ai.assistance.operit.core.agent.contract.AgentRunSnapshot
 import com.ai.assistance.operit.core.agent.contract.AgentRunStart
+import com.ai.assistance.operit.core.agent.contract.AgentRunStatus
 import com.ai.assistance.operit.core.agent.contract.AgentSessionId
-import com.ai.assistance.operit.core.agent.contract.AgentStatus
 
 @Entity(
     tableName = "agent_runs",
@@ -24,7 +25,10 @@ import com.ai.assistance.operit.core.agent.contract.AgentStatus
         Index("sessionId"),
         Index("parentRunId"),
         Index("parentMessageId"),
+        Index("inputMessageId"),
+        Index("outputMessageId"),
         Index(value = ["sessionId", "updatedAt"]),
+        Index(value = ["sessionId", "runId"], unique = true),
     ],
 )
 data class AgentRunEntity(
@@ -35,8 +39,12 @@ data class AgentRunEntity(
     val promptSnapshot: String,
     val modelSnapshotJson: String,
     val permissionSnapshotJson: String,
-    val status: String = AgentStatus.QUEUED.name,
+    @ColumnInfo(defaultValue = "'[]'") val toolSnapshotJson: String = "[]",
+    val inputMessageId: Long? = null,
+    val outputMessageId: Long? = null,
+    val status: String = AgentRunStatus.QUEUED.name,
     val summary: String? = null,
+    val errorCode: String? = null,
     val errorMessage: String? = null,
     val createdAt: Long,
     val startedAt: Long? = null,
@@ -52,8 +60,12 @@ data class AgentRunEntity(
             promptSnapshot = promptSnapshot,
             modelSnapshotJson = modelSnapshotJson,
             permissionSnapshotJson = permissionSnapshotJson,
-            status = AgentStatus.valueOf(status),
+            toolSnapshotJson = toolSnapshotJson,
+            inputMessageId = inputMessageId,
+            outputMessageId = outputMessageId,
+            status = AgentRunStatus.valueOf(status),
             summary = summary,
+            errorCode = errorCode,
             errorMessage = errorMessage,
             createdAt = createdAt,
             startedAt = startedAt,
@@ -72,6 +84,8 @@ data class AgentRunEntity(
                 promptSnapshot = input.promptSnapshot,
                 modelSnapshotJson = input.modelSnapshotJson,
                 permissionSnapshotJson = input.permissionSnapshotJson,
+                toolSnapshotJson = input.toolSnapshotJson,
+                inputMessageId = input.inputMessageId,
                 createdAt = now,
                 updatedAt = now,
             )

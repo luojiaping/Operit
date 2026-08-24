@@ -2,10 +2,11 @@ package com.ai.assistance.operit.core.agent.routing
 
 import com.ai.assistance.operit.core.agent.contract.AgentChatBindingSnapshot
 import com.ai.assistance.operit.core.agent.contract.AgentId
-import com.ai.assistance.operit.core.agent.contract.AgentMode
+import com.ai.assistance.operit.core.agent.contract.AgentModeId
+import com.ai.assistance.operit.core.agent.contract.AgentProfileKind
 import com.ai.assistance.operit.core.agent.contract.AgentSessionId
+import com.ai.assistance.operit.core.agent.contract.AgentSessionStatus
 import com.ai.assistance.operit.core.agent.contract.AgentSessionSnapshot
-import com.ai.assistance.operit.core.agent.contract.AgentStatus
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
@@ -69,7 +70,12 @@ class AgentRouterTest {
             AgentRouter.resolve(
                 chatId = "chat-1",
                 binding = binding(chatId = "chat-1", sessionId = "root"),
-                boundSession = session(chatId = "chat-1", sessionId = "root", status = AgentStatus.COMPLETED),
+                boundSession =
+                    session(
+                        chatId = "chat-1",
+                        sessionId = "root",
+                        status = AgentSessionStatus.COMPLETED,
+                    ),
             )
         }
     }
@@ -87,7 +93,7 @@ class AgentRouterTest {
         sessionId: String,
         parentSessionId: AgentSessionId? = null,
         depth: Int = 0,
-        status: AgentStatus = AgentStatus.IDLE,
+        status: AgentSessionStatus = AgentSessionStatus.IDLE,
     ): AgentSessionSnapshot {
         return AgentSessionSnapshot(
             sessionId = AgentSessionId(sessionId),
@@ -96,7 +102,8 @@ class AgentRouterTest {
             agentId = AgentId("build"),
             displayName = "Build",
             profileVersion = "1",
-            mode = AgentMode.BUILD,
+            profileKind = AgentProfileKind.PRIMARY,
+            modeId = AgentModeId("build"),
             parentSessionId = parentSessionId,
             depth = depth,
             status = status,

@@ -1,15 +1,17 @@
 package com.ai.assistance.operit.data.model
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.ai.assistance.operit.core.agent.contract.AgentId
-import com.ai.assistance.operit.core.agent.contract.AgentMode
+import com.ai.assistance.operit.core.agent.contract.AgentModeId
+import com.ai.assistance.operit.core.agent.contract.AgentProfileKind
 import com.ai.assistance.operit.core.agent.contract.AgentSessionId
 import com.ai.assistance.operit.core.agent.contract.AgentSessionSnapshot
 import com.ai.assistance.operit.core.agent.contract.AgentSessionStart
-import com.ai.assistance.operit.core.agent.contract.AgentStatus
+import com.ai.assistance.operit.core.agent.contract.AgentSessionStatus
 
 @Entity(
     tableName = "agent_sessions",
@@ -35,10 +37,11 @@ data class AgentSessionEntity(
     val agentId: String,
     val displayName: String,
     val profileVersion: String,
-    val mode: String,
+    @ColumnInfo(defaultValue = "'PRIMARY'") val profileKind: String = AgentProfileKind.PRIMARY.name,
+    @ColumnInfo(name = "mode") val modeId: String,
     val parentSessionId: String? = null,
     val depth: Int = 0,
-    val status: String = AgentStatus.IDLE.name,
+    val status: String = AgentSessionStatus.IDLE.name,
     val createdAt: Long,
     val startedAt: Long? = null,
     val finishedAt: Long? = null,
@@ -52,10 +55,11 @@ data class AgentSessionEntity(
             agentId = AgentId(agentId),
             displayName = displayName,
             profileVersion = profileVersion,
-            mode = AgentMode.valueOf(mode),
+            profileKind = AgentProfileKind.valueOf(profileKind),
+            modeId = AgentModeId(modeId),
             parentSessionId = parentSessionId?.let(::AgentSessionId),
             depth = depth,
-            status = AgentStatus.valueOf(status),
+            status = AgentSessionStatus.valueOf(status),
             createdAt = createdAt,
             startedAt = startedAt,
             finishedAt = finishedAt,
@@ -72,7 +76,8 @@ data class AgentSessionEntity(
                 agentId = input.agentId.value,
                 displayName = input.displayName,
                 profileVersion = input.profileVersion,
-                mode = input.mode.name,
+                profileKind = input.profileKind.name,
+                modeId = input.modeId.value,
                 parentSessionId = input.parentSessionId?.value,
                 depth = input.depth,
                 createdAt = now,

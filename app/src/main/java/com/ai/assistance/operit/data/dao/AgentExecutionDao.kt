@@ -13,7 +13,9 @@ import com.ai.assistance.operit.core.agent.contract.AgentSessionId
 import com.ai.assistance.operit.data.model.AgentChatBindingEntity
 import com.ai.assistance.operit.data.model.AgentMessageOwnerEntity
 import com.ai.assistance.operit.data.model.AgentRunEntity
+import com.ai.assistance.operit.data.model.AgentRunLeaseEntity
 import com.ai.assistance.operit.data.model.AgentSessionEntity
+import com.ai.assistance.operit.data.model.AgentStepEntity
 import com.ai.assistance.operit.data.model.AgentToolCallEntity
 import kotlinx.coroutines.flow.Flow
 
@@ -96,6 +98,33 @@ interface AgentExecutionDao {
 
     @Query("SELECT * FROM agent_runs WHERE sessionId = :sessionId ORDER BY createdAt ASC")
     fun observeRuns(sessionId: String): Flow<List<AgentRunEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertStep(entity: AgentStepEntity)
+
+    @Update
+    suspend fun updateStep(entity: AgentStepEntity)
+
+    @Query("SELECT * FROM agent_steps WHERE stepId = :stepId LIMIT 1")
+    suspend fun getStep(stepId: String): AgentStepEntity?
+
+    @Query("SELECT * FROM agent_steps WHERE runId = :runId ORDER BY sequence ASC")
+    fun observeSteps(runId: String): Flow<List<AgentStepEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertRunLease(entity: AgentRunLeaseEntity)
+
+    @Query("SELECT * FROM agent_run_leases WHERE sessionId = :sessionId LIMIT 1")
+    suspend fun getRunLease(sessionId: String): AgentRunLeaseEntity?
+
+    @Query("SELECT * FROM agent_run_leases ORDER BY acquiredAt ASC")
+    suspend fun getRunLeases(): List<AgentRunLeaseEntity>
+
+    @Query("SELECT * FROM agent_steps WHERE runId = :runId AND status = 'RUNNING' LIMIT 1")
+    suspend fun getRunningStep(runId: String): AgentStepEntity?
+
+    @Query("DELETE FROM agent_run_leases WHERE sessionId = :sessionId AND runId = :runId")
+    suspend fun deleteRunLease(sessionId: String, runId: String)
 
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertToolCall(entity: AgentToolCallEntity)

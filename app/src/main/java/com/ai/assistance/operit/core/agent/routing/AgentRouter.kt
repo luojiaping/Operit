@@ -1,8 +1,8 @@
 package com.ai.assistance.operit.core.agent.routing
 
 import com.ai.assistance.operit.core.agent.contract.AgentChatBindingSnapshot
+import com.ai.assistance.operit.core.agent.contract.AgentSessionStatus
 import com.ai.assistance.operit.core.agent.contract.AgentSessionSnapshot
-import com.ai.assistance.operit.core.agent.contract.AgentStatus
 
 sealed interface AgentRoute {
     val chatId: String
@@ -45,9 +45,9 @@ object AgentRouter {
                     "Only a root Agent session can own a chat route"
                 }
                 require(
-                    session.status != AgentStatus.COMPLETED &&
-                        session.status != AgentStatus.FAILED &&
-                        session.status != AgentStatus.CANCELLED
+                    session.status != AgentSessionStatus.COMPLETED &&
+                        session.status != AgentSessionStatus.FAILED &&
+                        session.status != AgentSessionStatus.CANCELLED
                 ) {
                     "A terminal Agent session cannot own a chat route"
                 }

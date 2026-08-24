@@ -1,22 +1,37 @@
 package com.ai.assistance.operit.core.agent.contract
 
-enum class AgentMode {
-    PLAN,
-    BUILD,
-    EXPLORE,
-    GENERAL
+enum class AgentProfileKind {
+    PRIMARY,
+    SUBAGENT,
+    ALL,
 }
 
-enum class AgentStatus {
+enum class AgentSessionStatus {
     IDLE,
+    RUNNING,
+    COMPLETED,
+    FAILED,
+    CANCELLED,
+}
+
+enum class AgentRunStatus {
     QUEUED,
     RUNNING,
     WAITING_PERMISSION,
+    WAITING_TOOL,
     WAITING_CHILD,
     COMPACTING,
     COMPLETED,
     FAILED,
-    CANCELLED
+    CANCELLED,
+}
+
+enum class AgentStepStatus {
+    QUEUED,
+    RUNNING,
+    COMPLETED,
+    FAILED,
+    CANCELLED,
 }
 
 enum class AgentToolCallStatus {
@@ -49,7 +64,8 @@ data class AgentProfileDeclaration(
     val agentId: AgentId,
     val displayName: String,
     val profileVersion: String,
-    val mode: AgentMode,
+    val profileKind: AgentProfileKind,
+    val modeId: AgentModeId,
     val promptKey: String,
     val requestedPermissions: List<AgentPermissionRule> = emptyList(),
     val toolIds: List<String> = emptyList(),
@@ -71,7 +87,8 @@ data class AgentSessionStart(
     val agentId: AgentId,
     val displayName: String,
     val profileVersion: String,
-    val mode: AgentMode,
+    val profileKind: AgentProfileKind,
+    val modeId: AgentModeId,
     val sessionId: AgentSessionId = AgentSessionId.generate(),
     val parentSessionId: AgentSessionId? = null,
     val depth: Int = 0
@@ -90,10 +107,23 @@ data class AgentRunStart(
     val promptSnapshot: String,
     val modelSnapshotJson: String,
     val permissionSnapshotJson: String,
+    val toolSnapshotJson: String = "[]",
     val runId: AgentRunId = AgentRunId.generate(),
     val parentRunId: AgentRunId? = null,
-    val parentMessageId: Long? = null
+    val parentMessageId: Long? = null,
+    val inputMessageId: Long? = null,
 )
+
+data class AgentStepStart(
+    val runId: AgentRunId,
+    val sequence: Int,
+    val modelRequestId: AgentModelRequestId,
+    val stepId: AgentStepId = AgentStepId.generate(),
+) {
+    init {
+        require(sequence >= 0) { "Agent step sequence must not be negative" }
+    }
+}
 
 data class AgentToolCallStart(
     val runId: AgentRunId,
@@ -116,10 +146,11 @@ data class AgentSessionSnapshot(
     val agentId: AgentId,
     val displayName: String,
     val profileVersion: String,
-    val mode: AgentMode,
+    val profileKind: AgentProfileKind,
+    val modeId: AgentModeId,
     val parentSessionId: AgentSessionId? = null,
     val depth: Int = 0,
-    val status: AgentStatus = AgentStatus.IDLE,
+    val status: AgentSessionStatus = AgentSessionStatus.IDLE,
     val createdAt: Long,
     val startedAt: Long? = null,
     val finishedAt: Long? = null,
@@ -166,13 +197,41 @@ data class AgentRunSnapshot(
     val promptSnapshot: String,
     val modelSnapshotJson: String,
     val permissionSnapshotJson: String,
-    val status: AgentStatus = AgentStatus.QUEUED,
+    val toolSnapshotJson: String,
+    val inputMessageId: Long? = null,
+    val outputMessageId: Long? = null,
+    val status: AgentRunStatus = AgentRunStatus.QUEUED,
     val summary: String? = null,
+    val errorCode: String? = null,
     val errorMessage: String? = null,
     val createdAt: Long,
     val startedAt: Long? = null,
     val finishedAt: Long? = null,
     val updatedAt: Long
+)
+
+data class AgentStepSnapshot(
+    val stepId: AgentStepId,
+    val runId: AgentRunId,
+    val sequence: Int,
+    val modelRequestId: AgentModelRequestId,
+    val status: AgentStepStatus,
+    val assistantText: String? = null,
+    val reasoningText: String? = null,
+    val usageJson: String? = null,
+    val finishReason: String? = null,
+    val errorCode: String? = null,
+    val errorMessage: String? = null,
+    val createdAt: Long,
+    val startedAt: Long? = null,
+    val finishedAt: Long? = null,
+    val updatedAt: Long,
+)
+
+data class AgentRunLeaseSnapshot(
+    val sessionId: AgentSessionId,
+    val runId: AgentRunId,
+    val acquiredAt: Long,
 )
 
 data class AgentToolCallSnapshot(
