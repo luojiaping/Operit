@@ -17,9 +17,7 @@ import com.ai.assistance.operit.data.model.ModelConfigData
 import java.io.IOException
 import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -269,13 +267,14 @@ class OpenAiResponsesAgentModelClientTest {
         }
         firstStarted.await()
 
-        val secondEvents = async(Dispatchers.IO) { collect(client, request("second")) }.await()
-
-        assertTrue(secondEvents.any { event -> event is AgentModelEvent.Completed })
         withTimeout(5_000L) {
             firstJob.cancelAndJoin()
             firstClosed.await()
         }
+
+        val secondEvents = collect(client, request("second"))
+
+        assertTrue(secondEvents.any { event -> event is AgentModelEvent.Completed })
     }
 
     private suspend fun collect(
