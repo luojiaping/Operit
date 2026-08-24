@@ -14,27 +14,26 @@ import com.ai.assistance.operit.core.agent.model.AgentModelStopReason
 import com.ai.assistance.operit.data.model.ApiProviderType
 import com.ai.assistance.operit.data.model.ApiKeyInfo
 import com.ai.assistance.operit.data.model.ModelConfigData
+import java.io.BufferedReader
 import java.io.IOException
-import java.util.concurrent.atomic.AtomicInteger
+import java.io.OutputStream
+import java.net.ServerSocket
+import java.nio.charset.StandardCharsets
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
-import okhttp3.MediaType
 import okhttp3.Interceptor
 import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Protocol
 import okhttp3.Response
-import okhttp3.ResponseBody
 import okhttp3.ResponseBody.Companion.toResponseBody
 import okio.Buffer
-import okio.BufferedSource
-import okio.Source
-import okio.Timeout
-import okio.buffer
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -230,27 +229,54 @@ class OpenAiResponsesAgentModelClientTest {
     fun cancellingOneRequestClosesOnlyItsSseCall() = runBlocking {
         val firstStarted = CompletableDeferred<Unit>()
         val firstClosed = CompletableDeferred<Unit>()
-        val requestCount = AtomicInteger()
-        val firstBody = BlockingSseResponseBody(firstStarted, firstClosed)
+        val server = ServerSocket(0)
+        val localUrl = "http://127.0.0.1:${server.localPort}/responses".toHttpUrl()
+        val serverJob =
+            launch(Dispatchers.IO) {
+                val firstSocket = server.accept()
+                val firstConnection =
+                    launch(Dispatchers.IO) {
+                        firstSocket.use { socket ->
+                            socket.getInputStream().bufferedReader().use { input ->
+                                consumeRequest(input)
+                                writeResponse(
+                                    socket.getOutputStream(),
+                                    body = "data: {\"type\":\"response.output_text.delta\",\"delta\":\"partial\"}\n\n",
+                                    keepAlive = true,
+                                )
+                                firstStarted.complete(Unit)
+                                try {
+                                    while (input.read() != -1) {
+                                    }
+                                } catch (_: IOException) {
+                                } finally {
+                                    firstClosed.complete(Unit)
+                                }
+                            }
+                        }
+                    }
+                val secondSocket = server.accept()
+                secondSocket.use { socket ->
+                    socket.getInputStream().bufferedReader().use { input ->
+                        consumeRequest(input)
+                        writeResponse(
+                            socket.getOutputStream(),
+                            body = fixture("text_reasoning_usage_completed.sse"),
+                            keepAlive = false,
+                        )
+                    }
+                }
+                firstConnection.join()
+            }
         val httpClient =
             OkHttpClient.Builder()
                 .addInterceptor(
                     Interceptor { chain ->
-                        val responseBody =
-                            if (requestCount.getAndIncrement() == 0) {
-                                firstBody
-                            } else {
-                                fixture("text_reasoning_usage_completed.sse")
-                                    .toResponseBody("text/event-stream".toMediaType())
-                            }
-                        Response.Builder()
-                            .request(chain.request())
-                            .protocol(Protocol.HTTP_1_1)
-                            .code(200)
-                            .message("OK")
-                            .header("Content-Type", "text/event-stream")
-                            .body(responseBody)
-                            .build()
+                        assertEquals(
+                            OpenAiResponsesAgentSnapshot.OFFICIAL_ENDPOINT,
+                            chain.request().url.toString(),
+                        )
+                        chain.proceed(chain.request().newBuilder().url(localUrl).build())
                     },
                 )
                 .build()
@@ -262,19 +288,58 @@ class OpenAiResponsesAgentModelClientTest {
                 httpClient = httpClient,
             )
 
-        val firstJob = launch {
-            client.execute(request("first")).collect { }
+        var firstJob: kotlinx.coroutines.Job? = null
+        try {
+            val activeFirstJob = launch {
+                client.execute(request("first")).collect { }
+            }
+            firstJob = activeFirstJob
+            firstStarted.await()
+
+            withTimeout(5_000L) {
+                activeFirstJob.cancelAndJoin()
+                firstClosed.await()
+            }
+
+            val secondEvents = collect(client, request("second"))
+
+            assertTrue(secondEvents.any { event -> event is AgentModelEvent.Completed })
+            withTimeout(5_000L) {
+                serverJob.join()
+            }
+        } finally {
+            firstJob?.cancelAndJoin()
+            server.close()
+            serverJob.cancelAndJoin()
         }
-        firstStarted.await()
+    }
 
-        withTimeout(5_000L) {
-            firstJob.cancelAndJoin()
-            firstClosed.await()
+    private fun consumeRequest(input: BufferedReader) {
+        var contentLength = 0
+        while (true) {
+            val line = input.readLine() ?: return
+            if (line.isEmpty()) {
+                repeat(contentLength) { input.read() }
+                return
+            }
+            if (line.startsWith("Content-Length:", ignoreCase = true)) {
+                contentLength = line.substringAfter(':').trim().toInt()
+            }
         }
+    }
 
-        val secondEvents = collect(client, request("second"))
-
-        assertTrue(secondEvents.any { event -> event is AgentModelEvent.Completed })
+    private fun writeResponse(output: OutputStream, body: String, keepAlive: Boolean) {
+        val connection = if (keepAlive) "keep-alive" else "close"
+        output.write(
+            (
+                "HTTP/1.1 200 OK\r\n" +
+                    "Content-Type: text/event-stream\r\n" +
+                    "Connection: $connection\r\n" +
+                    "\r\n"
+                ).toByteArray(StandardCharsets.UTF_8)
+        )
+        output.write(body.toByteArray(StandardCharsets.UTF_8))
+        output.flush()
     }
 
     private suspend fun collect(
@@ -380,54 +445,5 @@ class OpenAiResponsesAgentModelClientTest {
         return requireNotNull(javaClass.classLoader?.getResourceAsStream(path)) {
             "Missing OpenAI Responses fixture: $path"
         }.bufferedReader().use { reader -> reader.readText() }
-    }
-}
-
-private class BlockingSseResponseBody(
-    private val started: CompletableDeferred<Unit>,
-    private val closed: CompletableDeferred<Unit>,
-) : ResponseBody() {
-    private val lock = java.lang.Object()
-    private var isClosed = false
-    private val source =
-        object : Source {
-            override fun read(sink: Buffer, byteCount: Long): Long {
-                if (byteCount == 0L) {
-                    return 0L
-                }
-                started.complete(Unit)
-                synchronized(lock) {
-                    while (!isClosed) {
-                        try {
-                            lock.wait()
-                        } catch (interrupted: InterruptedException) {
-                            Thread.currentThread().interrupt()
-                            throw IOException("SSE source interrupted", interrupted)
-                        }
-                    }
-                }
-                throw IOException("SSE source closed")
-            }
-
-            override fun timeout(): Timeout = Timeout.NONE
-
-            override fun close() {
-                synchronized(lock) {
-                    isClosed = true
-                    lock.notifyAll()
-                }
-                closed.complete(Unit)
-            }
-        }
-    private val bufferedSource: BufferedSource = source.buffer()
-
-    override fun contentType(): MediaType? = "text/event-stream".toMediaType()
-
-    override fun contentLength(): Long = -1L
-
-    override fun source(): BufferedSource = bufferedSource
-
-    override fun close() {
-        source.close()
     }
 }
