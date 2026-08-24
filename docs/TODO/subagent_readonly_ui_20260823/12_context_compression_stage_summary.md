@@ -2,7 +2,7 @@
 fork: https://github.com/luojiaping/Operit.git
 scope: context compression recovery summary for Agent stages
 status: active
-current_commit: 43e0a3a5a
+current_commit: d87481a78
 ---
 
 # Agent Workstream Stage Summary
@@ -14,8 +14,8 @@ Agent, Room, provider, ToolPkg, ChatView, or Legacy chat code. Stage 13 is imple
 ## 1. Current Repository State
 
 - Branch: `development`
-- HEAD and origin: `43e0a3a5a`
-- implementation commit: `d87481a78`
+- functional implementation commit: `d87481a78`
+- documentation follow-up commits: `43e0a3a5a`, `1dd97a147`
 - Previous related commits:
   - `30d6c0124`: Chat View Slot baseline
   - `c295a4d28`: Room identity repair and Agent foundation persistence
