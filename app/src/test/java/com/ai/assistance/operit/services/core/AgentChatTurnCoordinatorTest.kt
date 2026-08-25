@@ -25,9 +25,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.mockito.kotlin.any
 import org.mockito.kotlin.argThat
+import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
-import org.mockito.kotlin.onBlocking
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 
@@ -39,8 +39,8 @@ class AgentChatTurnCoordinatorTest {
         val processing = mock<MessageProcessingDelegate>()
         val entry = mock<AgentInvocationEntry>()
         val session = sessionSnapshot()
-        onBlocking { repository.resolveRoute("chat") }.thenReturn(AgentRoute.Legacy("chat"))
-        onBlocking { repository.startSession(any(), any()) }.thenReturn(session)
+        doReturn(AgentRoute.Legacy("chat")).whenever(repository).resolveRoute("chat")
+        doReturn(session).whenever(repository).startSession(any(), any())
         val coordinator = coordinator(repository, history, processing, entry)
 
         val activated = coordinator.activateAgentForChat("chat")
