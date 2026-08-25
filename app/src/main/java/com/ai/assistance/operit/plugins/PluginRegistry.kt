@@ -2,6 +2,7 @@ package com.ai.assistance.operit.plugins
 
 import com.ai.assistance.operit.plugins.toolbox.ToolboxPlugin
 import com.ai.assistance.operit.plugins.toolpkg.ToolPkgCommonBridgePlugin
+import com.ai.assistance.operit.plugins.toolpkg.ToolPkgAgentProfileBridge
 import com.ai.assistance.operit.plugins.workflow.WorkflowLifecyclePlugin
 import com.ai.assistance.operit.core.agent.registry.BuiltinTextAgentPlugin
 import java.util.concurrent.CopyOnWriteArrayList
@@ -33,6 +34,7 @@ object PluginRegistry {
 
         register(ToolboxPlugin)
         register(ToolPkgCommonBridgePlugin)
+        register(ToolPkgAgentProfileBridge)
         register(WorkflowLifecyclePlugin)
         register(BuiltinTextAgentPlugin)
         installAll()

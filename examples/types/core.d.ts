@@ -180,6 +180,13 @@ export namespace NativeInterface {
     function registerToolPkgChatViewSlotPlugin(specJson: string): void;
 
     /**
+     * Register a static text-only Agent profile for the current toolpkg main registration session.
+     * The package identity is assigned by the host; tools and permissions must remain empty until
+     * their Agent bridges are enabled.
+     */
+    function registerToolPkgAgentProfile(specJson: string): void;
+
+    /**
      * Register a chat message hook for current toolpkg main registration session.
      * @param specJson - JSON object string describing a chat message hook
      */

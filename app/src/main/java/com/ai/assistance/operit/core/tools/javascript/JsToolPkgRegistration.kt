@@ -28,6 +28,7 @@ internal data class ToolPkgMainRegistrationCapture(
     val promptEstimateFinalizeHooks: List<String>,
     val summaryGenerateHooks: List<String>,
     val aiProviders: List<String>,
+    val agentProfiles: List<String>,
     val marketOrigin: ToolPkgMarketOrigin?
 )
 
@@ -53,7 +54,8 @@ private enum class RegistrationBucket {
     PROMPT_FINALIZE,
     PROMPT_ESTIMATE_FINALIZE,
     SUMMARY_GENERATE,
-    AI_PROVIDER
+    AI_PROVIDER,
+    AGENT_PROFILE
 }
 
 internal class JsToolPkgRegistrationSession {
@@ -122,6 +124,9 @@ internal class JsToolPkgRegistrationSession {
     fun appendAiProvider(specJson: String) =
         append(RegistrationBucket.AI_PROVIDER, specJson)
 
+    fun appendAgentProfile(specJson: String) =
+        append(RegistrationBucket.AGENT_PROFILE, specJson)
+
     fun captureMarketOrigin(specJson: String) {
         synchronized(lock) {
             // Marketplace publishing appends this call to the main module. The module can be
@@ -164,6 +169,7 @@ internal class JsToolPkgRegistrationSession {
                 promptEstimateFinalizeHooks = read(RegistrationBucket.PROMPT_ESTIMATE_FINALIZE),
                 summaryGenerateHooks = read(RegistrationBucket.SUMMARY_GENERATE),
                 aiProviders = read(RegistrationBucket.AI_PROVIDER),
+                agentProfiles = read(RegistrationBucket.AGENT_PROFILE),
                 marketOrigin = marketOrigin
             )
         }
@@ -542,6 +548,12 @@ internal fun buildToolPkgRegistrationBridgeScript(): String {
                 },
                 readResource: readToolPkgResource,
                 getConfigDir: getToolPkgConfigDir
+            };
+
+            api.registerAgentProfile = function(definition) {
+                requireNative('registerToolPkgAgentProfile')(
+                    JSON.stringify(copyObject(definition, ''))
+                );
             };
 
             [

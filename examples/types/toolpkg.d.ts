@@ -867,6 +867,22 @@ export namespace ToolPkg {
         calculateInputTokens: { function: AiProviderCalculateInputTokensHandler };
     }
 
+    /** Registers a static text-only Agent profile owned by this ToolPkg. */
+    export interface AgentProfileRegistration {
+        agentId: string;
+        displayName: string;
+        profileVersion: string;
+        profileKind?: "PRIMARY" | "SUBAGENT" | "ALL";
+        modeId: string;
+        promptKey: string;
+        promptSnapshot: string;
+        capabilities: string[];
+        permissions?: string[];
+        tools?: string[];
+        maxSteps?: number;
+        canSpawnChildren?: boolean;
+    }
+
     export type RuntimeKind = "main" | "ui" | "sandbox" | "provider";
 
     export interface IpcMeta {
@@ -961,6 +977,7 @@ export namespace ToolPkg {
         registerPromptEstimateFinalizeHook(definition: PromptEstimateFinalizeHookRegistration): void;
         registerSummaryGenerateHook(definition: SummaryGenerateHookRegistration): void;
         registerAiProvider(definition: AiProviderRegistration): void;
+        registerAgentProfile(definition: AgentProfileRegistration): void;
         readResource(key: string, outputFileName?: string, internal?: boolean): Promise<string>;
         getConfigDir(pluginId?: string): string;
         ipc: IpcApi;
@@ -1012,6 +1029,8 @@ declare global {
     function registerToolPkgSummaryGenerateHook(definition: ToolPkg.SummaryGenerateHookRegistration): void;
 
     function registerToolPkgAiProvider(definition: ToolPkg.AiProviderRegistration): void;
+
+    function registerToolPkgAgentProfile(definition: ToolPkg.AgentProfileRegistration): void;
 
     const ToolPkg: ToolPkg.Registry;
 }

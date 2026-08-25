@@ -3,6 +3,7 @@ package com.ai.assistance.operit.core.tools.packTool
 import android.content.Context
 import android.provider.DocumentsContract
 import com.ai.assistance.operit.core.tools.LocalizedText
+import com.ai.assistance.operit.core.agent.registry.AgentPluginRegistration
 import com.ai.assistance.operit.core.tools.StringOrStringListSerializer
 import com.ai.assistance.operit.core.tools.ToolPackage
 import java.io.File
@@ -175,6 +176,7 @@ internal data class ToolPkgContainerRuntime(
     val promptEstimateFinalizeHooks: List<ToolPkgFunctionHookRuntime>,
     val summaryGenerateHooks: List<ToolPkgFunctionHookRuntime>,
     val aiProviders: List<ToolPkgAiProviderRuntime>,
+    val agentProfiles: List<AgentPluginRegistration>,
     val logoResource: ToolPkgResourceRuntime? = null,
     val marketOrigin: ToolPkgMarketOrigin? = null
 )
@@ -335,6 +337,7 @@ internal data class ToolPkgMainRegistration(
     val promptEstimateFinalizeHooks: List<ToolPkgRegisteredFunctionHook> = emptyList(),
     val summaryGenerateHooks: List<ToolPkgRegisteredFunctionHook> = emptyList(),
     val aiProviders: List<ToolPkgRegisteredAiProvider> = emptyList(),
+    val agentProfiles: List<AgentPluginRegistration> = emptyList(),
     val marketOrigin: ToolPkgMarketOrigin? = null
 )
 
@@ -1373,6 +1376,7 @@ internal object ToolPkgArchiveParser {
                 promptEstimateFinalizeHooks = promptEstimateFinalizeHooks,
                 summaryGenerateHooks = summaryGenerateHooks,
                 aiProviders = aiProviders,
+                agentProfiles = mainRegistration.agentProfiles,
                 logoResource = logoResource,
                 marketOrigin = mainRegistration.marketOrigin
             )

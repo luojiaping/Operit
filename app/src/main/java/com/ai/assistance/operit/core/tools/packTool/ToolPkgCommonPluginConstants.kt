@@ -76,6 +76,8 @@ internal const val TOOLPKG_REGISTRATION_SUMMARY_GENERATE_HOOK =
     "registerToolPkgSummaryGenerateHook"
 internal const val TOOLPKG_REGISTRATION_AI_PROVIDER =
     "registerToolPkgAiProvider"
+internal const val TOOLPKG_REGISTRATION_AGENT_PROFILE =
+    "registerToolPkgAgentProfile"
 
 internal const val TOOLPKG_NAV_SURFACE_TOOLBOX = "toolbox"
 internal const val TOOLPKG_NAV_SURFACE_MAIN_SIDEBAR_PLUGINS = "main_sidebar_plugins"

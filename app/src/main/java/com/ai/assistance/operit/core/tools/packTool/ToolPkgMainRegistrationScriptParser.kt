@@ -1,6 +1,7 @@
 package com.ai.assistance.operit.core.tools.packTool
 
 import com.ai.assistance.operit.core.tools.LocalizedText
+import com.ai.assistance.operit.core.agent.registry.AgentPluginRegistrationCodec
 import com.ai.assistance.operit.core.tools.javascript.JsEngine
 import com.ai.assistance.operit.util.AppLogger
 import org.json.JSONObject
@@ -118,6 +119,17 @@ internal object ToolPkgMainRegistrationScriptParser {
                     registrations = captured.aiProviders,
                     registryName = TOOLPKG_REGISTRATION_AI_PROVIDER
                 )
+            val agentProfiles =
+                captured.agentProfiles.mapIndexed { index, raw ->
+                    try {
+                        AgentPluginRegistrationCodec.decode(toolPkgId, raw)
+                    } catch (error: Exception) {
+                        throw IllegalArgumentException(
+                            "$TOOLPKG_REGISTRATION_AGENT_PROFILE[$index] is invalid: ${error.message}",
+                            error,
+                        )
+                    }
+                }
             val marketOrigin =
                 ToolPkgMarketOriginCodec.validateForPackage(
                     origin = captured.marketOrigin,
@@ -148,6 +160,7 @@ internal object ToolPkgMainRegistrationScriptParser {
                         promptEstimateFinalizeHooks = promptEstimateFinalizeHooks,
                         summaryGenerateHooks = summaryGenerateHooks,
                         aiProviders = aiProviders,
+                        agentProfiles = agentProfiles,
                         marketOrigin = marketOrigin
                     )
             )

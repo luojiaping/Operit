@@ -111,6 +111,13 @@ class AgentPluginRegistry {
         return registrations.values.filter(AgentPluginRegistration::enabled)
     }
 
+    @Synchronized
+    fun removePlugin(pluginId: String): Int {
+        val keys = registrations.keys.filter { key -> key.pluginId == pluginId }
+        keys.forEach(registrations::remove)
+        return keys.size
+    }
+
     companion object {
         val global: AgentPluginRegistry = AgentPluginRegistry()
     }

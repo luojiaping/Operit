@@ -1894,6 +1894,11 @@ class JsEngine(private val context: Context) {
             toolPkgRegistrationSession.appendAiProvider(specJson)
         }
 
+        @JavascriptInterface
+        fun registerToolPkgAgentProfile(specJson: String) {
+            toolPkgRegistrationSession.appendAgentProfile(specJson)
+        }
+
         private fun bridgeClassLoader(): ClassLoader = getJavaBridgeClassLoader()
 
         private fun parseJsonObjectToMap(raw: String): Map<String, Any?> {
