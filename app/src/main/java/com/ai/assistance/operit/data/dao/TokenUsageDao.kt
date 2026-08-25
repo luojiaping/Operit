@@ -56,6 +56,18 @@ abstract class TokenUsageDao {
         model: String,
     ): TokenStatsModelEntity?
 
+    @Query(
+        """
+        SELECT * FROM token_usage_records
+        WHERE provider = :provider AND occurredAtMs IS NOT NULL
+        ORDER BY occurredAtMs DESC, id DESC
+        LIMIT 1
+        """
+    )
+    abstract suspend fun getLatestRecordForProvider(
+        provider: String,
+    ): TokenUsageRecordEntity?
+
     @Query("SELECT * FROM token_stats_models ORDER BY provider, model, configId")
     abstract suspend fun getAllStatsModels(): List<TokenStatsModelEntity>
 

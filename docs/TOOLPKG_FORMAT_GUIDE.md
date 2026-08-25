@@ -86,6 +86,7 @@ windows_control.toolpkg (ZIP 压缩包)
     "en": "Windows one-click setup and control bundle"
   },
   "logo": "package_logo",
+  "required_host_capabilities": [],
   "subpackages": [
     {
       "id": "windows_control",
@@ -168,6 +169,7 @@ windows_control.toolpkg (ZIP 压缩包)
 | `display_name` | LocalizedText | 否 | 包的显示名称，支持多语言 |
 | `description` | LocalizedText | 否 | 包的描述信息，支持多语言 |
 | `logo` | string | 否 | 包 Logo 对应的 `resources[].key`；支持 SVG、PNG、JPEG 和 WebP |
+| `required_host_capabilities` | string[] | 否 | 包调用宿主扩展桥接时必须声明的 capability 名称 |
 | `subpackages` | array | 否 | 子包列表，每个子包是一个独立的工具集 |
 | `resources` | array | 否 | 资源文件列表，可以是任意类型的文件 |
 | `wasm_modules` | array | 否 | 企业核心算法模块列表，当前用于声明和校验 `.wasm` 产物 |
@@ -372,18 +374,17 @@ function registerToolPkg() {
     }
   });
 
-  ToolPkg.registerDesktopWidget({
-    id: "windows_dashboard_widget",
-    route: "toolpkg:com.example.windows_bundle:ui:windows_dashboard",
-    render: "toolpkg:com.example.windows_bundle:ui:windows_dashboard_widget",
+  ToolPkg.registerFloatingWindow({
+    id: "windows_dashboard",
+    contentRoute: "toolpkg:com.example.windows_bundle:ui:windows_dashboard",
     title: {
-      zh: "Windows 面板小组件",
-      en: "Windows Widget"
+      zh: "Windows 面板",
+      en: "Windows Dashboard"
     },
-    subtitle: {
-      zh: "点击打开面板",
-      en: "Tap to open dashboard"
-    }
+    widthDp: 320,
+    heightDp: 420,
+    draggable: true,
+    resizable: true
   });
 
   ToolPkg.registerAppLifecycleHook({
@@ -473,14 +474,15 @@ exports.onInputMenuToggle = onInputMenuToggle;
 | `ToolPkg.registerNavigationEntry` | `title` | 否 | 导航入口标题（支持 `LocalizedText`） |
 | `ToolPkg.registerNavigationEntry` | `icon` | 否 | 图标名 |
 | `ToolPkg.registerNavigationEntry` | `order` | 否 | 同一 surface 内排序值，越小越靠前 |
-| `ToolPkg.registerDesktopWidget` | `id` | 是 | 小组件唯一标识 |
-| `ToolPkg.registerDesktopWidget` | `route` / `routeId` | 是 | 已注册路由 ID |
-| `ToolPkg.registerDesktopWidget` | `render` / `renderRouteId` | 否 | 小组件渲染所使用的 UI route；默认等于 `route` |
-| `ToolPkg.registerDesktopWidget` | `title` | 否 | 小组件标题（支持 `LocalizedText`） |
-| `ToolPkg.registerDesktopWidget` | `subtitle` | 否 | 小组件副标题（支持 `LocalizedText`） |
-| `ToolPkg.registerDesktopWidget` | `description` | 否 | 小组件配置说明（支持 `LocalizedText`） |
-| `ToolPkg.registerDesktopWidget` | `icon` | 否 | 图标名，供宿主配置页等场景使用 |
-| `ToolPkg.registerDesktopWidget` | `order` | 否 | 排序值，越小越靠前 |
+| `ToolPkg.registerFloatingWindow` | `id` | 是 | 浮窗唯一标识 |
+| `ToolPkg.registerFloatingWindow` | `contentRoute` | 是 | 同一 ToolPkg 已注册的 `compose_dsl` 路由 |
+| `ToolPkg.registerFloatingWindow` | `title` | 否 | 浮窗标题（支持 `LocalizedText`） |
+| `ToolPkg.registerFloatingWindow` | `description` | 否 | 浮窗描述（支持 `LocalizedText`） |
+| `ToolPkg.registerFloatingWindow` | `widthDp` / `heightDp` | 否 | 初始尺寸 |
+| `ToolPkg.registerFloatingWindow` | `draggable` | 否 | 是否允许拖动 |
+| `ToolPkg.registerFloatingWindow` | `resizable` | 否 | 是否允许调整尺寸 |
+| `ToolPkg.registerFloatingWindow` | `refreshIntervalMs` | 否 | 刷新函数周期，0 表示关闭 |
+| `ToolPkg.registerFloatingWindow` | `onRefresh` | 否 | 长驻浮窗的刷新函数 |
 | `ToolPkg.registerAppLifecycleHook` | `id` | 是 | 生命周期钩子唯一标识 |
 | `ToolPkg.registerAppLifecycleHook` | `event` | 是 | 生命周期事件名（见下方完整列表） |
 | `ToolPkg.registerAppLifecycleHook` | `function` | 是 | 函数引用（支持箭头函数） |

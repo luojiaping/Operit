@@ -2,6 +2,7 @@ package com.ai.assistance.operit.plugins
 
 import com.ai.assistance.operit.plugins.toolbox.ToolboxPlugin
 import com.ai.assistance.operit.plugins.toolpkg.ToolPkgCommonBridgePlugin
+import com.ai.assistance.operit.plugins.toolpkg.DeepSeekWhaleHostBridgePlugin
 import com.ai.assistance.operit.plugins.workflow.WorkflowLifecyclePlugin
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.ConcurrentHashMap
@@ -32,6 +33,7 @@ object PluginRegistry {
 
         register(ToolboxPlugin)
         register(ToolPkgCommonBridgePlugin)
+        register(DeepSeekWhaleHostBridgePlugin)
         register(WorkflowLifecyclePlugin)
         installAll()
     }

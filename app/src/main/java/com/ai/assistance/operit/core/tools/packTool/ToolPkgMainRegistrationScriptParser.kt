@@ -31,7 +31,10 @@ internal object ToolPkgMainRegistrationScriptParser {
             val uiModules = parseRegisteredUiModules(captured.toolboxUiModules)
             val uiRoutes = parseRegisteredUiRoutes(captured.uiRoutes, toolPkgId)
             val navigationEntries = parseRegisteredNavigationEntries(captured.navigationEntries)
-            val desktopWidgets = parseRegisteredDesktopWidgets(captured.desktopWidgets)
+            val floatingWindows = parseRegisteredFloatingWindows(
+                captured.floatingWindows,
+                uiRoutes
+            )
             val appLifecycleHooks = parseRegisteredAppLifecycleHooks(captured.appLifecycleHooks)
             val messageProcessingPlugins =
                 parseRegisteredFunctionHooks(
@@ -124,7 +127,7 @@ internal object ToolPkgMainRegistrationScriptParser {
                         toolboxUiModules = uiModules,
                         uiRoutes = uiRoutes,
                         navigationEntries = navigationEntries,
-                        desktopWidgets = desktopWidgets,
+                        floatingWindows = floatingWindows,
                         appLifecycleHooks = appLifecycleHooks,
                         messageProcessingPlugins = messageProcessingPlugins,
                         xmlRenderPlugins = xmlRenderPlugins,
@@ -314,51 +317,91 @@ internal object ToolPkgMainRegistrationScriptParser {
         return entries
     }
 
-    private fun parseRegisteredDesktopWidgets(
-        registrations: List<String>
-    ): List<ToolPkgRegisteredDesktopWidget> {
-        val widgets = mutableListOf<ToolPkgRegisteredDesktopWidget>()
+    private fun parseRegisteredFloatingWindows(
+        registrations: List<String>,
+        uiRoutes: List<ToolPkgRegisteredUiRoute>
+    ): List<ToolPkgRegisteredFloatingWindow> {
+        val windows = mutableListOf<ToolPkgRegisteredFloatingWindow>()
+        val ids = linkedSetOf<String>()
         registrations.forEachIndexed { index, raw ->
             val item =
                 try {
                     JSONObject(raw)
-                } catch (e: Exception) {
+                } catch (error: Exception) {
                     throw IllegalArgumentException(
-                        "$TOOLPKG_REGISTRATION_DESKTOP_WIDGET payload[$index] must be a JSON object",
-                        e
+                        "$TOOLPKG_REGISTRATION_FLOATING_WINDOW payload[$index] must be a JSON object",
+                        error
                     )
                 }
             val id = item.optString("id").trim()
-            val routeId =
-                item.optString("route").trim().ifBlank {
-                    item.optString("routeId").trim()
-                }
-            val renderRouteId =
-                item.optString("render").trim().ifBlank {
-                    item.optString("renderRouteId").trim()
+            val contentRouteId =
+                item.optString("contentRoute").trim().ifBlank {
+                    item.optString("content_route").trim()
                 }.ifBlank {
-                    routeId
+                    item.optString("route").trim()
                 }
             if (id.isBlank()) {
-                throw IllegalArgumentException("$TOOLPKG_REGISTRATION_DESKTOP_WIDGET[$index].id is required")
+                throw IllegalArgumentException(
+                    "$TOOLPKG_REGISTRATION_FLOATING_WINDOW[$index].id is required"
+                )
             }
-            if (routeId.isBlank()) {
-                throw IllegalArgumentException("$TOOLPKG_REGISTRATION_DESKTOP_WIDGET[$index].route is required")
+            if (!ids.add(id.lowercase())) {
+                throw IllegalArgumentException("Duplicate toolpkg floating window id: $id")
             }
-            widgets.add(
-                ToolPkgRegisteredDesktopWidget(
+            if (contentRouteId.isBlank()) {
+                throw IllegalArgumentException(
+                    "$TOOLPKG_REGISTRATION_FLOATING_WINDOW[$index].contentRoute is required"
+                )
+            }
+            val route =
+                uiRoutes.firstOrNull { candidate ->
+                    candidate.routeId.equals(contentRouteId, ignoreCase = true)
+                } ?: throw IllegalArgumentException(
+                    "$TOOLPKG_REGISTRATION_FLOATING_WINDOW[$index].contentRoute not found: $contentRouteId"
+                )
+            if (!route.runtime.equals(TOOLPKG_RUNTIME_COMPOSE_DSL, ignoreCase = true)) {
+                throw IllegalArgumentException(
+                    "$TOOLPKG_REGISTRATION_FLOATING_WINDOW[$index].contentRoute must use compose_dsl: $contentRouteId"
+                )
+            }
+            val widthDp = item.optInt("widthDp", 320)
+            val heightDp = item.optInt("heightDp", 420)
+            if (widthDp !in 160..1200 || heightDp !in 160..1600) {
+                throw IllegalArgumentException(
+                    "$TOOLPKG_REGISTRATION_FLOATING_WINDOW[$index] size is outside supported bounds"
+                )
+            }
+            val refreshIntervalMs = item.optLong("refreshIntervalMs", 60_000L)
+            if (refreshIntervalMs != 0L && refreshIntervalMs !in 30_000L..86_400_000L) {
+                throw IllegalArgumentException(
+                    "$TOOLPKG_REGISTRATION_FLOATING_WINDOW[$index].refreshIntervalMs is invalid"
+                )
+            }
+            val refreshFunction = item.optString("onRefresh").trim().ifBlank { null }
+            val refreshFunctionSource = item.optString("function_source").trim().ifBlank { null }
+            if (refreshFunctionSource != null && refreshFunction == null) {
+                throw IllegalArgumentException(
+                    "$TOOLPKG_REGISTRATION_FLOATING_WINDOW[$index].function_source requires onRefresh"
+                )
+            }
+            windows.add(
+                ToolPkgRegisteredFloatingWindow(
                     id = id,
-                    routeId = routeId,
-                    renderRouteId = renderRouteId,
+                    contentRouteId = route.routeId,
                     title = parseLocalizedText(item.opt("title"), fallback = id),
-                    subtitle = parseLocalizedText(item.opt("subtitle"), fallback = ""),
                     description = parseLocalizedText(item.opt("description"), fallback = ""),
                     icon = item.optString("icon").trim().ifBlank { null },
-                    order = item.optInt("order", 0)
+                    widthDp = widthDp,
+                    heightDp = heightDp,
+                    draggable = item.optBoolean("draggable", true),
+                    resizable = item.optBoolean("resizable", true),
+                    refreshIntervalMs = refreshIntervalMs,
+                    refreshFunction = refreshFunction,
+                    refreshFunctionSource = refreshFunctionSource
                 )
             )
         }
-        return widgets
+        return windows
     }
 
     private fun parseNavigationEntryAction(

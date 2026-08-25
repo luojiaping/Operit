@@ -154,32 +154,33 @@ internal class PackageManagerToolPkgFacade(
             )
     }
 
-    private fun buildToolPkgDesktopWidgets(
+    private fun buildToolPkgFloatingWindows(
         container: ToolPkgContainerRuntime,
         localizationContext: Context
-    ): List<PackageManager.ToolPkgDesktopWidget> {
-        return container.desktopWidgets
-            .map { widget ->
-                PackageManager.ToolPkgDesktopWidget(
-                    containerPackageName = container.packageName,
-                    toolPkgId = container.packageName,
-                    widgetId = widget.id,
-                    routeId = widget.routeId,
-                    renderRouteId = widget.renderRouteId,
-                    title = widget.title.resolve(localizationContext).trim().ifBlank { widget.id },
-                    subtitle = widget.subtitle.resolve(localizationContext).trim(),
-                    description = widget.description.resolve(localizationContext).trim(),
-                    icon = widget.icon,
-                    order = widget.order
-                )
-            }
-            .sortedWith(
-                compareBy(
-                    PackageManager.ToolPkgDesktopWidget::order,
-                    PackageManager.ToolPkgDesktopWidget::title,
-                    PackageManager.ToolPkgDesktopWidget::widgetId
-                )
+    ): List<PackageManager.ToolPkgFloatingWindow> {
+        return container.floatingWindows.map { window ->
+            PackageManager.ToolPkgFloatingWindow(
+                containerPackageName = container.packageName,
+                toolPkgId = container.packageName,
+                windowId = window.id,
+                contentRouteId = window.contentRouteId,
+                title = window.title.resolve(localizationContext).trim().ifBlank { window.id },
+                description = window.description.resolve(localizationContext).trim(),
+                icon = window.icon,
+                widthDp = window.widthDp,
+                heightDp = window.heightDp,
+                draggable = window.draggable,
+                resizable = window.resizable,
+                refreshIntervalMs = window.refreshIntervalMs,
+                refreshFunction = window.refreshFunction,
+                refreshFunctionSource = window.refreshFunctionSource
             )
+        }.sortedWith(
+            compareBy(
+                PackageManager.ToolPkgFloatingWindow::title,
+                PackageManager.ToolPkgFloatingWindow::windowId
+            )
+        )
     }
 
     private fun buildToolPkgWorkflowTemplates(
@@ -360,28 +361,15 @@ internal class PackageManagerToolPkgFacade(
             }
     }
 
-    fun getToolPkgDesktopWidgets(
+    fun getToolPkgFloatingWindows(
         resolveContext: Context? = null
-    ): List<PackageManager.ToolPkgDesktopWidget> {
+    ): List<PackageManager.ToolPkgFloatingWindow> {
         packageManager.ensureInitialized()
         val enabledSet = packageManager.getEnabledPackageNameSetInternal()
         val localizationContext = resolveContext ?: packageManager.contextInternal
         return packageManager.toolPkgContainersInternal.values
             .filter { container -> enabledSet.contains(container.packageName) }
-            .flatMap { container ->
-                buildToolPkgDesktopWidgets(
-                    container = container,
-                    localizationContext = localizationContext
-                )
-            }
-            .sortedWith(
-                compareBy(
-                    PackageManager.ToolPkgDesktopWidget::order,
-                    PackageManager.ToolPkgDesktopWidget::title,
-                    PackageManager.ToolPkgDesktopWidget::containerPackageName,
-                    PackageManager.ToolPkgDesktopWidget::widgetId
-                )
-            )
+            .flatMap { container -> buildToolPkgFloatingWindows(container, localizationContext) }
     }
 
     fun getToolPkgWorkflowTemplates(
