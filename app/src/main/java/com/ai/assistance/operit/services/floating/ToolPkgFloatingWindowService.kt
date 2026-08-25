@@ -14,6 +14,7 @@ import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
+import android.widget.FrameLayout
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
@@ -431,12 +432,12 @@ private enum class FloatingWindowTouchResult {
     Finished
 }
 
-private class ToolPkgFloatingWindowComposeView(
+private class ToolPkgFloatingWindowFrameLayout(
     context: Context,
-    private val touchHandler: (View, MotionEvent) -> FloatingWindowTouchResult
-) : ComposeView(context) {
+    private val touchHandler: (MotionEvent) -> FloatingWindowTouchResult
+) : FrameLayout(context) {
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
-        val result = touchHandler(this, event)
+        val result = touchHandler(event)
         return when (result) {
             FloatingWindowTouchResult.DragStarted -> {
                 cancelComposeGesture(event)
@@ -474,6 +475,7 @@ private class ToolPkgFloatingWindowInstance(
     private val renderError = mutableStateOf<String?>(null)
     private var routeArgsJsonValue = routeArgsJson
     private var composeView: ComposeView? = null
+    private var windowView: View? = null
     private var isAdded = false
     private var disposed = false
     private var refreshJob: Job? = null
@@ -498,10 +500,10 @@ private class ToolPkgFloatingWindowInstance(
         lifecycleOwner.handleLifecycleEvent(Lifecycle.Event.ON_CREATE)
         lifecycleOwner.handleLifecycleEvent(Lifecycle.Event.ON_START)
         lifecycleOwner.handleLifecycleEvent(Lifecycle.Event.ON_RESUME)
-        val view = ToolPkgFloatingWindowComposeView(service) { target, event ->
-            handleTouch(target, event)
-        }.apply {
-            isClickable = true
+        val window = ToolPkgFloatingWindowFrameLayout(service) { event ->
+            handleTouch(event)
+        }
+        val view = ComposeView(service).apply {
             setViewTreeLifecycleOwner(lifecycleOwner)
             setViewTreeViewModelStoreOwner(lifecycleOwner)
             setViewTreeSavedStateRegistryOwner(lifecycleOwner)
@@ -531,11 +533,19 @@ private class ToolPkgFloatingWindowInstance(
                 }
             }
         }
+        window.addView(
+            view,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
+        )
         composeView = view
+        windowView = window
         layoutParams = createLayoutParams()
         val params = layoutParams ?: error("Floating window layout params are unavailable")
         val windowManager = service.getSystemService(Context.WINDOW_SERVICE) as WindowManager
-        windowManager.addView(view, params)
+        windowManager.addView(window, params)
         isAdded = true
         requestRender()
         startRefreshLoop()
@@ -568,7 +578,7 @@ private class ToolPkgFloatingWindowInstance(
         if (patch.has("x")) params.x = patch.optInt("x")
         if (patch.has("y")) params.y = patch.optInt("y")
         layoutParams = params
-        composeView?.let { view ->
+        windowView?.let { view ->
             (service.getSystemService(Context.WINDOW_SERVICE) as WindowManager)
                 .updateViewLayout(view, params)
         }
@@ -582,7 +592,7 @@ private class ToolPkgFloatingWindowInstance(
         refreshJob?.cancel()
         refreshJob = null
         instanceScope.cancel()
-        val view = composeView
+        val view = windowView
         if (view != null && isAdded) {
             try {
                 (service.getSystemService(Context.WINDOW_SERVICE) as WindowManager).removeView(view)
@@ -591,6 +601,7 @@ private class ToolPkgFloatingWindowInstance(
             }
         }
         composeView = null
+        windowView = null
         isAdded = false
         lifecycleOwner.handleLifecycleEvent(Lifecycle.Event.ON_PAUSE)
         lifecycleOwner.handleLifecycleEvent(Lifecycle.Event.ON_STOP)
@@ -827,7 +838,7 @@ private class ToolPkgFloatingWindowInstance(
     }
 
     @Suppress("UNUSED_PARAMETER")
-    private fun handleTouch(view: View, event: MotionEvent): FloatingWindowTouchResult {
+    private fun handleTouch(event: MotionEvent): FloatingWindowTouchResult {
         if (!spec.draggable || disposed) return FloatingWindowTouchResult.Pass
         val params = layoutParams ?: return FloatingWindowTouchResult.Pass
         when (event.actionMasked) {
@@ -894,7 +905,7 @@ private class ToolPkgFloatingWindowInstance(
 
     private fun updatePosition(params: WindowManager.LayoutParams) {
         layoutParams = params
-        composeView?.let { view ->
+        windowView?.let { view ->
             try {
                 (service.getSystemService(Context.WINDOW_SERVICE) as WindowManager)
                     .updateViewLayout(view, params)
@@ -940,7 +951,7 @@ private class ToolPkgFloatingWindowInstance(
             .apply()
     }
 
-    private fun viewWidth(): Int = composeView?.width ?: layoutParams?.width ?: 0
+    private fun viewWidth(): Int = windowView?.width ?: layoutParams?.width ?: 0
 
-    private fun viewHeight(): Int = composeView?.height ?: layoutParams?.height ?: 0
+    private fun viewHeight(): Int = windowView?.height ?: layoutParams?.height ?: 0
 }
