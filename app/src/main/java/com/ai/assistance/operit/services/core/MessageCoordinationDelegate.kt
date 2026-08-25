@@ -131,6 +131,7 @@ class MessageCoordinationDelegate(
 
     private val pendingAutoContinuationByChatId =
         ConcurrentHashMap<String, PendingAutoContinuationRequest>()
+    private val pendingSendJobsByChatId = ConcurrentHashMap<String, Job>()
 
     init {
         ensureNonFatalErrorCollectorStarted()
@@ -371,23 +372,37 @@ class MessageCoordinationDelegate(
                     TAG,
                     "新对话创建完成，ID: ${chatHistoryDelegate.currentChatId.value}，现在发送消息"
                 )
-
-                // 对话创建完成后，发送消息
-                sendMessageInternal(
-                    promptFunctionType,
-                    roleCardIdOverride = roleCardIdOverride,
-                    preferActiveRoleCard = preferActiveRoleCard,
-                    chatIdOverride = chatIdOverride,
-                    messageTextOverride = messageTextOverride,
-                    proxySenderNameOverride = proxySenderNameOverride,
-                    chatModelConfigIdOverride = chatModelConfigIdOverride,
-                    chatModelIndexOverride = chatModelIndexOverride,
-                    turnOptions = turnOptions
-                )
+                val createdChatId = requireNotNull(chatHistoryDelegate.currentChatId.value)
+                val currentJob = coroutineContext[Job]
+                if (currentJob != null) {
+                    pendingSendJobsByChatId[createdChatId] = currentJob
+                }
+                try {
+                    sendMessageInternal(
+                        promptFunctionType,
+                        roleCardIdOverride = roleCardIdOverride,
+                        preferActiveRoleCard = preferActiveRoleCard,
+                        chatIdOverride = chatIdOverride,
+                        messageTextOverride = messageTextOverride,
+                        proxySenderNameOverride = proxySenderNameOverride,
+                        chatModelConfigIdOverride = chatModelConfigIdOverride,
+                        chatModelIndexOverride = chatModelIndexOverride,
+                        turnOptions = turnOptions
+                    )
+                } finally {
+                    if (currentJob != null) {
+                        pendingSendJobsByChatId.remove(createdChatId, currentJob)
+                    }
+                }
             }
         } else {
             // 已有对话，直接发送消息
-            coroutineScope.launch {
+            val targetChatId = chatIdOverride ?: chatHistoryDelegate.currentChatId.value
+            if (targetChatId == null) {
+                uiStateDelegate.showErrorMessage(context.getString(R.string.chat_no_active_conversation))
+                return
+            }
+            launchTrackedSend(targetChatId) {
                 sendMessageInternal(
                     promptFunctionType,
                     roleCardIdOverride = roleCardIdOverride,
@@ -410,7 +425,33 @@ class MessageCoordinationDelegate(
         agentChatTurnCoordinator.deactivateAgentForChat(chatId)
 
     fun cancelAgentMessage(chatId: String) {
+        pendingSendJobsByChatId[chatId]?.cancel()
+        cancelPendingAutoContinuation(chatId, restoreIdleIfPendingState = true)
         agentChatTurnCoordinator.cancel(chatId)
+    }
+
+    suspend fun isAgentActive(chatId: String): Boolean {
+        return agentChatTurnCoordinator.resolveRoute(chatId) is AgentRoute.Plugin
+    }
+
+    private fun launchTrackedSend(chatId: String, block: suspend () -> Unit) {
+        synchronized(pendingSendJobsByChatId) {
+            if (pendingSendJobsByChatId[chatId]?.isActive == true) {
+                uiStateDelegate.showErrorMessage("Chat is already processing")
+                return
+            }
+            val job = coroutineScope.launch {
+                try {
+                    block()
+                } finally {
+                    val currentJob = coroutineContext[Job]
+                    if (currentJob != null) {
+                        pendingSendJobsByChatId.remove(chatId, currentJob)
+                    }
+                }
+            }
+            pendingSendJobsByChatId[chatId] = job
+        }
     }
 
     suspend fun regenerateSingleAiMessage(index: Int) {
@@ -548,6 +589,7 @@ class MessageCoordinationDelegate(
         proxySenderNameOverride: String?,
         chatModelConfigIdOverride: String?,
         chatModelIndexOverride: Int?,
+        isBackgroundSend: Boolean,
         isGroupOrchestrationTurn: Boolean,
         turnOptions: ChatTurnOptions,
     ) {
@@ -565,7 +607,7 @@ class MessageCoordinationDelegate(
                     "Agent route does not support hidden user messages"
                 !proxySenderNameOverride.isNullOrBlank() ->
                     "Agent route does not support proxy senders"
-                attachmentDelegate.attachments.value.isNotEmpty() ->
+                !isBackgroundSend && attachmentDelegate.attachments.value.isNotEmpty() ->
                     "Agent route supports text messages without attachments only"
                 else -> null
             }
@@ -684,6 +726,7 @@ class MessageCoordinationDelegate(
                 proxySenderNameOverride = proxySenderNameOverride,
                 chatModelConfigIdOverride = chatModelConfigIdOverride,
                 chatModelIndexOverride = chatModelIndexOverride,
+                isBackgroundSend = isBackgroundSend,
                 isGroupOrchestrationTurn = isGroupOrchestrationTurn,
                 turnOptions = turnOptions,
             )

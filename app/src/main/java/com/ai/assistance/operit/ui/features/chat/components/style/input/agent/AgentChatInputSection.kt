@@ -171,6 +171,8 @@ fun AgentChatInputSection(
     onUserMessageChange: (TextFieldValue) -> Unit,
     enableEnterToSend: Boolean = false,
     onSendMessage: () -> Unit,
+    isAgentActive: Boolean = false,
+    onToggleAgent: () -> Unit = {},
     onQueueMessage: () -> Unit,
     onCancelMessage: () -> Unit,
     isLoading: Boolean,
@@ -666,7 +668,7 @@ fun AgentChatInputSection(
 
     Surface(color = Color.Transparent, modifier = floatingContainerModifier) {
         Column {
-            ChatViewSlotPluginRegistry.RenderSlot(
+                             ChatViewSlotPluginRegistry.RenderSlot(
                 params = ChatViewSlotRenderParams(
                     context = context,
                     slot = ChatViewSlots.ABOVE_INPUT,
@@ -715,14 +717,14 @@ fun AgentChatInputSection(
                             modifier = Modifier.weight(1f),
                         )
 
-                        IconButton(onClick = { onClearReply?.invoke() }, modifier = Modifier.size(24.dp)) {
-                            Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = context.getString(R.string.cancel_reply),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(16.dp),
-                            )
-                        }
+                         IconButton(onClick = { onClearReply?.invoke() }, modifier = Modifier.size(24.dp)) {
+                             Icon(
+                                 imageVector = Icons.Default.Close,
+                                 contentDescription = context.getString(R.string.cancel_reply),
+                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                 modifier = Modifier.size(16.dp),
+                             )
+                         }
                     }
                 }
             }
@@ -855,7 +857,7 @@ fun AgentChatInputSection(
                             .fillMaxWidth()
                             .padding(horizontal = 12.dp, vertical = 8.dp),
                 ) {
-                    ChatViewSlotPluginRegistry.RenderSlot(
+                             ChatViewSlotPluginRegistry.RenderSlot(
                         params = ChatViewSlotRenderParams(
                             context = context,
                             slot = ChatViewSlots.INPUT_DRAWER,
@@ -987,11 +989,22 @@ fun AgentChatInputSection(
                                     isInputFocused = isInputFocused,
                                     inputText = userMessage.text
                                 ),
-                                modifier = Modifier
-                                    .padding(start = 6.dp)
-                                    .widthIn(max = 180.dp)
-                            )
-                            }
+                                 modifier = Modifier
+                                     .padding(start = 6.dp)
+                                     .widthIn(max = 180.dp)
+                             )
+                             IconButton(onClick = onToggleAgent) {
+                                 Icon(
+                                     imageVector = Icons.Outlined.Hub,
+                                     contentDescription = context.getString(R.string.input_style_agent),
+                                     tint = if (isAgentActive) {
+                                         MaterialTheme.colorScheme.primary
+                                     } else {
+                                         MaterialTheme.colorScheme.onSurfaceVariant
+                                     },
+                                 )
+                             }
+                             }
                         }
 
                         Box(

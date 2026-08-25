@@ -248,6 +248,17 @@ class ChatViewModel(private val context: Context) : ViewModel() {
     }
     val chatHistories: StateFlow<List<ChatHistory>> by lazy { chatHistoryDelegate.chatHistories }
     val currentChatId: StateFlow<String?> by lazy { chatHistoryDelegate.currentChatId }
+    private val _agentActiveChatIds = MutableStateFlow<Set<String>>(emptySet())
+    val agentActiveChatIds: StateFlow<Set<String>> = _agentActiveChatIds.asStateFlow()
+    val currentChatAgentActive: StateFlow<Boolean> by lazy {
+        combine(currentChatId, agentActiveChatIds) { chatId, activeChatIds ->
+            chatId != null && chatId in activeChatIds
+        }.stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = false,
+        )
+    }
     val hasOlderDisplayHistory: StateFlow<Boolean> by lazy {
         chatHistoryDelegate.hasOlderDisplayHistory
     }
@@ -420,6 +431,12 @@ class ChatViewModel(private val context: Context) : ViewModel() {
         // Setup additional components
         setupPermissionSystemCollection()
         setupAttachmentDelegateToastCollection()
+
+        viewModelScope.launch {
+            currentChatId.filter { !it.isNullOrBlank() }.collect { chatId ->
+                refreshAgentActiveState(requireNotNull(chatId))
+            }
+        }
 
         // 初始化语音服务
         initializeVoiceService()
@@ -683,6 +700,7 @@ class ChatViewModel(private val context: Context) : ViewModel() {
 
     fun switchChat(chatId: String) {
         chatHistoryDelegate.switchChat(chatId)
+        refreshAgentActiveState(chatId)
         chatRuntimeHolder.syncMainChatSelectionToFloating(chatId)
 
         // 如果当前WebView正在显示，则更新工作区并触发刷新
@@ -1491,6 +1509,7 @@ class ChatViewModel(private val context: Context) : ViewModel() {
         viewModelScope.launch {
             try {
                 mainChatCore.activateAgentForChat(chatId)
+                updateAgentActiveState(chatId, true)
             } catch (error: Throwable) {
                 AppLogger.e(TAG, "激活 Agent 对话失败", error)
                 uiStateDelegate.showErrorMessage(error.message ?: "Agent activation failed")
@@ -1502,11 +1521,34 @@ class ChatViewModel(private val context: Context) : ViewModel() {
         viewModelScope.launch {
             try {
                 mainChatCore.deactivateAgentForChat(chatId)
+                updateAgentActiveState(chatId, false)
             } catch (error: Throwable) {
                 AppLogger.e(TAG, "停用 Agent 对话失败", error)
                 uiStateDelegate.showErrorMessage(error.message ?: "Agent deactivation failed")
             }
         }
+    }
+
+    fun toggleAgentForChat(chatId: String) {
+        if (chatId in _agentActiveChatIds.value) {
+            deactivateAgentForChat(chatId)
+        } else {
+            activateAgentForChat(chatId)
+        }
+    }
+
+    private fun refreshAgentActiveState(chatId: String) {
+        viewModelScope.launch {
+            runCatching { mainChatCore.isAgentActive(chatId) }
+                .onSuccess { active -> updateAgentActiveState(chatId, active) }
+                .onFailure { error -> AppLogger.e(TAG, "读取 Agent 路由状态失败", error) }
+        }
+    }
+
+    private fun updateAgentActiveState(chatId: String, active: Boolean) {
+        val updated = _agentActiveChatIds.value.toMutableSet()
+        if (active) updated += chatId else updated -= chatId
+        _agentActiveChatIds.value = updated
     }
 
     fun enqueuePendingQueueMessage(chatId: String, text: String, isQueueBlocked: Boolean) {

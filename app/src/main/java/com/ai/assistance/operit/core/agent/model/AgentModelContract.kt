@@ -123,6 +123,8 @@ interface AgentModelClient {
 data class AgentModelResolution(
     val modelSnapshotJson: String,
     val client: AgentModelClient,
+    val provider: String = "",
+    val modelName: String = "",
 ) {
     init {
         require(modelSnapshotJson.isNotBlank()) { "Agent model snapshot must not be blank" }

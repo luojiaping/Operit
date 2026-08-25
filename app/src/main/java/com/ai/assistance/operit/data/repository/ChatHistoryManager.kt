@@ -2429,7 +2429,7 @@ class ChatHistoryManager private constructor(private val context: Context) {
                     } else {
                         chatContentDao.getMessagesForChat(chatId)
                     }
-                hydrateMessages(chatId, messageEntities)
+                hydrateMessages(chatId, excludeAgentOwnedMessages(chatId, messageEntities))
             } catch (e: Exception) {
                 AppLogger.e(TAG, "加载运行态聊天消息失败", e)
                 emptyList()
@@ -2459,8 +2459,22 @@ class ChatHistoryManager private constructor(private val context: Context) {
                         upToTimestampInclusive = upToTimestampInclusive
                     )
                 }
-            hydrateMessages(chatId, messageEntities)
+            hydrateMessages(chatId, excludeAgentOwnedMessages(chatId, messageEntities))
         }
+    }
+
+    private suspend fun excludeAgentOwnedMessages(
+        chatId: String,
+        messageEntities: List<MessageEntity>,
+    ): List<MessageEntity> {
+        if (messageEntities.isEmpty()) {
+            return emptyList()
+        }
+        val agentMessageIds = agentExecutionDao.getMessageOwners(chatId)
+            .asSequence()
+            .map { owner -> owner.messageId }
+            .toSet()
+        return messageEntities.filterNot { message -> message.messageId in agentMessageIds }
     }
 
     suspend fun loadChatMessageLocatorPreviews(

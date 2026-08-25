@@ -7,6 +7,7 @@ import com.ai.assistance.operit.core.agent.kernel.AgentKernelCommand
 import com.ai.assistance.operit.core.agent.kernel.AgentKernelEvent
 import com.ai.assistance.operit.core.agent.kernel.AgentKernelStore
 import com.ai.assistance.operit.core.agent.model.AgentModelResolver
+import com.ai.assistance.operit.data.model.ChatMessageTimestampAllocator
 import com.ai.assistance.operit.core.agent.routing.AgentRoute
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emitAll
@@ -20,7 +21,7 @@ data class AgentInvocationRequest(
     val promptSnapshot: String,
     val permissionSnapshotJson: String,
     val toolSnapshotJson: String = "[]",
-    val userTimestamp: Long = System.currentTimeMillis(),
+    val userTimestamp: Long = ChatMessageTimestampAllocator.next(),
 ) {
     init {
         require(chatId.isNotBlank()) { "Agent invocation chatId must not be blank" }
@@ -57,6 +58,8 @@ class AgentInvocationEntry(
                     modelSnapshotJson = model.modelSnapshotJson,
                     permissionSnapshotJson = request.permissionSnapshotJson,
                     toolSnapshotJson = request.toolSnapshotJson,
+                    provider = model.provider,
+                    modelName = model.modelName,
                 )
             emitAll(AgentKernel(store = store, modelClient = model.client, clock = clock).execute(command))
         }

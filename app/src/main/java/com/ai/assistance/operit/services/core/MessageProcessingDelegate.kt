@@ -306,25 +306,35 @@ class MessageProcessingDelegate(
         setChatInputProcessingState(chatId, state)
     }
 
-    fun beginExternalAgentTurn(chatId: String): Boolean {
+    fun beginExternalAgentTurn(
+        chatId: String,
+        responseStream: SharedStream<String>,
+    ): Long? {
         val runtime = runtimeFor(chatId)
         if (runtime.isLoading.value) {
-            return false
+            return null
         }
+        val turnId = runtime.turnSequence.incrementAndGet()
+        runtime.activeTurnId = turnId
+        runtime.responseStream = responseStream
         runtime.isLoading.value = true
         updateGlobalLoadingState()
         setChatInputProcessingState(
             chatId,
             EnhancedInputProcessingState.Processing("Agent"),
         )
-        return true
+        return turnId
     }
 
     fun finishExternalAgentTurn(
         chatId: String,
+        turnId: Long,
         state: EnhancedInputProcessingState,
     ) {
         val runtime = runtimeFor(chatId)
+        if (runtime.activeTurnId != turnId) {
+            return
+        }
         runtime.isLoading.value = false
         runtime.responseStream = null
         runtime.activeStreamingTurn = null

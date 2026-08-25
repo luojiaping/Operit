@@ -27,6 +27,7 @@ import com.ai.assistance.operit.core.agent.kernel.AgentRunFailRequest
 import com.ai.assistance.operit.core.agent.kernel.AgentRunReservation
 import com.ai.assistance.operit.core.agent.kernel.AgentRunReserveRequest
 import com.ai.assistance.operit.core.agent.kernel.AgentRunTerminalSnapshot
+import com.ai.assistance.operit.core.agent.model.AgentModelUsage
 import com.ai.assistance.operit.core.agent.routing.AgentRoute
 import com.ai.assistance.operit.core.agent.routing.AgentRouter
 import com.ai.assistance.operit.data.dao.AgentExecutionDao
@@ -486,6 +487,8 @@ class AgentExecutionRepository internal constructor(
                 step = step.toSnapshot(),
                 inputMessage = inputMessage,
                 history = history,
+                provider = command.provider,
+                modelName = command.modelName,
             )
         }
     }
@@ -538,6 +541,9 @@ class AgentExecutionRepository internal constructor(
                     content = request.assistantText,
                     timestamp = request.assistantTimestamp,
                     now = request.now,
+                    provider = request.reservation.provider,
+                    modelName = request.reservation.modelName,
+                    usage = request.usage,
                 )
             val completedStep =
                 current.step.copy(
@@ -611,6 +617,11 @@ class AgentExecutionRepository internal constructor(
 
     suspend fun getSession(sessionId: AgentSessionId): AgentSessionSnapshot? {
         return dao.getSession(sessionId.value)?.toSnapshot()
+    }
+
+    suspend fun getLatestOpenRootSession(chatId: String): AgentSessionSnapshot? {
+        require(chatId.isNotBlank()) { "chatId must not be blank" }
+        return dao.getLatestOpenRootSession(chatId)?.toSnapshot()
     }
 
     suspend fun getMessageOwner(messageId: Long) = dao.getMessageOwnerRecord(messageId)?.toSnapshot()
@@ -823,6 +834,9 @@ class AgentExecutionRepository internal constructor(
         content: String,
         timestamp: Long,
         now: Long,
+        provider: String,
+        modelName: String,
+        usage: AgentModelUsage?,
     ): PersistedAgentMessageRef {
         val orderIndex = (messageDao.getMaxOrderIndex(chat.id) ?: -1) + 1
         val message =
@@ -830,6 +844,12 @@ class AgentExecutionRepository internal constructor(
                 sender = "ai",
                 content = content,
                 timestamp = timestamp,
+                provider = provider,
+                modelName = modelName,
+                inputTokens = usage?.inputTokens ?: 0L,
+                outputTokens = usage?.outputTokens ?: 0L,
+                cachedInputTokens = usage?.cachedInputTokens ?: 0L,
+                completedAt = now,
             )
         val messageId =
             messageDao.insertMessage(
@@ -841,21 +861,30 @@ class AgentExecutionRepository internal constructor(
             )
         require(messageId > 0L) { "Room did not return a persisted Agent output messageId" }
         dao.insertMessageOwner(ownerEntity(messageId, session))
-        updateChatMetadataLocked(chat, now)
+        updateChatMetadataLocked(
+            chat = chat,
+            now = now,
+            inputTokensDelta = usage?.inputTokens ?: 0L,
+            outputTokensDelta = usage?.outputTokens ?: 0L,
+            currentWindowSize = usage?.let { it.inputTokens + it.outputTokens },
+        )
         return PersistedAgentMessageRef(messageId = messageId, chatId = chat.id, timestamp = timestamp)
     }
 
     private suspend fun updateChatMetadataLocked(
         chat: ChatEntity,
         now: Long,
+        inputTokensDelta: Long = 0L,
+        outputTokensDelta: Long = 0L,
+        currentWindowSize: Long? = null,
     ) {
         chatDao.updateChatMetadata(
             chatId = chat.id,
             title = chat.title,
             timestamp = now,
-            inputTokens = chat.inputTokens,
-            outputTokens = chat.outputTokens,
-            currentWindowSize = chat.currentWindowSize,
+            inputTokens = chat.inputTokens + inputTokensDelta,
+            outputTokens = chat.outputTokens + outputTokensDelta,
+            currentWindowSize = currentWindowSize ?: chat.currentWindowSize,
         )
     }
 

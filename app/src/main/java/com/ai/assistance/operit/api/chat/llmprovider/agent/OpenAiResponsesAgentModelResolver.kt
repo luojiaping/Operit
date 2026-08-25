@@ -22,6 +22,8 @@ class OpenAiResponsesAgentModelResolver(
         return AgentModelResolution(
             modelSnapshotJson = snapshot.encode(),
             client = OpenAiResponsesAgentModelClient(credentialProvider),
+            provider = "OPENAI_RESPONSES",
+            modelName = snapshot.model,
         )
     }
 }

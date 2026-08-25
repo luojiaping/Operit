@@ -62,7 +62,7 @@ class AgentChatTurnCoordinatorTest {
         val history = mock<ChatHistoryDelegate>()
         val processing = mock<MessageProcessingDelegate>()
         val entry = mock<AgentInvocationEntry>()
-        whenever(processing.beginExternalAgentTurn("chat")).thenReturn(true)
+        whenever(processing.beginExternalAgentTurn(eq("chat"), any())).thenReturn(1L)
         whenever(
             entry.execute(any())
         ).thenReturn(
@@ -119,7 +119,7 @@ class AgentChatTurnCoordinatorTest {
                 eq("chat"),
             )
             verify(history).reloadChatMessagesSmart("chat")
-            verify(processing).finishExternalAgentTurn("chat", InputProcessingState.Completed)
+            verify(processing).finishExternalAgentTurn("chat", 1L, InputProcessingState.Completed)
         } finally {
             scope.cancel()
         }

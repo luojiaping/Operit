@@ -237,6 +237,7 @@ class ChatServiceCore(
 
         chatHistoryDelegate.setBeforeDestructiveHistoryMutation { chatId ->
             messageCoordinationDelegate.cancelSummaryForDestructiveMutation(chatId)
+            messageCoordinationDelegate.cancelAgentMessage(chatId)
             messageProcessingDelegate.cancelMessageForDestructiveMutation(chatId)
         }
         chatHistoryDelegate.setAfterDestructiveHistoryMutation { chatId ->
@@ -280,6 +281,10 @@ class ChatServiceCore(
 
     suspend fun deactivateAgentForChat(chatId: String) {
         messageCoordinationDelegate.deactivateAgentForChat(chatId)
+    }
+
+    suspend fun isAgentActive(chatId: String): Boolean {
+        return messageCoordinationDelegate.isAgentActive(chatId)
     }
 
     /** 取消当前消息 */

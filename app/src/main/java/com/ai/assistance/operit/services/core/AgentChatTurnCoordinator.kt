@@ -25,6 +25,7 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.ai.assistance.operit.util.stream.MutableSharedStreamImpl
 
 class AgentChatTurnCoordinator(
     private val coroutineScope: CoroutineScope,
@@ -46,19 +47,20 @@ class AgentChatTurnCoordinator(
             is AgentRoute.Plugin -> route.session
             is AgentRoute.Legacy -> {
                 val session =
-                    repository.startSession(
-                        input =
-                            com.ai.assistance.operit.core.agent.contract.AgentSessionStart(
-                                chatId = chatId,
-                                pluginId = BUILTIN_PLUGIN_ID,
-                                agentId = AgentId(BUILTIN_AGENT_ID),
-                                displayName = BUILTIN_DISPLAY_NAME,
-                                profileVersion = BUILTIN_PROFILE_VERSION,
-                                profileKind = AgentProfileKind.PRIMARY,
-                                modeId = AgentModeId(BUILTIN_MODE_ID),
-                                sessionId = AgentSessionId.generate(),
-                            )
-                    )
+                    repository.getLatestOpenRootSession(chatId)
+                        ?: repository.startSession(
+                            input =
+                                com.ai.assistance.operit.core.agent.contract.AgentSessionStart(
+                                    chatId = chatId,
+                                    pluginId = BUILTIN_PLUGIN_ID,
+                                    agentId = AgentId(BUILTIN_AGENT_ID),
+                                    displayName = BUILTIN_DISPLAY_NAME,
+                                    profileVersion = BUILTIN_PROFILE_VERSION,
+                                    profileKind = AgentProfileKind.PRIMARY,
+                                    modeId = AgentModeId(BUILTIN_MODE_ID),
+                                    sessionId = AgentSessionId.generate(),
+                                )
+                        )
                 repository.bindRootSession(chatId = chatId, sessionId = session.sessionId)
                 session
             }
@@ -91,7 +93,10 @@ class AgentChatTurnCoordinator(
     fun isActive(chatId: String): Boolean = jobs[chatId]?.isActive == true
 
     private suspend fun execute(request: AgentInvocationRequest) {
-        if (!messageProcessingDelegate.beginExternalAgentTurn(request.chatId)) {
+        val responseStream = MutableSharedStreamImpl<String>()
+        val turnId = messageProcessingDelegate.beginExternalAgentTurn(request.chatId, responseStream)
+        if (turnId == null) {
+            responseStream.close()
             AppLogger.w(TAG, "Agent chat turn rejected because chat is already processing: ${request.chatId}")
             return
         }
@@ -103,6 +108,7 @@ class AgentChatTurnCoordinator(
                 when (event) {
                     is AgentKernelEvent.AssistantTextDelta -> {
                         text.append(event.text)
+                        responseStream.emit(event.text)
                         chatHistoryDelegate.addMessageToChat(
                             ChatMessage(
                                 sender = "ai",
@@ -124,6 +130,7 @@ class AgentChatTurnCoordinator(
                         settled = true
                         messageProcessingDelegate.finishExternalAgentTurn(
                             chatId = request.chatId,
+                            turnId = turnId,
                             state = InputProcessingState.Completed,
                         )
                     }
@@ -132,6 +139,7 @@ class AgentChatTurnCoordinator(
                         settled = true
                         messageProcessingDelegate.finishExternalAgentTurn(
                             chatId = request.chatId,
+                            turnId = turnId,
                             state = InputProcessingState.Error(event.error.message),
                         )
                         chatHistoryDelegate.reloadChatMessagesSmart(request.chatId)
@@ -145,6 +153,7 @@ class AgentChatTurnCoordinator(
             if (!settled) {
                 messageProcessingDelegate.finishExternalAgentTurn(
                     chatId = request.chatId,
+                    turnId = turnId,
                     state = InputProcessingState.Error("Agent event stream ended without settlement"),
                 )
                 chatHistoryDelegate.reloadChatMessagesSmart(request.chatId)
@@ -153,6 +162,7 @@ class AgentChatTurnCoordinator(
             withContext(NonCancellable) {
                 messageProcessingDelegate.finishExternalAgentTurn(
                     chatId = request.chatId,
+                    turnId = turnId,
                     state = InputProcessingState.Idle,
                 )
                 chatHistoryDelegate.reloadChatMessagesSmart(request.chatId)
@@ -162,9 +172,12 @@ class AgentChatTurnCoordinator(
             AppLogger.e(TAG, "Agent chat turn failed", error)
             messageProcessingDelegate.finishExternalAgentTurn(
                 chatId = request.chatId,
+                turnId = turnId,
                 state = InputProcessingState.Error(error.message ?: "Agent chat turn failed"),
             )
             chatHistoryDelegate.reloadChatMessagesSmart(request.chatId)
+        } finally {
+            responseStream.close()
         }
     }
 

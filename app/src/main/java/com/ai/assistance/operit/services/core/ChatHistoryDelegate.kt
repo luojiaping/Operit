@@ -649,6 +649,13 @@ class ChatHistoryDelegate(
     suspend fun reloadChatMessagesSmart(chatId: String) {
         try {
             historyUpdateMutex.withLock {
+                if (chatId != _currentChatId.value) {
+                    AppLogger.d(
+                        TAG,
+                        "跳过非当前聊天的智能重载: target=$chatId, current=${_currentChatId.value}"
+                    )
+                    return@withLock
+                }
                 try {
                     val reloadedMessages = reloadCurrentChatDisplayHistory(chatId)
                     AppLogger.d(TAG, "智能重新加载聊天 $chatId 完成: ${reloadedMessages.size} 条消息")

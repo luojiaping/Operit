@@ -20,6 +20,8 @@ data class AgentKernelCommand(
     val modelSnapshotJson: String,
     val permissionSnapshotJson: String,
     val toolSnapshotJson: String = "[]",
+    val provider: String = "",
+    val modelName: String = "",
     val maxSteps: Int = 1,
     val runId: AgentRunId = AgentRunId.generate(),
     val stepId: AgentStepId = AgentStepId.generate(),
@@ -47,6 +49,8 @@ data class AgentRunReservation(
     val step: AgentStepSnapshot,
     val inputMessage: PersistedAgentMessageRef,
     val history: List<AgentHistoryItem>,
+    val provider: String = "",
+    val modelName: String = "",
 )
 
 data class AgentRunCompleteRequest(
@@ -54,6 +58,7 @@ data class AgentRunCompleteRequest(
     val assistantText: String,
     val reasoningText: String,
     val usageJson: String?,
+    val usage: AgentModelUsage? = null,
     val finishReason: AgentModelStopReason,
     val assistantTimestamp: Long,
     val now: Long,

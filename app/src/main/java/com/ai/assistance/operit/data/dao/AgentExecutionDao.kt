@@ -69,6 +69,14 @@ interface AgentExecutionDao {
     @Query("SELECT COUNT(*) FROM agent_sessions WHERE chatId = :chatId")
     suspend fun countSessions(chatId: String): Int
 
+    @Query(
+        "SELECT * FROM agent_sessions " +
+            "WHERE chatId = :chatId AND parentSessionId IS NULL AND depth = 0 " +
+            "AND status NOT IN ('COMPLETED', 'FAILED', 'CANCELLED') " +
+            "ORDER BY updatedAt DESC LIMIT 1"
+    )
+    suspend fun getLatestOpenRootSession(chatId: String): AgentSessionEntity?
+
     @Upsert
     suspend fun setChatBinding(entity: AgentChatBindingEntity)
 

@@ -9,6 +9,7 @@ import com.ai.assistance.operit.core.agent.model.AgentModelMessageRole
 import com.ai.assistance.operit.core.agent.model.AgentModelRequest
 import com.ai.assistance.operit.core.agent.model.AgentModelStopReason
 import com.ai.assistance.operit.core.agent.model.AgentModelUsage
+import com.ai.assistance.operit.data.model.ChatMessageTimestampAllocator
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.currentCoroutineContext
@@ -23,7 +24,7 @@ import kotlinx.serialization.json.put
 class AgentKernel(
     private val store: AgentKernelStore,
     private val modelClient: AgentModelClient,
-    private val clock: AgentKernelClock = AgentKernelClock { System.currentTimeMillis() },
+    private val clock: AgentKernelClock = AgentKernelClock { ChatMessageTimestampAllocator.next() },
 ) {
     suspend fun recoverInterruptedRuns(): Int {
         return store.recoverInterruptedRuns(clock.now())
@@ -183,6 +184,7 @@ class AgentKernel(
                                             assistantText = text.toString(),
                                             reasoningText = reasoning.toString(),
                                             usageJson = usage?.let(::encodeUsage),
+                                            usage = usage,
                                             finishReason = terminal.stopReason,
                                             assistantTimestamp = clock.now(),
                                             now = clock.now(),
