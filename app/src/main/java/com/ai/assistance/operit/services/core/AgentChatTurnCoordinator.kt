@@ -35,6 +35,8 @@ class AgentChatTurnCoordinator(
     private val invocationEntryProvider: () -> AgentInvocationEntry,
 ) {
     private val jobs = ConcurrentHashMap<String, Job>()
+    private val activeResponseStreams = ConcurrentHashMap<String, MutableSharedStreamImpl<String>>()
+    private val activeTurnIds = ConcurrentHashMap<String, Long>()
     private val invocationEntry by lazy(invocationEntryProvider)
 
     suspend fun resolveRoute(chatId: String): AgentRoute {
@@ -79,9 +81,32 @@ class AgentChatTurnCoordinator(
             ) {
                 return false
             }
+            val responseStream = MutableSharedStreamImpl<String>()
+            val turnId =
+                messageProcessingDelegate.beginExternalAgentTurn(
+                    request.chatId,
+                    responseStream,
+                ) ?: run {
+                    responseStream.close()
+                    return false
+                }
+            activeResponseStreams[request.chatId] = responseStream
+            activeTurnIds[request.chatId] = turnId
             val job = coroutineScope.launch(Dispatchers.IO) { execute(request) }
             jobs[request.chatId] = job
-            job.invokeOnCompletion { jobs.remove(request.chatId, job) }
+            job.invokeOnCompletion {
+                jobs.remove(request.chatId, job)
+                activeResponseStreams.remove(request.chatId, responseStream)
+                activeTurnIds.remove(request.chatId, turnId)
+                if (!job.isCompleted || job.isCancelled) {
+                    responseStream.close()
+                    messageProcessingDelegate.finishExternalAgentTurn(
+                        chatId = request.chatId,
+                        turnId = turnId,
+                        state = InputProcessingState.Idle,
+                    )
+                }
+            }
             return true
         }
     }
@@ -93,13 +118,8 @@ class AgentChatTurnCoordinator(
     fun isActive(chatId: String): Boolean = jobs[chatId]?.isActive == true
 
     private suspend fun execute(request: AgentInvocationRequest) {
-        val responseStream = MutableSharedStreamImpl<String>()
-        val turnId = messageProcessingDelegate.beginExternalAgentTurn(request.chatId, responseStream)
-        if (turnId == null) {
-            responseStream.close()
-            AppLogger.w(TAG, "Agent chat turn rejected because chat is already processing: ${request.chatId}")
-            return
-        }
+        val responseStream = requireNotNull(activeResponseStreams[request.chatId])
+        val turnId = requireNotNull(activeTurnIds[request.chatId])
         val previewTimestamp = ChatMessageTimestampAllocator.next()
         val text = StringBuilder()
         var settled = false
@@ -178,6 +198,8 @@ class AgentChatTurnCoordinator(
             chatHistoryDelegate.reloadChatMessagesSmart(request.chatId)
         } finally {
             responseStream.close()
+            activeResponseStreams.remove(request.chatId, responseStream)
+            activeTurnIds.remove(request.chatId, turnId)
         }
     }
 
