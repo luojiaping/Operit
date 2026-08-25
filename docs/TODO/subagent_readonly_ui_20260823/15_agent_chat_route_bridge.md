@@ -3,7 +3,7 @@ fork: https://github.com/luojiaping/Operit.git
 scope: per-chat Agent activation, pre-Legacy route dispatch, and transient turn bridge
 status: lifecycle_hardened_pending_device_e2e
 implementation_commit: 286c41c04
-build_commit: 940c85554
+build_commit: 792d30e99
 route_test_commit: 4e70c2077
 hardening_commit: 41e2297be
 ---
@@ -92,5 +92,14 @@ passed for `940c85554` before the hardening pass:
 - size: `403232415`
 - SHA-256: `072b0320df37431be3d072c85c315795f60e0c65a9580be30dd81906d377a4d4`
 
-The hardening pass needs a new APK build. It still needs device E2E verification and production
-send-path integration coverage before it can be called an MVP release candidate.
+The hardening pass still needs device E2E verification and production send-path integration
+coverage before it can be called an MVP release candidate.
+
+The hardened APK build passed for `792d30e99`:
+
+- artifact: `operit-dev-development-792d30e9.apk`
+- size: `403236511`
+- SHA-256: `2370ea65359d79aab27cb26ca83db9a1a0ca95612b55bce821a135c224904b7f`
+
+The hardened targeted JVM suite passed 36/36; main compilation and Android test source compilation
+passed. Device E2E and production send-path verification remain pending.
