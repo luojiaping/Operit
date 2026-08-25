@@ -188,6 +188,15 @@ export interface ComposeGeneratedCircularProgressIndicatorProps extends ComposeC
   zIndex?: number;
 }
 
+export interface ComposeGeneratedSliderProps extends ComposeCommonProps {
+  enabled?: boolean;
+  onValueChange: (value: number) => void;
+  onValueChangeFinished?: () => void | Promise<void>;
+  steps?: number;
+  value: number;
+  zIndex?: number;
+}
+
 export interface ComposeGeneratedSnackbarHostProps extends ComposeCommonProps {
   zIndex?: number;
 }
@@ -766,6 +775,7 @@ export interface ComposeMaterial3GeneratedUiFactoryRegistry {
   Icon: ComposeNodeFactory<ComposeGeneratedIconProps>;
   LinearProgressIndicator: ComposeNodeFactory<ComposeGeneratedLinearProgressIndicatorProps>;
   CircularProgressIndicator: ComposeNodeFactory<ComposeGeneratedCircularProgressIndicatorProps>;
+  Slider: ComposeNodeFactory<ComposeGeneratedSliderProps>;
   SnackbarHost: ComposeNodeFactory<ComposeGeneratedSnackbarHostProps>;
   AssistChip: ComposeNodeFactory<ComposeGeneratedAssistChipProps>;
   Badge: ComposeNodeFactory<ComposeGeneratedBadgeProps>;
@@ -833,4 +843,3 @@ export interface ComposeMaterial3GeneratedUiFactoryRegistry {
   SelectionContainer: ComposeNodeFactory<ComposeGeneratedSelectionContainerProps>;
   Canvas: ComposeNodeFactory<ComposeGeneratedCanvasProps>;
 }
-

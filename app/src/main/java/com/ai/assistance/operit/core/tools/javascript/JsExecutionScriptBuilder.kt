@@ -1335,6 +1335,9 @@ internal fun buildExecutionRuntimeBridgeScript(): String {
                     floatingApi.hide = function(windowId) {
                         return command('hide', windowId);
                     };
+                    floatingApi.get = function(windowId) {
+                        return command('get', windowId);
+                    };
                     floatingApi.update = function(windowId, patch) {
                         return command('update', windowId, patch);
                     };

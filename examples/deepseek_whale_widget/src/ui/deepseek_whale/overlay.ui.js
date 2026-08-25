@@ -17,12 +17,21 @@ const BUBBLE_TAIL = [
   { type: "close" },
 ];
 
+const RANDOM_LINES = [
+  "好模型... ↓",
+  "我去吃饭啦，测完叫我~",
+  "压力一只蓝色大肥鱼？！",
+  "DeepSleep...",
+  "恭喜你实现 Token 自由！",
+  "今天也要省着用哦~",
+];
+
 function formatMoney(value, currency) {
   if (!value) return "--";
   return currency === "CNY" ? `¥ ${value}` : `${value} ${currency}`;
 }
 
-function bubbleCommands(amount, usage, colors) {
+function bubbleCommands() {
   return [
     { type: "drawPath", path: BUBBLE_PATH, unit: "fraction", color: "#FFFFFF", style: "fill" },
     { type: "drawPath", path: BUBBLE_PATH, unit: "fraction", color: "#203170", strokeWidth: 6, style: "stroke" },
@@ -32,9 +41,6 @@ function bubbleCommands(amount, usage, colors) {
     { type: "circle", cx: 0.343, cy: 0.801, radius: 0.036, unit: "fraction", color: "#203170", strokeWidth: 6, filled: false },
     { type: "circle", cx: 0.431, cy: 0.923, radius: 0.024, unit: "fraction", color: "#FFFFFF", filled: true },
     { type: "circle", cx: 0.431, cy: 0.923, radius: 0.024, unit: "fraction", color: "#203170", strokeWidth: 6, filled: false },
-    { type: "drawText", text: "DeepSeek 余额", x: 0.145, y: 0.255, unit: "fraction", color: "#536BA9", fontSize: 10, maxLines: 1 },
-    { type: "drawText", text: amount, x: 0.145, y: 0.385, unit: "fraction", color: "#203170", fontSize: 20, maxLines: 1 },
-    { type: "drawText", text: usage, x: 0.145, y: 0.560, unit: "fraction", color: colors.onSurfaceVariant, fontSize: 8, maxWidth: { value: 0.62, unit: "fraction" }, maxLines: 2 },
   ];
 }
 
@@ -49,13 +55,18 @@ function Overlay(ctx) {
     updatedAtMs: "",
   });
   const [imagePath, setImagePath] = ctx.useState("imagePath", "");
+  const [gifPath, setGifPath] = ctx.useState("gifPath", "");
   const [bubbleVisible, setBubbleVisible] = ctx.useState("bubbleVisible", false);
-  let bubbleTimer = null;
+  const [bubbleMode, setBubbleMode] = ctx.useState("bubbleMode", "normal");
+  const [randomMessage, setRandomMessage] = ctx.useState("randomMessage", "");
+  const [randomIsGif, setRandomIsGif] = ctx.useState("randomIsGif", false);
+  const [bubbleTimer, setBubbleTimer] = ctx.useMutable("bubbleTimer", null);
 
   async function load() {
     try {
       setSnapshot(await bridge.loadCachedModel());
       setImagePath(await ToolPkg.readResource("whale_image", "whale.png", true));
+      setGifPath(await ToolPkg.readResource("whale_gif", "rua.gif", true));
     } catch (error) {
       console.error("[dsh-whale-widget] overlay refresh failed", error);
       setSnapshot({
@@ -68,19 +79,32 @@ function Overlay(ctx) {
     }
   }
 
-  function closeBubble() {
-    if (bubbleTimer !== null) {
-      clearTimeout(bubbleTimer);
-      bubbleTimer = null;
-    }
-    setBubbleVisible(false);
+  function scheduleClose() {
+    if (bubbleTimer !== null) clearTimeout(bubbleTimer);
+    setBubbleTimer(setTimeout(() => setBubbleVisible(false), 5000));
   }
 
   async function openBubble() {
-    if (bubbleTimer !== null) clearTimeout(bubbleTimer);
+    setBubbleMode("normal");
     setBubbleVisible(true);
     await load();
-    bubbleTimer = setTimeout(closeBubble, 5000);
+    scheduleClose();
+  }
+
+  function closeBubble() {
+    if (bubbleTimer !== null) clearTimeout(bubbleTimer);
+    setBubbleVisible(false);
+  }
+
+  function cycleBubble() {
+    if (bubbleMode === "normal") {
+      setRandomMessage(RANDOM_LINES[Math.floor(Math.random() * RANDOM_LINES.length)]);
+      setRandomIsGif(Math.random() < 0.2);
+      setBubbleMode("random");
+      scheduleClose();
+      return;
+    }
+    closeBubble();
   }
 
   const amount = snapshot.totalBalance
@@ -96,6 +120,33 @@ function Overlay(ctx) {
         ? "余额读取失败"
         : "等待余额刷新";
 
+  const bubbleText =
+    bubbleMode === "random"
+      ? UI.Text({
+          text: randomMessage,
+          style: "titleSmall",
+          color: "#203170",
+          maxLines: 3,
+          softWrap: true,
+        })
+      : UI.Column(
+          {
+            fillMaxSize: true,
+            horizontalAlignment: "center",
+            verticalArrangement: "center",
+            spacing: 1,
+          },
+          [
+            UI.Text({ text: "DeepSeek 余额", fontSize: 9, color: "#536BA9", maxLines: 1 }),
+            UI.Text({ text: amount, fontSize: 20, color: "#203170", maxLines: 1 }),
+            UI.Text({ text: usage, fontSize: 7, color: colors.onSurfaceVariant, maxLines: 2 }),
+          ]
+        );
+
+  const bubbleContent = bubbleMode === "random" && randomIsGif && gifPath
+    ? UI.Image({ path: gifPath, width: 58, height: 45, contentScale: "fit", contentDescription: "" })
+    : bubbleText;
+
   const whale = imagePath
     ? UI.Image({
         path: imagePath,
@@ -109,16 +160,23 @@ function Overlay(ctx) {
     { fillMaxSize: true, onLoad: load },
     [
       bubbleVisible
-        ? UI.Canvas({
-            fillMaxSize: true,
-            commands: bubbleCommands(amount, usage, colors),
-          })
+        ? UI.Canvas({ fillMaxSize: true, commands: bubbleCommands() })
+        : null,
+      bubbleVisible
+        ? UI.Box(
+            {
+              width: 104,
+              height: 76,
+              modifier: ctx.Modifier.align("topStart").offset({ x: 18, y: 14 }),
+            },
+            [bubbleContent]
+          )
         : null,
       bubbleVisible
         ? UI.Box({
             width: 128,
             height: 100,
-            modifier: ctx.Modifier.align("topStart").clickable(closeBubble),
+            modifier: ctx.Modifier.align("topStart").clickable(cycleBubble),
           })
         : null,
       UI.Box(

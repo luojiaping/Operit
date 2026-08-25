@@ -30,6 +30,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -955,6 +956,37 @@ internal fun renderCircularProgressIndicatorNode(
         modifier = applyScopedCommonModifier(Modifier, props, modifierResolver),
         strokeWidth = if (strokeWidth != null) strokeWidth.dp else 4.dp,
         color = color ?: MaterialTheme.colorScheme.primary
+    )
+}
+
+@Composable
+internal fun renderSliderNode(
+    node: ToolPkgComposeDslNode,
+    onAction: (String, Any?) -> Unit,
+    nodePath: String,
+    modifierResolver: ComposeDslModifierResolver
+) {
+    val props = node.props
+    val onValueChangeActionId = ToolPkgComposeDslParser.extractActionId(props["onValueChange"])
+    val onValueChangeFinishedActionId =
+        ToolPkgComposeDslParser.extractActionId(props["onValueChangeFinished"])
+    Slider(
+        value = (props.floatOrNull("value") ?: 0f).coerceIn(0f, 1f),
+        onValueChange = { value ->
+            if (!onValueChangeActionId.isNullOrBlank()) {
+                onAction(onValueChangeActionId, value.toDouble())
+            }
+        },
+        modifier = applyScopedCommonModifier(Modifier, props, modifierResolver),
+        enabled = props.bool("enabled", true),
+        valueRange = 0f..1f,
+        steps = props.int("steps", 0),
+        onValueChangeFinished =
+            if (onValueChangeFinishedActionId.isNullOrBlank()) {
+                null
+            } else {
+                { onAction(onValueChangeFinishedActionId, null) }
+            }
     )
 }
 

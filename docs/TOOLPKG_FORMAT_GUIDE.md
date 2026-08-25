@@ -384,7 +384,10 @@ function registerToolPkg() {
     widthDp: 320,
     heightDp: 420,
     draggable: true,
-    resizable: true
+    resizable: true,
+    snapMode: "quarter",
+    pressSoundResource: "press_sound",
+    releaseSoundResource: "release_sound"
   });
 
   ToolPkg.registerAppLifecycleHook({
@@ -481,6 +484,8 @@ exports.onInputMenuToggle = onInputMenuToggle;
 | `ToolPkg.registerFloatingWindow` | `widthDp` / `heightDp` | 否 | 初始尺寸 |
 | `ToolPkg.registerFloatingWindow` | `draggable` | 否 | 是否允许拖动 |
 | `ToolPkg.registerFloatingWindow` | `resizable` | 否 | 是否允许调整尺寸 |
+| `ToolPkg.registerFloatingWindow` | `snapMode` | 否 | `quarter` 边缘吸附或 `none` 自由定位，默认 `quarter` |
+| `ToolPkg.registerFloatingWindow` | `pressSoundResource` / `releaseSoundResource` | 否 | 按压和松开反馈音效资源 key |
 | `ToolPkg.registerFloatingWindow` | `refreshIntervalMs` | 否 | 刷新函数周期，0 表示关闭 |
 | `ToolPkg.registerFloatingWindow` | `onRefresh` | 否 | 长驻浮窗的刷新函数 |
 | `ToolPkg.registerAppLifecycleHook` | `id` | 是 | 生命周期钩子唯一标识 |

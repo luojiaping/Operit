@@ -384,6 +384,12 @@ internal object ToolPkgMainRegistrationScriptParser {
                     "$TOOLPKG_REGISTRATION_FLOATING_WINDOW[$index].function_source requires onRefresh"
                 )
             }
+            val snapMode = item.optString("snapMode", "quarter").trim().lowercase()
+            if (snapMode !in setOf("none", "quarter")) {
+                throw IllegalArgumentException(
+                    "$TOOLPKG_REGISTRATION_FLOATING_WINDOW[$index].snapMode must be none or quarter"
+                )
+            }
             windows.add(
                 ToolPkgRegisteredFloatingWindow(
                     id = id,
@@ -395,6 +401,9 @@ internal object ToolPkgMainRegistrationScriptParser {
                     heightDp = heightDp,
                     draggable = item.optBoolean("draggable", true),
                     resizable = item.optBoolean("resizable", true),
+                    snapMode = snapMode,
+                    pressSoundResource = item.optString("pressSoundResource").trim().ifBlank { null },
+                    releaseSoundResource = item.optString("releaseSoundResource").trim().ifBlank { null },
                     refreshIntervalMs = refreshIntervalMs,
                     refreshFunction = refreshFunction,
                     refreshFunctionSource = refreshFunctionSource

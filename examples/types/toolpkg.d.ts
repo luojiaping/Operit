@@ -723,6 +723,9 @@ export namespace ToolPkg {
         heightDp?: number;
         draggable?: boolean;
         resizable?: boolean;
+        snapMode?: "none" | "quarter";
+        pressSoundResource?: string;
+        releaseSoundResource?: string;
         refreshIntervalMs?: number;
         onRefresh?: FloatingWindowRefreshHandler;
     }
@@ -734,6 +737,18 @@ export namespace ToolPkg {
         windowId: string;
         contentRoute: string;
         status: FloatingWindowStatus;
+        widthDp?: number;
+        heightDp?: number;
+        draggable?: boolean;
+        resizable?: boolean;
+        alpha?: number;
+        x?: number;
+        y?: number;
+        snapMode?: "none" | "quarter";
+        soundEnabled?: boolean;
+        soundVolume?: number;
+        pressSoundResource?: string | null;
+        releaseSoundResource?: string | null;
         instanceId?: string;
         updatedAtMs: string;
         errorCode?: string;
@@ -743,6 +758,7 @@ export namespace ToolPkg {
     export interface FloatingWindowApi {
         show(windowId: string, routeArgs?: JsonObject): Promise<FloatingWindowState>;
         hide(windowId: string): Promise<FloatingWindowState>;
+        get(windowId: string): Promise<FloatingWindowState>;
         update(windowId: string, patch?: JsonObject): Promise<FloatingWindowState>;
     }
 

@@ -586,11 +586,21 @@ ToolPkg.registerFloatingWindow({
   heightDp: 420,
   draggable: true,
   resizable: true,
+  snapMode: "quarter",
+  pressSoundResource: "press_sound",
+  releaseSoundResource: "release_sound",
   refreshIntervalMs: 60000,
   onRefresh: refreshOverlay,
 });
 
 await ToolPkg.floatingWindow.show("whale", {});
+const state = await ToolPkg.floatingWindow.get("whale");
+await ToolPkg.floatingWindow.update("whale", {
+  widthDp: 240,
+  heightDp: 240,
+  alpha: 0.85,
+  snapMode: "none"
+});
 await ToolPkg.floatingWindow.update("whale", { routeArgs: {} });
 await ToolPkg.floatingWindow.hide("whale");
 ```
@@ -721,7 +731,9 @@ await ToolPkg.floatingWindow.show('demo_window');
 说明：
 
 - `contentRoute` 必须指向同一 ToolPkg 已注册的 `compose_dsl` UI route。
-- `show()`、`hide()` 和 `update()` 控制单实例浮窗的生命周期。
+- `show()`、`hide()`、`get()` 和 `update()` 控制单实例浮窗的生命周期和运行配置。
+- `snapMode` 支持 `quarter`（屏幕四分之一边缘吸附）和 `none`（自由定位）。
+- `get()` / `update()` 状态包含尺寸、透明度、位置、吸附模式和声音配置。
 - 浮窗隐藏或插件停用后，宿主会释放该窗口的 Compose 和 JavaScript runtime。
 
 ### 注册应用生命周期钩子

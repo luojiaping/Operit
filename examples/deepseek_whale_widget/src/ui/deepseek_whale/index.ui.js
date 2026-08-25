@@ -31,6 +31,19 @@ function formatTokens(value) {
   return value.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
 
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function sizeToSlider(widthDp) {
+  const scale = Number(widthDp || 140) / 140;
+  return clamp((scale - 0.6) / 1.9, 0, 1);
+}
+
+function sliderToSize(value) {
+  return Math.round(140 * (0.6 + clamp(Number(value), 0, 1) * 1.9));
+}
+
 function accountCards(ctx, model, setModel, reload) {
   const { UI } = ctx;
   const colors = ctx.MaterialTheme.colorScheme;
@@ -104,6 +117,21 @@ function Screen(ctx) {
   const [platformToken, setPlatformToken] = ctx.useState("platformToken", "");
   const [imagePath, setImagePath] = ctx.useState("imagePath", "");
   const [overlayVisible, setOverlayVisible] = ctx.useState("overlayVisible", false);
+  const [floating, setFloating] = ctx.useState("floating", {
+    status: "hidden",
+    widthDp: 140,
+    heightDp: 140,
+    alpha: 1,
+    snapMode: "quarter",
+    soundEnabled: true,
+    soundVolume: 1,
+    pressSoundResource: "sound_duck_press",
+    releaseSoundResource: "sound_duck_release",
+  });
+  const [sizeDraft, setSizeDraft] = ctx.useState("sizeDraft", sizeToSlider(140));
+  const [alphaDraft, setAlphaDraft] = ctx.useState("alphaDraft", 1);
+  const [volumeDraft, setVolumeDraft] = ctx.useState("volumeDraft", 1);
+  const [soundSet, setSoundSet] = ctx.useState("soundSet", "duck");
 
   async function refresh() {
     try {
@@ -135,7 +163,8 @@ function Screen(ctx) {
 
   async function showOverlay() {
     try {
-      await ToolPkg.floatingWindow.show("whale", {});
+      const next = await ToolPkg.floatingWindow.show("whale", {});
+      setFloating(next);
       setOverlayVisible(true);
     } catch (error) {
       console.error("[dsh-whale-widget] floating window show failed", error);
@@ -145,11 +174,85 @@ function Screen(ctx) {
 
   async function hideOverlay() {
     try {
-      await ToolPkg.floatingWindow.hide("whale");
+      const next = await ToolPkg.floatingWindow.hide("whale");
+      setFloating(next);
       setOverlayVisible(false);
     } catch (error) {
       console.error("[dsh-whale-widget] floating window hide failed", error);
     }
+  }
+
+  async function loadFloatingState() {
+    try {
+      const next = await ToolPkg.floatingWindow.get("whale");
+      setFloating(next);
+      setOverlayVisible(next.status === "visible");
+      setSizeDraft(sizeToSlider(next.widthDp));
+      setAlphaDraft(clamp(Number(next.alpha), 0.2, 1));
+      setVolumeDraft(clamp(Number(next.soundVolume), 0, 1));
+      setSoundSet(next.pressSoundResource === "sound_fx_press" ? "fx" : "duck");
+    } catch (error) {
+      console.error("[dsh-whale-widget] floating state load failed", error);
+    }
+  }
+
+  async function updateFloating(patch) {
+    try {
+      const next = await ToolPkg.floatingWindow.update("whale", patch);
+      setFloating(next);
+    } catch (error) {
+      console.error("[dsh-whale-widget] floating state update failed", error);
+      setModel({ ...model, state: "error", error: "悬浮窗设置保存失败" });
+    }
+  }
+
+  async function commitSize() {
+    const sizeDp = sliderToSize(sizeDraft);
+    await updateFloating({ widthDp: sizeDp, heightDp: sizeDp });
+  }
+
+  async function commitAlpha() {
+    await updateFloating({ alpha: clamp(Number(alphaDraft), 0.2, 1) });
+  }
+
+  async function setSnapEnabled(enabled) {
+    await updateFloating({ snapMode: enabled ? "quarter" : "none" });
+  }
+
+  async function setSoundEnabled(enabled) {
+    await updateFloating({ soundEnabled: enabled });
+  }
+
+  async function commitVolume() {
+    const volume = clamp(Number(volumeDraft), 0, 1);
+    setFloating({ ...floating, soundVolume: volume, soundEnabled: volume > 0 });
+    await updateFloating({ soundVolume: volume, soundEnabled: volume > 0 });
+  }
+
+  async function chooseSound(nextSet) {
+    const isFx = nextSet === "fx";
+    setSoundSet(nextSet);
+    await updateFloating({
+      pressSoundResource: isFx ? "sound_fx_press" : "sound_duck_press",
+      releaseSoundResource: isFx ? "sound_fx_release" : "sound_duck_release",
+    });
+  }
+
+  async function resetFloating() {
+    setSizeDraft(sizeToSlider(140));
+    setAlphaDraft(1);
+    setVolumeDraft(1);
+    setSoundSet("duck");
+    await updateFloating({
+      widthDp: 140,
+      heightDp: 140,
+      alpha: 1,
+      snapMode: "quarter",
+      soundEnabled: true,
+      soundVolume: 1,
+      pressSoundResource: "sound_duck_press",
+      releaseSoundResource: "sound_duck_release",
+    });
   }
 
   const onLoad = async () => {
@@ -160,6 +263,7 @@ function Screen(ctx) {
       console.error("[dsh-whale-widget] whale image load failed", error);
     }
     await refresh();
+    await loadFloatingState();
   };
 
   const balance = model.balance;
@@ -235,6 +339,63 @@ function Screen(ctx) {
           }),
         ]
       ),
+      textCard(UI, colors, "悬浮窗设置", "调整大小、透明度、吸附和按压反馈"),
+      UI.Row(
+        { fillMaxWidth: true, horizontalArrangement: "spaceBetween", verticalAlignment: "center" },
+        [
+          UI.Text({ text: `大小 ${(0.6 + sizeDraft * 1.9).toFixed(1)}x`, style: "bodyMedium", color: colors.onSurface }),
+          UI.Text({ text: `${floating.widthDp || 140}dp`, style: "bodySmall", color: colors.onSurfaceVariant }),
+        ]
+      ),
+      UI.Slider({
+        fillMaxWidth: true,
+        value: sizeDraft,
+        onValueChange: setSizeDraft,
+        onValueChangeFinished: commitSize,
+      }),
+      UI.Row(
+        { fillMaxWidth: true, horizontalArrangement: "spaceBetween", verticalAlignment: "center" },
+        [
+          UI.Text({ text: "透明度", style: "bodyMedium", color: colors.onSurface }),
+          UI.Text({ text: `${Math.round(alphaDraft * 100)}%`, style: "bodySmall", color: colors.onSurfaceVariant }),
+        ]
+      ),
+      UI.Slider({
+        fillMaxWidth: true,
+        value: (alphaDraft - 0.2) / 0.8,
+        onValueChange: (value) => setAlphaDraft(0.2 + Number(value) * 0.8),
+        onValueChangeFinished: commitAlpha,
+      }),
+      UI.Row(
+        { fillMaxWidth: true, horizontalArrangement: "spaceBetween", verticalAlignment: "center" },
+        [
+          UI.Text({ text: "自动边缘吸附", style: "bodyMedium", color: colors.onSurface }),
+          UI.Switch({ checked: floating.snapMode !== "none", onCheckedChange: setSnapEnabled }),
+        ]
+      ),
+      UI.Row(
+        { fillMaxWidth: true, spacing: 8 },
+        [
+          UI.Button({ weight: 1, text: "小黄鸭音效", enabled: soundSet !== "duck", onClick: () => chooseSound("duck") }),
+          UI.Button({ weight: 1, text: "音效 1", enabled: soundSet !== "fx", onClick: () => chooseSound("fx") }),
+        ]
+      ),
+      UI.Row(
+        { fillMaxWidth: true, horizontalArrangement: "spaceBetween", verticalAlignment: "center" },
+        [
+          UI.Text({ text: "按压音效", style: "bodyMedium", color: colors.onSurface }),
+          UI.Switch({ checked: floating.soundEnabled === true, onCheckedChange: setSoundEnabled }),
+        ]
+      ),
+      UI.Row(
+        { fillMaxWidth: true, horizontalArrangement: "spaceBetween", verticalAlignment: "center" },
+        [
+          UI.Text({ text: "音量", style: "bodyMedium", color: colors.onSurface }),
+          UI.Text({ text: `${Math.round(volumeDraft * 100)}%`, style: "bodySmall", color: colors.onSurfaceVariant }),
+        ]
+      ),
+      UI.Slider({ fillMaxWidth: true, value: volumeDraft, onValueChange: setVolumeDraft, onValueChangeFinished: commitVolume }),
+      UI.Button({ fillMaxWidth: true, text: "恢复默认悬浮窗设置", onClick: resetFloating }),
       textCard(UI, colors, "今日 Token 统计", buildStatsText(model.stats)),
       textCard(UI, colors, "最近一轮", buildTurnText(model.stats && model.stats.latestTurn)),
       UI.TextField({

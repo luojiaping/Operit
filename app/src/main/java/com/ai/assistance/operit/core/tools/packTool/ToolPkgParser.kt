@@ -85,6 +85,9 @@ internal data class ToolPkgFloatingWindowRuntime(
     val heightDp: Int = 420,
     val draggable: Boolean = true,
     val resizable: Boolean = true,
+    val snapMode: String = "quarter",
+    val pressSoundResource: String? = null,
+    val releaseSoundResource: String? = null,
     val refreshIntervalMs: Long = 60_000L,
     val refreshFunction: String? = null,
     val refreshFunctionSource: String? = null
@@ -268,6 +271,9 @@ internal data class ToolPkgRegisteredFloatingWindow(
     val heightDp: Int = 420,
     val draggable: Boolean = true,
     val resizable: Boolean = true,
+    val snapMode: String = "quarter",
+    val pressSoundResource: String? = null,
+    val releaseSoundResource: String? = null,
     val refreshIntervalMs: Long = 60_000L,
     val refreshFunction: String? = null,
     val refreshFunctionSource: String? = null
@@ -856,6 +862,9 @@ internal object ToolPkgArchiveParser {
                     heightDp = window.heightDp,
                     draggable = window.draggable,
                     resizable = window.resizable,
+                    snapMode = window.snapMode,
+                    pressSoundResource = window.pressSoundResource,
+                    releaseSoundResource = window.releaseSoundResource,
                     refreshIntervalMs = window.refreshIntervalMs,
                     refreshFunction = window.refreshFunction,
                     refreshFunctionSource = window.refreshFunctionSource
