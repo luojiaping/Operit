@@ -279,7 +279,6 @@ val actualViewModel: ChatViewModel = viewModel ?: viewModel { ChatViewModel(cont
     val showChatHistorySelector by actualViewModel.showChatHistorySelector.collectAsState()
     val chatHistories by actualViewModel.chatHistories.collectAsState()
     val currentChatId by actualViewModel.currentChatId.collectAsState()
-    val agentRouteActive by actualViewModel.isCurrentChatAgentActive.collectAsState()
     val hasNewerDisplayHistory by actualViewModel.hasNewerDisplayHistory.collectAsState()
     val isLoadingDisplayWindow by actualViewModel.isLoadingDisplayWindow.collectAsState()
     val popupMessage by actualViewModel.popupMessage.collectAsState()
@@ -1869,7 +1868,7 @@ private fun ChatInputBottomBar(
                 onUserMessageChange = { value -> handleUserMessageChange(value) },
                 enableEnterToSend = enableEnterToSend,
                  onSendMessage = sendMessage,
-                 isAgentActive = agentRouteActive,
+                 isAgentActive = actualViewModel.isCurrentChatAgentActive.collectAsState().value,
                  onToggleAgent = {
                      currentChatId?.let(actualViewModel::toggleAgentForChat)
                  },
