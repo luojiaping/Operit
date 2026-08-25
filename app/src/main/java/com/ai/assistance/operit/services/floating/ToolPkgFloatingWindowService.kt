@@ -503,6 +503,9 @@ private class ToolPkgFloatingWindowInstance(
         val window = ToolPkgFloatingWindowFrameLayout(service) { event ->
             handleTouch(event)
         }
+        window.setViewTreeLifecycleOwner(lifecycleOwner)
+        window.setViewTreeViewModelStoreOwner(lifecycleOwner)
+        window.setViewTreeSavedStateRegistryOwner(lifecycleOwner)
         val view = ComposeView(service).apply {
             setViewTreeLifecycleOwner(lifecycleOwner)
             setViewTreeViewModelStoreOwner(lifecycleOwner)
