@@ -711,17 +711,39 @@ export namespace ToolPkg {
         order?: number;
     }
 
-    export interface DesktopWidgetRegistration {
+    export type FloatingWindowRefreshHandler = () => HookReturn;
+
+    export interface FloatingWindowRegistration {
         id: string;
-        route?: string;
-        routeId?: string;
-        render?: string;
-        renderRouteId?: string;
+        contentRoute: string;
         title?: LocalizedText;
-        subtitle?: LocalizedText;
         description?: LocalizedText;
         icon?: string;
-        order?: number;
+        widthDp?: number;
+        heightDp?: number;
+        draggable?: boolean;
+        resizable?: boolean;
+        refreshIntervalMs?: number;
+        onRefresh?: FloatingWindowRefreshHandler;
+    }
+
+    export type FloatingWindowStatus = "visible" | "hidden" | "disabled" | "error";
+
+    export interface FloatingWindowState extends JsonObject {
+        schemaVersion: number;
+        windowId: string;
+        contentRoute: string;
+        status: FloatingWindowStatus;
+        instanceId?: string;
+        updatedAtMs: string;
+        errorCode?: string;
+        errorMessage?: string;
+    }
+
+    export interface FloatingWindowApi {
+        show(windowId: string, routeArgs?: JsonObject): Promise<FloatingWindowState>;
+        hide(windowId: string): Promise<FloatingWindowState>;
+        update(windowId: string, patch?: JsonObject): Promise<FloatingWindowState>;
     }
 
     export interface AppLifecycleHookRegistration {
@@ -847,6 +869,18 @@ export namespace ToolPkg {
         ): Promise<TResult>;
     }
 
+    export interface HostBridgeResponse extends JsonObject {
+        schemaVersion: number;
+        state: string;
+    }
+
+    export interface HostBridgeApi {
+        call<TPayload extends JsonObject, TResult extends HostBridgeResponse>(
+            capability: string,
+            payload: TPayload
+        ): Promise<TResult>;
+    }
+
     export type WasmValueType = "i32" | "i64" | "f32" | "f64";
 
     export interface WasmI32Arg {
@@ -891,7 +925,7 @@ export namespace ToolPkg {
         registerToolboxUiModule(definition: ToolboxUiModuleRegistration): void;
         registerUiRoute(definition: UiRouteRegistration): void;
         registerNavigationEntry(definition: NavigationEntryRegistration): void;
-        registerDesktopWidget(definition: DesktopWidgetRegistration): void;
+        registerFloatingWindow(definition: FloatingWindowRegistration): void;
         registerAppLifecycleHook(definition: AppLifecycleHookRegistration): void;
         registerMessageProcessingPlugin(definition: MessageProcessingPluginRegistration): void;
         registerXmlRenderPlugin(definition: XmlRenderPluginRegistration): void;
@@ -912,6 +946,8 @@ export namespace ToolPkg {
         readResource(key: string, outputFileName?: string, internal?: boolean): Promise<string>;
         getConfigDir(pluginId?: string): string;
         ipc: IpcApi;
+        host: HostBridgeApi;
+        floatingWindow: FloatingWindowApi;
         wasm: WasmApi;
     }
 }
@@ -923,7 +959,7 @@ declare global {
 
     function registerToolPkgNavigationEntry(definition: ToolPkg.NavigationEntryRegistration): void;
 
-    function registerToolPkgDesktopWidget(definition: ToolPkg.DesktopWidgetRegistration): void;
+    function registerToolPkgFloatingWindow(definition: ToolPkg.FloatingWindowRegistration): void;
 
     function registerToolPkgAppLifecycleHook(definition: ToolPkg.AppLifecycleHookRegistration): void;
 

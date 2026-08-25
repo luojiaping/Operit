@@ -75,15 +75,19 @@ internal data class ToolPkgNavigationActionHookRuntime(
     val functionSource: String? = null
 )
 
-internal data class ToolPkgDesktopWidgetRuntime(
+internal data class ToolPkgFloatingWindowRuntime(
     val id: String,
-    val routeId: String,
-    val renderRouteId: String,
+    val contentRouteId: String,
     val title: LocalizedText,
-    val subtitle: LocalizedText,
     val description: LocalizedText,
     val icon: String? = null,
-    val order: Int = 0
+    val widthDp: Int = 320,
+    val heightDp: Int = 420,
+    val draggable: Boolean = true,
+    val resizable: Boolean = true,
+    val refreshIntervalMs: Long = 60_000L,
+    val refreshFunction: String? = null,
+    val refreshFunctionSource: String? = null
 )
 
 internal data class ToolPkgAppLifecycleHookRuntime(
@@ -137,6 +141,7 @@ internal data class ToolPkgContainerRuntime(
     val displayName: LocalizedText,
     val description: LocalizedText,
     val version: String,
+    val requiredHostCapabilities: Set<String>,
     val author: List<String>,
     val mainEntry: String,
     val sourceType: ToolPkgSourceType,
@@ -149,7 +154,7 @@ internal data class ToolPkgContainerRuntime(
     val uiModules: List<ToolPkgUiModuleRuntime>,
     val uiRoutes: List<ToolPkgUiRouteRuntime>,
     val navigationEntries: List<ToolPkgNavigationEntryRuntime>,
-    val desktopWidgets: List<ToolPkgDesktopWidgetRuntime>,
+    val floatingWindows: List<ToolPkgFloatingWindowRuntime>,
     val appLifecycleHooks: List<ToolPkgAppLifecycleHookRuntime>,
     val messageProcessingPlugins: List<ToolPkgFunctionHookRuntime>,
     val xmlRenderPlugins: List<ToolPkgTagFunctionHookRuntime>,
@@ -189,6 +194,8 @@ internal data class ToolPkgManifest(
     @Serializable(with = StringOrStringListSerializer::class)
     val author: List<String> = emptyList(),
     @SerialName("enabled_by_default") val enabledByDefault: Boolean = true,
+    @SerialName("required_host_capabilities")
+    val requiredHostCapabilities: List<String> = emptyList(),
     val subpackages: List<ToolPkgManifestSubpackage> = emptyList(),
     val resources: List<ToolPkgManifestResource> = emptyList(),
     @SerialName("wasm_modules")
@@ -251,15 +258,19 @@ internal data class ToolPkgRegisteredNavigationEntry(
     val order: Int = 0
 )
 
-internal data class ToolPkgRegisteredDesktopWidget(
+internal data class ToolPkgRegisteredFloatingWindow(
     val id: String,
-    val routeId: String,
-    val renderRouteId: String,
+    val contentRouteId: String,
     val title: LocalizedText,
-    val subtitle: LocalizedText,
     val description: LocalizedText,
     val icon: String? = null,
-    val order: Int = 0
+    val widthDp: Int = 320,
+    val heightDp: Int = 420,
+    val draggable: Boolean = true,
+    val resizable: Boolean = true,
+    val refreshIntervalMs: Long = 60_000L,
+    val refreshFunction: String? = null,
+    val refreshFunctionSource: String? = null
 )
 
 internal data class ToolPkgRegisteredAppLifecycleHook(
@@ -301,7 +312,7 @@ internal data class ToolPkgMainRegistration(
     val toolboxUiModules: List<ToolPkgRegisteredUiModule> = emptyList(),
     val uiRoutes: List<ToolPkgRegisteredUiRoute> = emptyList(),
     val navigationEntries: List<ToolPkgRegisteredNavigationEntry> = emptyList(),
-    val desktopWidgets: List<ToolPkgRegisteredDesktopWidget> = emptyList(),
+    val floatingWindows: List<ToolPkgRegisteredFloatingWindow> = emptyList(),
     val appLifecycleHooks: List<ToolPkgRegisteredAppLifecycleHook> = emptyList(),
     val messageProcessingPlugins: List<ToolPkgRegisteredFunctionHook> = emptyList(),
     val xmlRenderPlugins: List<ToolPkgRegisteredTagFunctionHook> = emptyList(),
@@ -506,6 +517,22 @@ internal object ToolPkgArchiveParser {
             }
 
         val logoResource = resolveLogoResource(manifest.logo, resources)
+        val requiredHostCapabilities =
+            manifest.requiredHostCapabilities.mapIndexed { index, capability ->
+                val normalizedCapability = capability.trim()
+                if (normalizedCapability.isBlank()) {
+                    throw IllegalArgumentException(
+                        "required_host_capabilities[$index] must not be blank"
+                    )
+                }
+                normalizedCapability
+            }
+        if (
+            requiredHostCapabilities.map { it.lowercase() }.toSet().size !=
+                requiredHostCapabilities.size
+        ) {
+            throw IllegalArgumentException("required_host_capabilities contains duplicate names")
+        }
 
         val wasmModuleIds = linkedSetOf<String>()
         val wasmModules =
@@ -790,44 +817,48 @@ internal object ToolPkgArchiveParser {
             )
         }
 
-        val desktopWidgets = mutableListOf<ToolPkgDesktopWidgetRuntime>()
-        val desktopWidgetIds = linkedSetOf<String>()
-        mainRegistration.desktopWidgets.forEachIndexed { index, widget ->
-            val id = widget.id.trim()
-            val routeId = widget.routeId.trim()
-            val renderRouteId = widget.renderRouteId.trim()
+        val floatingWindows = mutableListOf<ToolPkgFloatingWindowRuntime>()
+        val floatingWindowIds = linkedSetOf<String>()
+        mainRegistration.floatingWindows.forEachIndexed { index, window ->
+            val id = window.id.trim()
+            val contentRouteId = window.contentRouteId.trim()
             if (id.isBlank()) {
-                throw IllegalArgumentException("$TOOLPKG_REGISTRATION_DESKTOP_WIDGET[$index].id is required")
-            }
-            if (!desktopWidgetIds.add(id.lowercase())) {
-                throw IllegalArgumentException("Duplicate toolpkg desktop widget id: $id")
-            }
-            if (routeId.isBlank()) {
-                throw IllegalArgumentException("$TOOLPKG_REGISTRATION_DESKTOP_WIDGET[$index].route is required")
-            }
-            if (uiRoutes.none { it.routeId.equals(routeId, ignoreCase = true) }) {
                 throw IllegalArgumentException(
-                    "$TOOLPKG_REGISTRATION_DESKTOP_WIDGET[$index].route not found: $routeId"
+                    "$TOOLPKG_REGISTRATION_FLOATING_WINDOW[$index].id is required"
                 )
             }
-            if (renderRouteId.isBlank()) {
-                throw IllegalArgumentException("$TOOLPKG_REGISTRATION_DESKTOP_WIDGET[$index].render is required")
+            if (!floatingWindowIds.add(id.lowercase())) {
+                throw IllegalArgumentException("Duplicate toolpkg floating window id: $id")
             }
-            if (uiRoutes.none { it.routeId.equals(renderRouteId, ignoreCase = true) }) {
+            if (contentRouteId.isBlank()) {
                 throw IllegalArgumentException(
-                    "$TOOLPKG_REGISTRATION_DESKTOP_WIDGET[$index].render not found: $renderRouteId"
+                    "$TOOLPKG_REGISTRATION_FLOATING_WINDOW[$index].contentRoute is required"
                 )
             }
-            desktopWidgets.add(
-                ToolPkgDesktopWidgetRuntime(
+            val route = uiRoutes.firstOrNull { candidate ->
+                candidate.routeId.equals(contentRouteId, ignoreCase = true)
+            } ?: throw IllegalArgumentException(
+                "$TOOLPKG_REGISTRATION_FLOATING_WINDOW[$index].contentRoute not found: $contentRouteId"
+            )
+            if (!route.runtime.equals(TOOLPKG_RUNTIME_COMPOSE_DSL, ignoreCase = true)) {
+                throw IllegalArgumentException(
+                    "$TOOLPKG_REGISTRATION_FLOATING_WINDOW[$index].contentRoute must use compose_dsl: $contentRouteId"
+                )
+            }
+            floatingWindows.add(
+                ToolPkgFloatingWindowRuntime(
                     id = id,
-                    routeId = routeId,
-                    renderRouteId = renderRouteId,
-                    title = widget.title,
-                    subtitle = widget.subtitle,
-                    description = widget.description,
-                    icon = widget.icon,
-                    order = widget.order
+                    contentRouteId = route.routeId,
+                    title = window.title,
+                    description = window.description,
+                    icon = window.icon,
+                    widthDp = window.widthDp,
+                    heightDp = window.heightDp,
+                    draggable = window.draggable,
+                    resizable = window.resizable,
+                    refreshIntervalMs = window.refreshIntervalMs,
+                    refreshFunction = window.refreshFunction,
+                    refreshFunctionSource = window.refreshFunctionSource
                 )
             )
         }
@@ -1297,6 +1328,7 @@ internal object ToolPkgArchiveParser {
                 displayName = containerDisplayName,
                 description = containerDescription,
                 version = manifest.version,
+                requiredHostCapabilities = requiredHostCapabilities.toSet(),
                 author = manifest.author,
                 mainEntry = normalizedMainEntry,
                 sourceType = sourceType,
@@ -1309,7 +1341,7 @@ internal object ToolPkgArchiveParser {
                 uiModules = uiModules,
                 uiRoutes = uiRoutes,
                 navigationEntries = navigationEntries,
-                desktopWidgets = desktopWidgets,
+                floatingWindows = floatingWindows,
                 appLifecycleHooks = appLifecycleHooks,
                 messageProcessingPlugins = messageProcessingPlugins,
                 xmlRenderPlugins = xmlRenderPlugins,

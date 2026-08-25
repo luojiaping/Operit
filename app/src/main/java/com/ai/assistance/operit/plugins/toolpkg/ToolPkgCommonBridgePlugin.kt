@@ -31,6 +31,7 @@ import com.ai.assistance.operit.core.tools.packTool.ToolPkgXmlRenderHookComposeD
 import com.ai.assistance.operit.core.tools.packTool.ToolPkgXmlRenderHookObjectResult
 import com.ai.assistance.operit.core.tools.javascript.extractJsExecutionErrorMessage
 import com.ai.assistance.operit.util.stream.stream
+import com.ai.assistance.operit.services.floating.ToolPkgFloatingWindowService
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CoroutineScope
@@ -891,6 +892,10 @@ object ToolPkgCommonBridgePlugin : OperitPlugin {
     private val runtimeChangeListener =
         PackageManager.ToolPkgRuntimeChangeListener { activeContainers ->
             syncToolPkgRegistrations(activeContainers)
+            ToolPkgFloatingWindowService.onToolPkgRuntimeChanged(
+                toolPkgPackageManager().contextInternal,
+                activeContainers.map { it.packageName }.toSet()
+            )
         }
 
     override fun register() {
@@ -907,6 +912,7 @@ object ToolPkgCommonBridgePlugin : OperitPlugin {
         ToolPkgChatViewHookBridge.register()
         ToolPkgChatMessageHookBridge.register()
         ToolPkgAiProviderRegistry.register()
+        ToolPkgFloatingWindowHost.register()
 
         val manager = toolPkgPackageManager()
         manager.addToolPkgRuntimeChangeListener(runtimeChangeListener)
