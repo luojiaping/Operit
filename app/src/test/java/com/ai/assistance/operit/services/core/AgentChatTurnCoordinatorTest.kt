@@ -129,7 +129,7 @@ class AgentChatTurnCoordinatorTest {
             chatHistoryDelegate = history,
             messageProcessingDelegate = processing,
             repository = repository,
-            invocationEntry = entry,
+            invocationEntryProvider = { entry },
         )
     }
 
