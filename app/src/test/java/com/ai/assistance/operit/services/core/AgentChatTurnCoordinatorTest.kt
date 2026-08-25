@@ -46,7 +46,7 @@ class AgentChatTurnCoordinatorTest {
         val activated = coordinator.activateAgentForChat("chat")
 
         assertEquals(session, activated)
-        verify(repository).bindRootSession("chat", session.sessionId, any())
+        verify(repository).bindRootSession(eq("chat"), eq(session.sessionId), any())
         Unit
     }
 
