@@ -49,7 +49,7 @@ class AgentChatTurnCoordinatorTest {
         assertEquals(session, activated)
         val bindInvocation =
             mockingDetails(repository).invocations.single { invocation ->
-                invocation.method.name == "bindRootSession"
+                invocation.method.name.startsWith("bindRootSession")
             }
         assertEquals("chat", bindInvocation.arguments[0])
         assertEquals(session.sessionId.value, bindInvocation.arguments[1])
