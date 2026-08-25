@@ -18,7 +18,7 @@ status: complete
 - `deepseek.balance.v2`
 - `deepseek.platform_usage.v2`
 - `deepseek.stats.v2`
-- `toolpkg.floating_window.v1`
+- `toolpkg.floating_window.v2`
 
 桥接返回配置摘要、凭据状态、余额、平台用量、Token usage、价格快照和最近回合，不返回原始凭据。
 

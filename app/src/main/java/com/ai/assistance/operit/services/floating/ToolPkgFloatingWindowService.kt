@@ -6,17 +6,19 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.graphics.PixelFormat
-import android.media.MediaPlayer
+import android.media.AudioAttributes
+import android.media.SoundPool
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.view.Choreographer
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import android.view.WindowManager
 import android.widget.FrameLayout
-import android.view.animation.OvershootInterpolator
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
@@ -59,8 +61,10 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.json.JSONObject
 
-private const val TOOLPKG_FLOATING_PREFS_NAME = "toolpkg_floating_windows_v2"
+private const val TOOLPKG_FLOATING_PREFS_NAME = "toolpkg_floating_windows_v3"
 private const val DEFAULT_FLOATING_SNAP_MODE = "quarter"
+private const val MIN_FLOATING_WIDTH_DP = 72
+private const val MIN_FLOATING_HEIGHT_DP = 72
 private const val MIN_FLOATING_ALPHA = 0.2f
 private const val MAX_FLOATING_ALPHA = 1f
 
@@ -118,7 +122,7 @@ class ToolPkgFloatingWindowService : Service() {
             val widthPx = (widthDp * density).toInt().coerceAtLeast(1)
             val heightPx = (heightDp * density).toInt().coerceAtLeast(1)
             return JSONObject()
-                .put("schemaVersion", 2)
+                .put("schemaVersion", 3)
                 .put("windowId", spec.windowId)
                 .put("contentRoute", spec.contentRouteId)
                 .put("status", "hidden")
@@ -130,6 +134,9 @@ class ToolPkgFloatingWindowService : Service() {
                 .put("x", prefs.getInt("x:$key", (context.resources.displayMetrics.widthPixels - widthPx).coerceAtLeast(0)))
                 .put("y", prefs.getInt("y:$key", (context.resources.displayMetrics.heightPixels - heightPx).coerceAtLeast(0)))
                 .put("snapMode", normalizeSnapMode(prefs.getString("snapMode:$key", spec.snapMode)))
+                .put("followWindowId", spec.followWindowId ?: JSONObject.NULL)
+                .put("followPlacement", spec.followPlacement)
+                .put("followGapDp", spec.followGapDp)
                 .put("soundEnabled", prefs.getBoolean("soundEnabled:$key", true))
                 .put("soundVolume", prefs.getFloat("soundVolume:$key", 1f).coerceIn(0f, 1f).toDouble())
                 .put("pressSoundResource", prefs.getString("pressSoundResource:$key", spec.pressSoundResource) ?: JSONObject.NULL)
@@ -291,11 +298,17 @@ class ToolPkgFloatingWindowService : Service() {
             } else {
                 spec.copy(snapMode = normalizeSnapMode(persistedSnapMode))
             }
+        effectiveSpec.followWindowId?.let { followWindowId ->
+            check(instances.containsKey(WindowKey(key.packageName, followWindowId))) {
+                "Follow window anchor is not visible: ${key.packageName}:$followWindowId"
+            }
+        }
         val existing = instances[key]
         if (existing != null) {
             existing.updateRouteArgs(routeArgs)
             persistVisibility(key, true, routeArgs)
             existing.requestRender()
+            positionWindowFromAnchor(existing)
             return existing.state("visible")
         }
 
@@ -309,6 +322,7 @@ class ToolPkgFloatingWindowService : Service() {
             instances[key] = created
             persistVisibility(key, true, routeArgs)
             created.show()
+            positionWindowFromAnchor(created)
             created.state("visible")
         } catch (error: Exception) {
             instances.remove(key)
@@ -320,6 +334,13 @@ class ToolPkgFloatingWindowService : Service() {
     }
 
     private fun hideWindow(key: WindowKey, specJson: JSONObject? = null): JSONObject {
+        instances.values
+            .filter { instance ->
+                instance.spec.followWindowId.equals(key.windowId, ignoreCase = true) &&
+                    instance.spec.packageName == key.packageName
+            }
+            .map { instance -> WindowKey(instance.spec.packageName, instance.spec.windowId) }
+            .forEach { followerKey -> hideWindow(followerKey) }
         val removed = instances.remove(key)
         removed?.dispose()
         persistVisibility(key, false, "")
@@ -345,6 +366,9 @@ class ToolPkgFloatingWindowService : Service() {
                         draggable = true,
                         resizable = true,
                         snapMode = DEFAULT_FLOATING_SNAP_MODE,
+                        followWindowId = null,
+                        followPlacement = "above",
+                        followGapDp = 8,
                         pressSoundResource = null,
                         releaseSoundResource = null,
                         refreshIntervalMs = 60_000L,
@@ -372,14 +396,61 @@ class ToolPkgFloatingWindowService : Service() {
         return persistedState(key, FloatingWindowSpec.fromJson(specJson), "hidden")
     }
 
+    private fun positionWindowFromAnchor(window: ToolPkgFloatingWindowInstance) {
+        val followWindowId = window.spec.followWindowId
+        if (followWindowId != null) {
+            val anchor = instances[WindowKey(window.spec.packageName, followWindowId)]
+                ?: error("Follow window anchor is not visible: ${window.spec.packageName}:$followWindowId")
+            val anchorParams = anchor.currentLayoutParams()
+                ?: error("Follow window anchor layout is unavailable: $followWindowId")
+            val followerParams = window.currentLayoutParams()
+                ?: error("Follow window layout is unavailable: ${window.spec.windowId}")
+            val gap = dpToPx(window.spec.followGapDp, resources.displayMetrics.density)
+            val screenWidth = resources.displayMetrics.widthPixels
+            val screenHeight = resources.displayMetrics.heightPixels
+            val centeredX = anchorParams.x + (anchorParams.width - followerParams.width) / 2
+            val x = centeredX.coerceIn(0, (screenWidth - followerParams.width).coerceAtLeast(0))
+            val aboveY = anchorParams.y - followerParams.height - gap
+            val belowY = anchorParams.y + anchorParams.height + gap
+            val y = if (aboveY >= 0) aboveY else belowY
+                .coerceIn(0, (screenHeight - followerParams.height).coerceAtLeast(0))
+            window.applyFollowPosition(x, y)
+        }
+
+        positionFollowersOf(window)
+    }
+
+    private fun onWindowPositionChanged(window: ToolPkgFloatingWindowInstance) {
+        positionFollowersOf(window)
+    }
+
+    private fun onWindowLayoutChanged(window: ToolPkgFloatingWindowInstance) {
+        if (window.spec.followWindowId != null) {
+            positionWindowFromAnchor(window)
+        } else {
+            positionFollowersOf(window)
+        }
+    }
+
+    private fun positionFollowersOf(anchor: ToolPkgFloatingWindowInstance) {
+        instances.values
+            .filter { candidate ->
+                candidate.spec.packageName == anchor.spec.packageName &&
+                    candidate.spec.followWindowId.equals(anchor.spec.windowId, ignoreCase = true)
+            }
+            .forEach { follower ->
+                positionWindowFromAnchor(follower)
+            }
+    }
+
     private fun persistPatch(key: WindowKey, patch: JSONObject) {
         val storageKey = storageKey(key)
         val editor = preferences.edit()
         patch.optInt("widthDp", -1).takeIf { it > 0 }?.let { widthDp ->
-            editor.putInt("widthDp:$storageKey", widthDp.coerceIn(120, 1200))
+            editor.putInt("widthDp:$storageKey", widthDp.coerceIn(MIN_FLOATING_WIDTH_DP, 1200))
         }
         patch.optInt("heightDp", -1).takeIf { it > 0 }?.let { heightDp ->
-            editor.putInt("heightDp:$storageKey", heightDp.coerceIn(120, 1600))
+            editor.putInt("heightDp:$storageKey", heightDp.coerceIn(MIN_FLOATING_HEIGHT_DP, 1600))
         }
         if (patch.has("alpha")) {
             editor.putFloat(
@@ -405,6 +476,9 @@ class ToolPkgFloatingWindowService : Service() {
         if (patch.has("releaseSoundResource")) {
             editor.putString("releaseSoundResource:$storageKey", patch.optString("releaseSoundResource").trim())
         }
+        patch.optJSONObject("routeArgs")?.let { routeArgs ->
+            editor.putString("$ARGS_PREFIX$storageKey", routeArgs.toString())
+        }
         editor.apply()
     }
 
@@ -418,7 +492,7 @@ class ToolPkgFloatingWindowService : Service() {
         val widthDp = preferences.getInt("widthDp:$storageKey", spec.widthDp)
         val heightDp = preferences.getInt("heightDp:$storageKey", spec.heightDp)
         return JSONObject()
-            .put("schemaVersion", 2)
+            .put("schemaVersion", 3)
             .put("windowId", spec.windowId)
             .put("contentRoute", spec.contentRouteId)
             .put("status", status)
@@ -430,6 +504,9 @@ class ToolPkgFloatingWindowService : Service() {
             .put("x", preferences.getInt("x:$storageKey", (resources.displayMetrics.widthPixels - dpToPx(widthDp, density)).coerceAtLeast(0)))
             .put("y", preferences.getInt("y:$storageKey", (resources.displayMetrics.heightPixels - dpToPx(heightDp, density)).coerceAtLeast(0)))
             .put("snapMode", normalizeSnapMode(preferences.getString("snapMode:$storageKey", spec.snapMode)))
+            .put("followWindowId", spec.followWindowId ?: JSONObject.NULL)
+            .put("followPlacement", spec.followPlacement)
+            .put("followGapDp", spec.followGapDp)
             .put("soundEnabled", preferences.getBoolean("soundEnabled:$storageKey", true))
             .put("soundVolume", preferences.getFloat("soundVolume:$storageKey", 1f).toDouble())
             .put("pressSoundResource", preferences.getString("pressSoundResource:$storageKey", spec.pressSoundResource) ?: JSONObject.NULL)
@@ -455,24 +532,40 @@ class ToolPkgFloatingWindowService : Service() {
             try {
                 packageManager.ensureInitialized()
                 val registeredWindows = packageManager.getToolPkgFloatingWindows(this@ToolPkgFloatingWindowService)
-                val restored = registeredWindows.mapNotNull { window ->
+                val visibleWindows = registeredWindows.filter { window ->
                     val key = WindowKey(window.containerPackageName, window.windowId)
                     val storageKey = storageKey(key)
-                    if (!preferences.getBoolean("$VISIBLE_PREFIX$storageKey", false)) {
-                        null
-                    } else {
-                        val command =
-                            JSONObject()
-                                .put("operation", "show")
-                                .put("packageName", window.containerPackageName)
-                                .put("windowId", window.windowId)
-                                .put("spec", serializeWindow(window))
-                        val routeArgs = preferences.getString("$ARGS_PREFIX$storageKey", "").orEmpty()
-                        if (routeArgs.isNotBlank()) {
-                            command.put("routeArgs", JSONObject(routeArgs))
+                    preferences.getBoolean("$VISIBLE_PREFIX$storageKey", false)
+                }
+                val visibleByKey = visibleWindows.associateBy { window ->
+                    WindowKey(window.containerPackageName, window.windowId)
+                }
+                fun followDepth(
+                    window: PackageManager.ToolPkgFloatingWindow,
+                    path: Set<WindowKey> = emptySet()
+                ): Int {
+                    val followWindowId = window.followWindowId ?: return 0
+                    val key = WindowKey(window.containerPackageName, window.windowId)
+                    require(key !in path) { "Visible floating window follow cycle detected" }
+                    val anchorKey = WindowKey(window.containerPackageName, followWindowId)
+                    val anchor = visibleByKey[anchorKey]
+                        ?: error("Visible floating window anchor is missing: ${window.containerPackageName}:$followWindowId")
+                    return 1 + followDepth(anchor, path + key)
+                }
+                val restored = visibleWindows.sortedBy { window -> followDepth(window) }.map { window ->
+                    val key = WindowKey(window.containerPackageName, window.windowId)
+                    val storageKey = storageKey(key)
+                    JSONObject()
+                        .put("operation", "show")
+                        .put("packageName", window.containerPackageName)
+                        .put("windowId", window.windowId)
+                        .put("spec", serializeWindow(window))
+                        .also { command ->
+                            val routeArgs = preferences.getString("$ARGS_PREFIX$storageKey", "").orEmpty()
+                            if (routeArgs.isNotBlank()) {
+                                command.put("routeArgs", JSONObject(routeArgs))
+                            }
                         }
-                        command
-                    }
                 }
                 withContext(Dispatchers.Main.immediate) {
                     restored.forEach { command ->
@@ -501,6 +594,9 @@ class ToolPkgFloatingWindowService : Service() {
             .put("draggable", window.draggable)
             .put("resizable", window.resizable)
             .put("snapMode", window.snapMode)
+            .put("followWindowId", window.followWindowId ?: JSONObject.NULL)
+            .put("followPlacement", window.followPlacement)
+            .put("followGapDp", window.followGapDp)
             .put("pressSoundResource", window.pressSoundResource ?: JSONObject.NULL)
             .put("releaseSoundResource", window.releaseSoundResource ?: JSONObject.NULL)
             .put("refreshIntervalMs", window.refreshIntervalMs)
@@ -550,6 +646,9 @@ private data class FloatingWindowSpec(
     val draggable: Boolean,
     val resizable: Boolean,
     val snapMode: String,
+    val followWindowId: String?,
+    val followPlacement: String,
+    val followGapDp: Int,
     val pressSoundResource: String?,
     val releaseSoundResource: String?,
     val refreshIntervalMs: Long,
@@ -569,6 +668,13 @@ private data class FloatingWindowSpec(
                 draggable = json.optBoolean("draggable", true),
                 resizable = json.optBoolean("resizable", true),
                 snapMode = normalizeSnapMode(json.optString("snapMode", DEFAULT_FLOATING_SNAP_MODE)),
+                followWindowId = if (json.isNull("followWindowId")) {
+                    null
+                } else {
+                    json.optString("followWindowId").trim().ifBlank { null }
+                },
+                followPlacement = json.optString("followPlacement", "above").trim().lowercase(),
+                followGapDp = json.optInt("followGapDp", 8).coerceIn(0, 120),
                 pressSoundResource = json.optString("pressSoundResource").trim().ifBlank { null },
                 releaseSoundResource = json.optString("releaseSoundResource").trim().ifBlank { null },
                 refreshIntervalMs = json.optLong("refreshIntervalMs", 60_000L),
@@ -653,8 +759,26 @@ private class ToolPkgFloatingWindowInstance(
     private var soundVolume = 1f
     private var pressSoundResource = spec.pressSoundResource
     private var releaseSoundResource = spec.releaseSoundResource
-    private var pressPlayer: MediaPlayer? = null
-    private var releasePlayer: MediaPlayer? = null
+    private val soundPool = SoundPool.Builder()
+        .setMaxStreams(4)
+        .setAudioAttributes(
+            AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .build()
+        )
+        .build()
+    private var pressSoundId = 0
+    private var releaseSoundId = 0
+    private var soundLoadGeneration = 0
+    // WindowManager updates cross the system-server boundary; one update per raw MOVE makes drag visibly stall.
+    private val choreographer = Choreographer.getInstance()
+    private val positionFrameCallback = Choreographer.FrameCallback {
+        positionFrameScheduled = false
+        applyPositionNow()
+    }
+    private var positionFrameScheduled = false
+    private val touchSlop = ViewConfiguration.get(service).scaledTouchSlop
 
     fun show() {
         check(!disposed) { "Floating window instance is disposed" }
@@ -712,6 +836,7 @@ private class ToolPkgFloatingWindowInstance(
         val windowManager = service.getSystemService(Context.WINDOW_SERVICE) as WindowManager
         windowManager.addView(window, params)
         isAdded = true
+        prepareSounds()
         requestRender()
         startRefreshLoop()
     }
@@ -733,10 +858,10 @@ private class ToolPkgFloatingWindowInstance(
         }
         val params = layoutParams ?: return
         patch.optInt("widthDp", -1).takeIf { it > 0 }?.let { widthDp ->
-            params.width = dpToPx(widthDp.coerceIn(120, 1200))
+            params.width = dpToPx(widthDp.coerceIn(MIN_FLOATING_WIDTH_DP, 1200))
         }
         patch.optInt("heightDp", -1).takeIf { it > 0 }?.let { heightDp ->
-            params.height = dpToPx(heightDp.coerceIn(120, 1600))
+            params.height = dpToPx(heightDp.coerceIn(MIN_FLOATING_HEIGHT_DP, 1600))
         }
         if (patch.has("alpha")) {
             params.alpha = patch.optDouble("alpha", 1.0).toFloat()
@@ -769,6 +894,10 @@ private class ToolPkgFloatingWindowInstance(
                 .updateViewLayout(view, params)
         }
         persistLayout(params)
+        if (patch.has("pressSoundResource") || patch.has("releaseSoundResource")) {
+            prepareSounds()
+        }
+        service.onWindowLayoutChanged(this)
         requestRender()
     }
 
@@ -777,6 +906,11 @@ private class ToolPkgFloatingWindowInstance(
         disposed = true
         refreshJob?.cancel()
         refreshJob = null
+        soundLoadGeneration += 1
+        if (positionFrameScheduled) {
+            choreographer.removeFrameCallback(positionFrameCallback)
+            positionFrameScheduled = false
+        }
         instanceScope.cancel()
         val view = windowView
         if (view != null && isAdded) {
@@ -788,7 +922,9 @@ private class ToolPkgFloatingWindowInstance(
         }
         composeView = null
         windowView = null
-        releasePlayers()
+        soundPool.release()
+        pressSoundId = 0
+        releaseSoundId = 0
         isAdded = false
         lifecycleOwner.handleLifecycleEvent(Lifecycle.Event.ON_PAUSE)
         lifecycleOwner.handleLifecycleEvent(Lifecycle.Event.ON_STOP)
@@ -805,7 +941,7 @@ private class ToolPkgFloatingWindowInstance(
         val params = layoutParams ?: createLayoutParams()
         val density = service.resources.displayMetrics.density
         return JSONObject()
-            .put("schemaVersion", 2)
+            .put("schemaVersion", 3)
             .put("windowId", spec.windowId)
             .put("contentRoute", spec.contentRouteId)
             .put("status", status)
@@ -817,6 +953,9 @@ private class ToolPkgFloatingWindowInstance(
             .put("x", params.x)
             .put("y", params.y)
             .put("snapMode", snapMode)
+            .put("followWindowId", spec.followWindowId ?: JSONObject.NULL)
+            .put("followPlacement", spec.followPlacement)
+            .put("followGapDp", spec.followGapDp)
             .put("soundEnabled", soundEnabled)
             .put("soundVolume", soundVolume.toDouble())
             .put("pressSoundResource", pressSoundResource ?: JSONObject.NULL)
@@ -1076,8 +1215,8 @@ private class ToolPkgFloatingWindowInstance(
                 val dy = event.rawY - lastTouchY
                 if (resizing) {
                     val wasDragging = dragging
-                    params.width = (originWidth + dx.toInt()).coerceIn(dpToPx(120), dpToPx(1200))
-                    params.height = (originHeight + dy.toInt()).coerceIn(dpToPx(120), dpToPx(1600))
+                    params.width = (originWidth + dx.toInt()).coerceIn(dpToPx(MIN_FLOATING_WIDTH_DP), dpToPx(1200))
+                    params.height = (originHeight + dy.toInt()).coerceIn(dpToPx(MIN_FLOATING_HEIGHT_DP), dpToPx(1600))
                     updatePosition(params)
                     dragging = true
                     return if (wasDragging) {
@@ -1087,7 +1226,7 @@ private class ToolPkgFloatingWindowInstance(
                     }
                 }
                 val wasDragging = dragging
-                if (!wasDragging && dx * dx + dy * dy < 64f) {
+                if (!wasDragging && dx * dx + dy * dy < touchSlop * touchSlop) {
                     return FloatingWindowTouchResult.Pass
                 }
                 dragging = true
@@ -1107,6 +1246,7 @@ private class ToolPkgFloatingWindowInstance(
                 playReleaseFeedback()
                 if (!spec.draggable) return FloatingWindowTouchResult.Pass
                 if (resizing) {
+                    flushPositionUpdate()
                     persistLayout(params)
                     resizing = false
                     return FloatingWindowTouchResult.Finished
@@ -1122,18 +1262,46 @@ private class ToolPkgFloatingWindowInstance(
 
     private fun updatePosition(params: WindowManager.LayoutParams) {
         layoutParams = params
-        windowView?.let { view ->
-            try {
-                (service.getSystemService(Context.WINDOW_SERVICE) as WindowManager)
-                    .updateViewLayout(view, params)
-            } catch (error: Exception) {
-                AppLogger.e(tag, "Failed to update floating window position", error)
-            }
+        if (!positionFrameScheduled) {
+            positionFrameScheduled = true
+            choreographer.postFrameCallback(positionFrameCallback)
         }
+    }
+
+    private fun flushPositionUpdate() {
+        if (positionFrameScheduled) {
+            choreographer.removeFrameCallback(positionFrameCallback)
+            positionFrameScheduled = false
+        }
+        applyPositionNow()
+    }
+
+    private fun applyPositionNow() {
+        if (disposed || !isAdded) return
+        val view = windowView ?: return
+        val params = layoutParams ?: return
+        try {
+            (service.getSystemService(Context.WINDOW_SERVICE) as WindowManager)
+                .updateViewLayout(view, params)
+            service.onWindowPositionChanged(this)
+        } catch (error: Exception) {
+            AppLogger.e(tag, "Failed to update floating window position", error)
+        }
+    }
+
+    fun currentLayoutParams(): WindowManager.LayoutParams? = layoutParams
+
+    fun applyFollowPosition(x: Int, y: Int) {
+        val params = layoutParams ?: return
+        params.x = x
+        params.y = y
+        layoutParams = params
+        applyPositionNow()
     }
 
     private fun settlePosition(params: WindowManager.LayoutParams) {
         if (snapMode == "none") {
+            flushPositionUpdate()
             persistLayout(params)
             return
         }
@@ -1152,6 +1320,7 @@ private class ToolPkgFloatingWindowInstance(
             else -> params.y.coerceIn(0, (screenHeight - params.height).coerceAtLeast(0))
         }
         updatePosition(params)
+        flushPositionUpdate()
         val key = "${spec.packageName}:${spec.windowId}"
         service.getSharedPreferences(TOOLPKG_FLOATING_PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
@@ -1175,72 +1344,59 @@ private class ToolPkgFloatingWindowInstance(
             .putFloat("soundVolume:$key", soundVolume)
             .putString("pressSoundResource:$key", pressSoundResource)
             .putString("releaseSoundResource:$key", releaseSoundResource)
+            .putString("$ARGS_PREFIX$key", routeArgsJsonValue)
             .apply()
     }
 
     private fun playPressFeedback() {
-        animatePressState(pressed = true)
         playSound(pressSoundResource, press = true)
     }
 
     private fun playReleaseFeedback() {
-        animatePressState(pressed = false)
         playSound(releaseSoundResource, press = false)
     }
 
-    private fun animatePressState(pressed: Boolean) {
-        val view = windowView ?: return
-        view.pivotX = view.width / 2f
-        view.pivotY = view.height.toFloat()
-        view.animate()
-            .cancel()
-        view.animate()
-            .scaleX(if (pressed) 1.05f else 1f)
-            .scaleY(if (pressed) 0.88f else 1f)
-            .setDuration(if (pressed) 90L else 220L)
-            .setInterpolator(OvershootInterpolator(1.15f))
-            .start()
+    private fun prepareSounds() {
+        // Copying and decoding audio during ACTION_DOWN blocks the touch dispatcher, so prepare samples before playback.
+        val generation = ++soundLoadGeneration
+        if (pressSoundId != 0) soundPool.unload(pressSoundId)
+        if (releaseSoundId != 0) soundPool.unload(releaseSoundId)
+        pressSoundId = 0
+        releaseSoundId = 0
+        val requested = listOf(
+            true to pressSoundResource,
+            false to releaseSoundResource
+        )
+        instanceScope.launch(Dispatchers.IO) {
+            val files = requested.mapNotNull { (press, resourceKey) ->
+                if (resourceKey.isNullOrBlank()) return@mapNotNull null
+                val outputDir = File(service.cacheDir, "toolpkg-floating-audio")
+                if (!outputDir.exists()) outputDir.mkdirs()
+                val safeName = resourceKey.replace(Regex("[^A-Za-z0-9_.-]"), "_")
+                val outputFile = File(outputDir, "${spec.packageName}_$safeName")
+                if (!outputFile.exists() && !packageManager.copyToolPkgResourceToFile(spec.packageName, resourceKey, outputFile)) {
+                    AppLogger.e(tag, "Floating window sound resource unavailable: $resourceKey")
+                    return@mapNotNull null
+                }
+                press to outputFile
+            }
+            withContext(Dispatchers.Main.immediate) {
+                if (disposed || generation != soundLoadGeneration) return@withContext
+                pressSoundId = files.firstOrNull { it.first }?.second?.let { file ->
+                    soundPool.load(file.absolutePath, 1)
+                } ?: 0
+                releaseSoundId = files.firstOrNull { !it.first }?.second?.let { file ->
+                    soundPool.load(file.absolutePath, 1)
+                } ?: 0
+            }
+        }
     }
 
     private fun playSound(resourceKey: String?, press: Boolean) {
         if (!soundEnabled || soundVolume <= 0f || resourceKey.isNullOrBlank()) return
-        val outputDir = File(service.cacheDir, "toolpkg-floating-audio")
-        if (!outputDir.exists()) outputDir.mkdirs()
-        val safeName = resourceKey.replace(Regex("[^A-Za-z0-9_.-]"), "_")
-        val outputFile = File(outputDir, "${spec.packageName}_$safeName")
-        if (!outputFile.exists() && !packageManager.copyToolPkgResourceToFile(spec.packageName, resourceKey, outputFile)) {
-            AppLogger.e(tag, "Floating window sound resource unavailable: $resourceKey")
-            return
-        }
-        val current = if (press) pressPlayer else releasePlayer
-        current?.release()
-        val player = MediaPlayer()
-        try {
-            player.setDataSource(outputFile.absolutePath)
-            player.setVolume(soundVolume, soundVolume)
-            player.setOnCompletionListener { completed ->
-                completed.release()
-                if (press) pressPlayer = null else releasePlayer = null
-            }
-            player.setOnErrorListener { failed, _, _ ->
-                failed.release()
-                if (press) pressPlayer = null else releasePlayer = null
-                true
-            }
-            player.prepare()
-            player.start()
-            if (press) pressPlayer = player else releasePlayer = player
-        } catch (error: Exception) {
-            player.release()
-            AppLogger.e(tag, "Failed to play floating window sound: $resourceKey", error)
-        }
-    }
-
-    private fun releasePlayers() {
-        pressPlayer?.release()
-        releasePlayer?.release()
-        pressPlayer = null
-        releasePlayer = null
+        val soundId = if (press) pressSoundId else releaseSoundId
+        if (soundId == 0) return
+        soundPool.play(soundId, soundVolume, soundVolume, 1, 0, 1f)
     }
 
     private fun viewWidth(): Int = windowView?.width ?: layoutParams?.width ?: 0

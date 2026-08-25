@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "toolpkg_id": "dsh-whale-widget",
-  "version": "0.1.4",
+  "version": "0.2.0",
   "main": "src/main.js",
   "display_name": {
     "zh": "DeepSeek 鲸鱼余额",
@@ -22,7 +22,7 @@
     "deepseek.platform_set.v2",
     "deepseek.platform_usage.v2",
     "deepseek.stats.v2",
-    "toolpkg.floating_window.v1"
+    "toolpkg.floating_window.v2"
   ],
   "subpackages": [],
   "resources": [

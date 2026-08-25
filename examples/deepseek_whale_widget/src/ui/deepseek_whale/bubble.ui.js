@@ -26,27 +26,38 @@ const RANDOM_LINES = [
   "今天也要省着用哦~",
 ];
 
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function routeScale(ctx) {
+  const moduleSpec = ctx.getModuleSpec();
+  const routeArgs = JSON.parse(moduleSpec.routeArgsJson);
+  return clamp(Number(routeArgs.scale), 0.6, 2.5);
+}
+
 function formatMoney(value, currency) {
   if (!value) return "--";
   return currency === "CNY" ? `¥ ${value}` : `${value} ${currency}`;
 }
 
-function bubbleCommands() {
+function bubbleCommands(scale) {
   return [
     { type: "drawPath", path: BUBBLE_PATH, unit: "fraction", color: "#FFFFFF", style: "fill" },
-    { type: "drawPath", path: BUBBLE_PATH, unit: "fraction", color: "#203170", strokeWidth: 6, style: "stroke" },
+    { type: "drawPath", path: BUBBLE_PATH, unit: "fraction", color: "#203170", strokeWidth: 6 * scale, style: "stroke" },
     { type: "drawPath", path: BUBBLE_TAIL, unit: "fraction", color: "#FFFFFF", style: "fill" },
-    { type: "drawPath", path: BUBBLE_TAIL, unit: "fraction", color: "#203170", strokeWidth: 6, style: "stroke" },
+    { type: "drawPath", path: BUBBLE_TAIL, unit: "fraction", color: "#203170", strokeWidth: 6 * scale, style: "stroke" },
     { type: "circle", cx: 0.343, cy: 0.801, radius: 0.036, unit: "fraction", color: "#FFFFFF", filled: true },
-    { type: "circle", cx: 0.343, cy: 0.801, radius: 0.036, unit: "fraction", color: "#203170", strokeWidth: 6, filled: false },
+    { type: "circle", cx: 0.343, cy: 0.801, radius: 0.036, unit: "fraction", color: "#203170", strokeWidth: 6 * scale, filled: false },
     { type: "circle", cx: 0.431, cy: 0.923, radius: 0.024, unit: "fraction", color: "#FFFFFF", filled: true },
-    { type: "circle", cx: 0.431, cy: 0.923, radius: 0.024, unit: "fraction", color: "#203170", strokeWidth: 6, filled: false },
+    { type: "circle", cx: 0.431, cy: 0.923, radius: 0.024, unit: "fraction", color: "#203170", strokeWidth: 6 * scale, filled: false },
   ];
 }
 
-function Overlay(ctx) {
+function Bubble(ctx) {
   const { UI } = ctx;
   const colors = ctx.MaterialTheme.colorScheme;
+  const scale = routeScale(ctx);
   const [snapshot, setSnapshot] = ctx.useState("snapshot", {
     state: "loading",
     totalBalance: "",
@@ -54,9 +65,7 @@ function Overlay(ctx) {
     todayUsage: "",
     updatedAtMs: "",
   });
-  const [imagePath, setImagePath] = ctx.useState("imagePath", "");
   const [gifPath, setGifPath] = ctx.useState("gifPath", "");
-  const [bubbleVisible, setBubbleVisible] = ctx.useState("bubbleVisible", false);
   const [bubbleMode, setBubbleMode] = ctx.useState("bubbleMode", "normal");
   const [randomMessage, setRandomMessage] = ctx.useState("randomMessage", "");
   const [randomIsGif, setRandomIsGif] = ctx.useState("randomIsGif", false);
@@ -65,10 +74,9 @@ function Overlay(ctx) {
   async function load() {
     try {
       setSnapshot(await bridge.loadCachedModel());
-      setImagePath(await ToolPkg.readResource("whale_image", "whale.png", true));
       setGifPath(await ToolPkg.readResource("whale_gif", "rua.gif", true));
     } catch (error) {
-      console.error("[dsh-whale-widget] overlay refresh failed", error);
+      console.error("[dsh-whale-widget] bubble load failed", error);
       setSnapshot({
         state: "error",
         totalBalance: "",
@@ -79,21 +87,23 @@ function Overlay(ctx) {
     }
   }
 
+  async function hideBubble() {
+    if (bubbleTimer !== null) clearTimeout(bubbleTimer);
+    try {
+      await ToolPkg.floatingWindow.hide("bubble");
+    } catch (error) {
+      console.error("[dsh-whale-widget] bubble hide failed", error);
+    }
+  }
+
   function scheduleClose() {
     if (bubbleTimer !== null) clearTimeout(bubbleTimer);
-    setBubbleTimer(setTimeout(() => setBubbleVisible(false), 5000));
+    setBubbleTimer(setTimeout(() => hideBubble(), 5000));
   }
 
-  async function openBubble() {
-    setBubbleMode("normal");
-    setBubbleVisible(true);
+  async function onLoad() {
     await load();
     scheduleClose();
-  }
-
-  function closeBubble() {
-    if (bubbleTimer !== null) clearTimeout(bubbleTimer);
-    setBubbleVisible(false);
   }
 
   function cycleBubble() {
@@ -104,7 +114,7 @@ function Overlay(ctx) {
       scheduleClose();
       return;
     }
-    closeBubble();
+    void hideBubble();
   }
 
   const amount = snapshot.totalBalance
@@ -124,7 +134,7 @@ function Overlay(ctx) {
     bubbleMode === "random"
       ? UI.Text({
           text: randomMessage,
-          style: "titleSmall",
+          fontSize: 14 * scale,
           color: "#203170",
           maxLines: 3,
           softWrap: true,
@@ -134,62 +144,42 @@ function Overlay(ctx) {
             fillMaxSize: true,
             horizontalAlignment: "center",
             verticalArrangement: "center",
-            spacing: 1,
+            spacing: scale,
           },
           [
-            UI.Text({ text: "DeepSeek 余额", fontSize: 9, color: "#536BA9", maxLines: 1 }),
-            UI.Text({ text: amount, fontSize: 20, color: "#203170", maxLines: 1 }),
-            UI.Text({ text: usage, fontSize: 7, color: colors.onSurfaceVariant, maxLines: 2 }),
+            UI.Text({ text: "DeepSeek 余额", fontSize: 9 * scale, color: "#536BA9", maxLines: 1 }),
+            UI.Text({ text: amount, fontSize: 20 * scale, color: "#203170", maxLines: 1 }),
+            UI.Text({ text: usage, fontSize: 7 * scale, color: colors.onSurfaceVariant, maxLines: 2 }),
           ]
         );
 
-  const bubbleContent = bubbleMode === "random" && randomIsGif && gifPath
-    ? UI.Image({ path: gifPath, width: 58, height: 45, contentScale: "fit", contentDescription: "" })
-    : bubbleText;
+  const bubbleContent =
+    bubbleMode === "random" && randomIsGif && gifPath
+      ? UI.Image({
+          path: gifPath,
+          width: 58 * scale,
+          height: 45 * scale,
+          contentScale: "fit",
+          contentDescription: "",
+        })
+      : bubbleText;
 
-  const whale = imagePath
-    ? UI.Image({
-        path: imagePath,
-        fillMaxSize: true,
-        contentScale: "fit",
-        contentDescription: "DeepSeek whale",
-      })
-    : UI.Spacer({ width: 84, height: 84 });
-
-  return UI.Box(
-    { fillMaxSize: true, onLoad: load },
-    [
-      bubbleVisible
-        ? UI.Canvas({ fillMaxSize: true, commands: bubbleCommands() })
-        : null,
-      bubbleVisible
-        ? UI.Box(
-            {
-              width: 104,
-              height: 76,
-              modifier: ctx.Modifier.align("topStart").offset({ x: 18, y: 14 }),
-            },
-            [bubbleContent]
-          )
-        : null,
-      bubbleVisible
-        ? UI.Box({
-            width: 128,
-            height: 100,
-            modifier: ctx.Modifier.align("topStart").clickable(cycleBubble),
-          })
-        : null,
-      UI.Box(
-        {
-          width: 84,
-          height: 84,
-          modifier: ctx.Modifier.align("bottomEnd").clickable(openBubble),
-        },
-        [whale]
-      ),
-    ]
-  );
+  return UI.Box({ fillMaxSize: true, onLoad }, [
+    UI.Canvas({ fillMaxSize: true, commands: bubbleCommands(scale) }),
+    UI.Box(
+      {
+        width: 104 * scale,
+        height: 76 * scale,
+        modifier: ctx.Modifier.align("topStart").offset({ x: 18 * scale, y: 14 * scale }),
+      },
+      [bubbleContent]
+    ),
+    UI.Box({
+      fillMaxSize: true,
+      modifier: ctx.Modifier.align("topStart").clickable(cycleBubble),
+    }),
+  ]);
 }
 
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.default = Overlay;
+exports.default = Bubble;

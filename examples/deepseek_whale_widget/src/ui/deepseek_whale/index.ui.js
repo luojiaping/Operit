@@ -44,6 +44,10 @@ function sliderToSize(value) {
   return Math.round(140 * (0.6 + clamp(Number(value), 0, 1) * 1.9));
 }
 
+function sliderToScale(value) {
+  return 0.6 + clamp(Number(value), 0, 1) * 1.9;
+}
+
 function accountCards(ctx, model, setModel, reload) {
   const { UI } = ctx;
   const colors = ctx.MaterialTheme.colorScheme;
@@ -163,7 +167,7 @@ function Screen(ctx) {
 
   async function showOverlay() {
     try {
-      const next = await ToolPkg.floatingWindow.show("whale", {});
+      const next = await ToolPkg.floatingWindow.show("whale", { scale: sliderToScale(sizeDraft) });
       setFloating(next);
       setOverlayVisible(true);
     } catch (error) {
@@ -200,6 +204,15 @@ function Screen(ctx) {
     try {
       const next = await ToolPkg.floatingWindow.update("whale", patch);
       setFloating(next);
+      const hasSize = patch.widthDp !== undefined || patch.heightDp !== undefined;
+      const hasRouteArgs = patch.routeArgs !== undefined;
+      if (hasSize || hasRouteArgs) {
+        const bubblePatch = {};
+        if (patch.widthDp !== undefined) bubblePatch.widthDp = patch.widthDp;
+        if (patch.heightDp !== undefined) bubblePatch.heightDp = patch.heightDp;
+        if (hasRouteArgs) bubblePatch.routeArgs = patch.routeArgs;
+        await ToolPkg.floatingWindow.update("bubble", bubblePatch);
+      }
     } catch (error) {
       console.error("[dsh-whale-widget] floating state update failed", error);
       setModel({ ...model, state: "error", error: "悬浮窗设置保存失败" });
@@ -208,7 +221,11 @@ function Screen(ctx) {
 
   async function commitSize() {
     const sizeDp = sliderToSize(sizeDraft);
-    await updateFloating({ widthDp: sizeDp, heightDp: sizeDp });
+    await updateFloating({
+      widthDp: sizeDp,
+      heightDp: sizeDp,
+      routeArgs: { scale: sliderToScale(sizeDraft) },
+    });
   }
 
   async function commitAlpha() {
@@ -246,6 +263,7 @@ function Screen(ctx) {
     await updateFloating({
       widthDp: 140,
       heightDp: 140,
+      routeArgs: { scale: 1 },
       alpha: 1,
       snapMode: "quarter",
       soundEnabled: true,
