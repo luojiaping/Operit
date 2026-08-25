@@ -6,7 +6,6 @@ import com.ai.assistance.operit.util.AppLogger
 import com.ai.assistance.operit.api.chat.EnhancedAIService
 import com.ai.assistance.operit.core.chat.AIMessageManager
 import com.ai.assistance.operit.core.agent.routing.AgentRoute
-import com.ai.assistance.operit.core.agent.runtime.AgentInvocationRequest
 import com.ai.assistance.operit.core.chat.hooks.PromptTurn
 import com.ai.assistance.operit.core.chat.hooks.PromptTurnKind
 import com.ai.assistance.operit.core.config.FunctionalPrompts
@@ -649,15 +648,21 @@ class MessageCoordinationDelegate(
                 else -> functionalConfigManager.getConfigMappingForFunction(FunctionType.CHAT)
             }
         val request =
-            AgentInvocationRequest(
-                chatId = chatId,
-                userText = userText,
-                modelConfigId = modelMapping.configId,
-                modelIndex = modelMapping.modelIndex,
-                promptSnapshot = AgentChatTurnCoordinator.TEXT_ONLY_SYSTEM_PROMPT,
-                permissionSnapshotJson = "[]",
-                toolSnapshotJson = "[]",
-            )
+            try {
+                agentChatTurnCoordinator.buildInvocationRequest(
+                    chatId = chatId,
+                    userText = userText,
+                    modelConfigId = modelMapping.configId,
+                    modelIndex = modelMapping.modelIndex,
+                )
+            } catch (error: Throwable) {
+                AppLogger.e(TAG, "解析 Agent profile 失败: chatId=$chatId", error)
+                messageProcessingDelegate.setInputProcessingStateForChat(
+                    chatId,
+                    InputProcessingState.Error(error.message ?: "Agent profile is unavailable"),
+                )
+                return
+            }
         if (agentChatTurnCoordinator.start(request)) {
             messageProcessingDelegate.clearUserMessageDraftForChat(chatId)
         } else {

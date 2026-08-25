@@ -10,6 +10,8 @@ import com.ai.assistance.operit.core.agent.kernel.AgentKernelEvent
 import com.ai.assistance.operit.core.agent.runtime.AgentInvocationEntry
 import com.ai.assistance.operit.core.agent.runtime.AgentInvocationRequest
 import com.ai.assistance.operit.core.agent.routing.AgentRoute
+import com.ai.assistance.operit.core.agent.registry.AgentPluginRegistry
+import com.ai.assistance.operit.core.agent.registry.BuiltinTextAgentPlugin
 import com.ai.assistance.operit.data.model.InputProcessingState
 import com.ai.assistance.operit.data.repository.AgentExecutionRepository
 import kotlinx.coroutines.CoroutineScope
@@ -34,6 +36,29 @@ import org.mockito.kotlin.whenever
 
 class AgentChatTurnCoordinatorTest {
     @Test
+    fun invocationRequestUsesRegisteredProfileSnapshot() = runBlocking {
+        val repository = mock<AgentExecutionRepository>()
+        val registration = BuiltinTextAgentPlugin.registration().copy(promptSnapshot = "registered prompt")
+        val registry = AgentPluginRegistry().also { it.register(registration) }
+        doReturn(AgentRoute.Plugin("chat", sessionSnapshot())).whenever(repository).resolveRoute("chat")
+        val coordinator =
+            coordinator(
+                repository = repository,
+                history = mock(),
+                processing = mock(),
+                entry = mock(),
+                registry = registry,
+            )
+
+        val request = coordinator.buildInvocationRequest("chat", "question", "config", 0)
+
+        assertEquals("registered prompt", request.promptSnapshot)
+        assertEquals("[]", request.permissionSnapshotJson)
+        assertEquals("[]", request.toolSnapshotJson)
+        Unit
+    }
+
+    @Test
     fun activationCreatesAndBindsPrimaryRootSession() = runBlocking {
         val repository = mock<AgentExecutionRepository>()
         val history = mock<ChatHistoryDelegate>()
@@ -42,7 +67,8 @@ class AgentChatTurnCoordinatorTest {
         val session = sessionSnapshot()
         doReturn(AgentRoute.Legacy("chat")).whenever(repository).resolveRoute("chat")
         doReturn(session).whenever(repository).startSession(any(), any())
-        val coordinator = coordinator(repository, history, processing, entry)
+        val registry = AgentPluginRegistry().also { it.register(BuiltinTextAgentPlugin.registration()) }
+        val coordinator = coordinator(repository, history, processing, entry, registry = registry)
 
         val activated = coordinator.activateAgentForChat("chat")
 
@@ -132,6 +158,7 @@ class AgentChatTurnCoordinatorTest {
         processing: MessageProcessingDelegate,
         entry: AgentInvocationEntry,
         scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
+        registry: AgentPluginRegistry = AgentPluginRegistry(),
     ): AgentChatTurnCoordinator {
         return AgentChatTurnCoordinator(
             coroutineScope = scope,
@@ -139,6 +166,7 @@ class AgentChatTurnCoordinatorTest {
             messageProcessingDelegate = processing,
             repository = repository,
             invocationEntryProvider = { entry },
+            pluginRegistry = registry,
         )
     }
 

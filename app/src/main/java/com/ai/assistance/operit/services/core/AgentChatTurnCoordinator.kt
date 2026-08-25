@@ -2,11 +2,10 @@ package com.ai.assistance.operit.services.core
 
 import android.content.Context
 import com.ai.assistance.operit.api.chat.llmprovider.agent.OpenAiResponsesAgentInvocationEntryFactory
-import com.ai.assistance.operit.core.agent.contract.AgentId
-import com.ai.assistance.operit.core.agent.contract.AgentModeId
-import com.ai.assistance.operit.core.agent.contract.AgentProfileKind
 import com.ai.assistance.operit.core.agent.contract.AgentSessionId
 import com.ai.assistance.operit.core.agent.contract.AgentSessionSnapshot
+import com.ai.assistance.operit.core.agent.registry.AgentPluginRegistry
+import com.ai.assistance.operit.core.agent.registry.BuiltinTextAgentPlugin
 import com.ai.assistance.operit.core.agent.kernel.AgentKernelEvent
 import com.ai.assistance.operit.core.agent.routing.AgentRoute
 import com.ai.assistance.operit.core.agent.runtime.AgentInvocationEntry
@@ -33,6 +32,7 @@ class AgentChatTurnCoordinator(
     private val messageProcessingDelegate: MessageProcessingDelegate,
     private val repository: AgentExecutionRepository,
     private val invocationEntryProvider: () -> AgentInvocationEntry,
+    private val pluginRegistry: AgentPluginRegistry = AgentPluginRegistry.global,
 ) {
     private val jobs = ConcurrentHashMap<String, Job>()
     private val activeResponseStreams = ConcurrentHashMap<String, MutableSharedStreamImpl<String>>()
@@ -48,18 +48,32 @@ class AgentChatTurnCoordinator(
         return when (val route = repository.resolveRoute(chatId)) {
             is AgentRoute.Plugin -> route.session
             is AgentRoute.Legacy -> {
+                val registration =
+                    pluginRegistry.requireEnabled(
+                        pluginId = BuiltinTextAgentPlugin.PLUGIN_ID,
+                        agentId = BuiltinTextAgentPlugin.AGENT_ID,
+                        profileVersion = BuiltinTextAgentPlugin.PROFILE_VERSION,
+                        modeId = BuiltinTextAgentPlugin.MODE_ID,
+                    )
+                val declaration = registration.declaration
                 val session =
                     repository.getLatestOpenRootSession(chatId)
+                        ?.takeIf { existing ->
+                            existing.pluginId == declaration.pluginId &&
+                                existing.agentId == declaration.agentId &&
+                                existing.profileVersion == declaration.profileVersion &&
+                                existing.modeId == declaration.modeId
+                        }
                         ?: repository.startSession(
                             input =
                                 com.ai.assistance.operit.core.agent.contract.AgentSessionStart(
                                     chatId = chatId,
-                                    pluginId = BUILTIN_PLUGIN_ID,
-                                    agentId = AgentId(BUILTIN_AGENT_ID),
-                                    displayName = BUILTIN_DISPLAY_NAME,
-                                    profileVersion = BUILTIN_PROFILE_VERSION,
-                                    profileKind = AgentProfileKind.PRIMARY,
-                                    modeId = AgentModeId(BUILTIN_MODE_ID),
+                                    pluginId = declaration.pluginId,
+                                    agentId = declaration.agentId,
+                                    displayName = declaration.displayName,
+                                    profileVersion = declaration.profileVersion,
+                                    profileKind = declaration.profileKind,
+                                    modeId = declaration.modeId,
                                     sessionId = AgentSessionId.generate(),
                                 )
                         )
@@ -72,6 +86,34 @@ class AgentChatTurnCoordinator(
     suspend fun deactivateAgentForChat(chatId: String) {
         cancel(chatId)
         repository.clearRootSessionBinding(chatId)
+    }
+
+    suspend fun buildInvocationRequest(
+        chatId: String,
+        userText: String,
+        modelConfigId: String,
+        modelIndex: Int,
+    ): AgentInvocationRequest {
+        val route = repository.resolveRoute(chatId)
+        val pluginRoute = requireNotNull(route as? AgentRoute.Plugin) {
+            "Agent invocation requires an active Agent route: $chatId"
+        }
+        val registration =
+            pluginRegistry.requireEnabled(
+                pluginId = pluginRoute.session.pluginId,
+                agentId = pluginRoute.session.agentId,
+                profileVersion = pluginRoute.session.profileVersion,
+                modeId = pluginRoute.session.modeId,
+            )
+        return AgentInvocationRequest(
+            chatId = chatId,
+            userText = userText,
+            modelConfigId = modelConfigId,
+            modelIndex = modelIndex,
+            promptSnapshot = registration.promptSnapshot,
+            permissionSnapshotJson = registration.permissionSnapshotJson,
+            toolSnapshotJson = registration.toolSnapshotJson,
+        )
     }
 
     fun start(request: AgentInvocationRequest): Boolean {
@@ -134,7 +176,7 @@ class AgentChatTurnCoordinator(
                                 sender = "ai",
                                 content = text.toString(),
                                 timestamp = previewTimestamp,
-                                roleName = BUILTIN_DISPLAY_NAME,
+                                roleName = BuiltinTextAgentPlugin.DISPLAY_NAME,
                                 isVariantPreview = true,
                             ),
                             chatIdOverride = request.chatId,
@@ -221,13 +263,6 @@ class AgentChatTurnCoordinator(
             )
         }
 
-        const val TEXT_ONLY_SYSTEM_PROMPT =
-            "You are a text-only Agent runtime. Do not call tools, emit XML, or explain your process."
-        private const val BUILTIN_PLUGIN_ID = "operit.agent"
-        private const val BUILTIN_AGENT_ID = "operit.primary"
-        private const val BUILTIN_DISPLAY_NAME = "Operit Agent"
-        private const val BUILTIN_PROFILE_VERSION = "1"
-        private const val BUILTIN_MODE_ID = "text"
         private const val TAG = "AgentChatTurnCoordinator"
     }
 }
