@@ -23,6 +23,7 @@ import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.mockito.Mockito.mockingDetails
 import org.mockito.kotlin.any
 import org.mockito.kotlin.argThat
 import org.mockito.kotlin.doReturn
@@ -46,7 +47,12 @@ class AgentChatTurnCoordinatorTest {
         val activated = coordinator.activateAgentForChat("chat")
 
         assertEquals(session, activated)
-        verify(repository).bindRootSession(eq("chat"), any(), any())
+        val bindInvocation =
+            mockingDetails(repository).invocations.single { invocation ->
+                invocation.method.name == "bindRootSession"
+            }
+        assertEquals("chat", bindInvocation.arguments[0])
+        assertEquals(session.sessionId.value, bindInvocation.arguments[1])
         Unit
     }
 
