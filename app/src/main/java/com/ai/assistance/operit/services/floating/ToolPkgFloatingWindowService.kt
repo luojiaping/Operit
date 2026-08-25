@@ -67,6 +67,7 @@ private const val MIN_FLOATING_WIDTH_DP = 72
 private const val MIN_FLOATING_HEIGHT_DP = 72
 private const val MIN_FLOATING_ALPHA = 0.2f
 private const val MAX_FLOATING_ALPHA = 1f
+private const val TOOLPKG_FLOATING_ARGS_PREFIX = "args:"
 
 private fun normalizeSnapMode(value: String?): String {
     return if (value.equals("none", ignoreCase = true)) "none" else DEFAULT_FLOATING_SNAP_MODE
@@ -80,7 +81,6 @@ class ToolPkgFloatingWindowService : Service() {
         private const val EXTRA_COMMAND_ID = "toolpkg_command_id"
         private const val EXTRA_COMMAND_JSON = "toolpkg_command_json"
         private const val VISIBLE_PREFIX = "visible:"
-        private const val ARGS_PREFIX = "args:"
 
         @Volatile
         private var instance: ToolPkgFloatingWindowService? = null
@@ -420,15 +420,19 @@ class ToolPkgFloatingWindowService : Service() {
         positionFollowersOf(window)
     }
 
-    private fun onWindowPositionChanged(window: ToolPkgFloatingWindowInstance) {
-        positionFollowersOf(window)
+    internal fun onWindowPositionChanged(packageName: String, windowId: String) {
+        instances[WindowKey(packageName, windowId)]?.let { window ->
+            positionFollowersOf(window)
+        }
     }
 
-    private fun onWindowLayoutChanged(window: ToolPkgFloatingWindowInstance) {
-        if (window.spec.followWindowId != null) {
-            positionWindowFromAnchor(window)
-        } else {
-            positionFollowersOf(window)
+    internal fun onWindowLayoutChanged(packageName: String, windowId: String) {
+        instances[WindowKey(packageName, windowId)]?.let { window ->
+            if (window.spec.followWindowId != null) {
+                positionWindowFromAnchor(window)
+            } else {
+                positionFollowersOf(window)
+            }
         }
     }
 
@@ -477,7 +481,7 @@ class ToolPkgFloatingWindowService : Service() {
             editor.putString("releaseSoundResource:$storageKey", patch.optString("releaseSoundResource").trim())
         }
         patch.optJSONObject("routeArgs")?.let { routeArgs ->
-            editor.putString("$ARGS_PREFIX$storageKey", routeArgs.toString())
+            editor.putString("$TOOLPKG_FLOATING_ARGS_PREFIX$storageKey", routeArgs.toString())
         }
         editor.apply()
     }
@@ -520,7 +524,7 @@ class ToolPkgFloatingWindowService : Service() {
         val storageKey = storageKey(key)
         preferences.edit()
             .putBoolean("$VISIBLE_PREFIX$storageKey", visible)
-            .putString("$ARGS_PREFIX$storageKey", routeArgsJson)
+            .putString("$TOOLPKG_FLOATING_ARGS_PREFIX$storageKey", routeArgsJson)
             .apply()
     }
 
@@ -561,7 +565,7 @@ class ToolPkgFloatingWindowService : Service() {
                         .put("windowId", window.windowId)
                         .put("spec", serializeWindow(window))
                         .also { command ->
-                            val routeArgs = preferences.getString("$ARGS_PREFIX$storageKey", "").orEmpty()
+                            val routeArgs = preferences.getString("$TOOLPKG_FLOATING_ARGS_PREFIX$storageKey", "").orEmpty()
                             if (routeArgs.isNotBlank()) {
                                 command.put("routeArgs", JSONObject(routeArgs))
                             }
@@ -722,7 +726,7 @@ private class ToolPkgFloatingWindowFrameLayout(
 
 private class ToolPkgFloatingWindowInstance(
     private val service: ToolPkgFloatingWindowService,
-    private val spec: FloatingWindowSpec,
+    val spec: FloatingWindowSpec,
     routeArgsJson: String
 ) {
     private val tag = "ToolPkgFloatingWindowInstance"
@@ -897,7 +901,7 @@ private class ToolPkgFloatingWindowInstance(
         if (patch.has("pressSoundResource") || patch.has("releaseSoundResource")) {
             prepareSounds()
         }
-        service.onWindowLayoutChanged(this)
+        service.onWindowLayoutChanged(spec.packageName, spec.windowId)
         requestRender()
     }
 
@@ -1283,7 +1287,7 @@ private class ToolPkgFloatingWindowInstance(
         try {
             (service.getSystemService(Context.WINDOW_SERVICE) as WindowManager)
                 .updateViewLayout(view, params)
-            service.onWindowPositionChanged(this)
+            service.onWindowPositionChanged(spec.packageName, spec.windowId)
         } catch (error: Exception) {
             AppLogger.e(tag, "Failed to update floating window position", error)
         }
@@ -1344,7 +1348,7 @@ private class ToolPkgFloatingWindowInstance(
             .putFloat("soundVolume:$key", soundVolume)
             .putString("pressSoundResource:$key", pressSoundResource)
             .putString("releaseSoundResource:$key", releaseSoundResource)
-            .putString("$ARGS_PREFIX$key", routeArgsJsonValue)
+            .putString("$TOOLPKG_FLOATING_ARGS_PREFIX$key", routeArgsJsonValue)
             .apply()
     }
 
