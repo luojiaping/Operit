@@ -1,8 +1,9 @@
 ---
 fork: https://github.com/luojiaping/Operit.git
 scope: per-chat Agent activation, pre-Legacy route dispatch, and transient turn bridge
-status: implemented_pending_route_ui_tests
+status: build_verified_pending_route_ui_tests
 implementation_commit: 286c41c04
+build_commit: 940c85554
 ---
 
 # Agent Chat Route Bridge
@@ -67,6 +68,13 @@ only writer for Agent-owned user/output messages.
 
 ## 5. Verification
 
-On the preceding functional commit, the Agent/Kernel/Responses targeted JVM suite passed 34/34,
-and `:app:compileDebugAndroidTestKotlin` passed. The route bridge requires a new build and new
-integration tests before it can be called an MVP release candidate.
+On the route implementation commit, the Agent/Kernel/Responses targeted JVM suite passed 34/34,
+and `:app:compileDebugAndroidTestKotlin` passed. Remote `development` sync and `build_dev` also
+passed for `940c85554`:
+
+- artifact: `operit-dev-development-940c8555.apk`
+- size: `403232415`
+- SHA-256: `072b0320df37431be3d072c85c315795f60e0c65a9580be30dd81906d377a4d4`
+
+The route bridge still needs route-specific integration tests and a user-visible activation
+control before it can be called an MVP release candidate.

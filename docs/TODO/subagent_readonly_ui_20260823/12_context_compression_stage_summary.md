@@ -15,8 +15,8 @@ Agent, Room, provider, ToolPkg, ChatView, or Legacy chat code. Stage 13 is imple
 
 - Branch: `development`
 - functional implementation commit: `286c41c04`
-- build commit: `2ff742ae9`
-- latest documentation/schema commit: `11a9a650a`
+- build commit: `940c85554`
+- latest documentation/schema commit: `940c85554`
 - Previous related commits:
   - `30d6c0124`: Chat View Slot baseline
   - `c295a4d28`: Room identity repair and Agent foundation persistence
@@ -232,6 +232,12 @@ functional code from `73b99d052`:
 
 The generated Room 24 baseline is now committed at
 `app/schemas/com.ai.assistance.operit.data.db.AppDatabase/24.json`.
+
+The Stage 15 route bridge build passed after sync to `940c85554`:
+
+- artifact: `operit-dev-development-940c8555.apk`
+- size: `403232415`
+- SHA-256: `072b0320df37431be3d072c85c315795f60e0c65a9580be30dd81906d377a4d4`
 
 The temporary worktree was removed after the report was collected.
 
