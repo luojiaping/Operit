@@ -242,14 +242,14 @@ The Stage 15 route bridge build passed after sync to `940c85554`:
 Route coordinator JVM coverage was added after the build and passed on test commit `4e70c2077`:
 2 tests executed, 2 passed, 0 failures, 0 errors.
 
-The lifecycle hardening build passed after sync to `792d30e99`:
+The lifecycle hardening build passed after sync to `37152bdc7`:
 
-- artifact: `operit-dev-development-792d30e9.apk`
+- artifact: `operit-dev-development-37152bdc.apk`
 - size: `403236511`
-- SHA-256: `2370ea65359d79aab27cb26ca83db9a1a0ca95612b55bce821a135c224904b7f`
+- SHA-256: `7f0c33bdd337478cdaf3bcaa65c4ab7a79d37e9172702a582debd03785db0bb0`
 
 The hardened targeted JVM suite contains 36 tests, all passed on `cfead4225`. Main app compilation
-and Android test source compilation also passed. The final build for this commit is still pending.
+and Android test source compilation also passed.
 
 The temporary worktree was removed after the report was collected.
 
@@ -257,9 +257,8 @@ The temporary worktree was removed after the report was collected.
 
 Before production Agent routing:
 
-1. Add route-bridge tests and a user-visible per-chat Agent activation control.
-2. Run Android migration and Repository instrumentation when an adb device is available.
-3. Only after those gates, add tools/permissions and expand production Agent routing.
+1. Run Android migration and Repository instrumentation when an adb device is available.
+2. Only after those gates, add tools/permissions and expand production Agent routing.
 
 Do not implement ToolPkg Agent registration, permissions, tool materialization, Plan/Build UI, or
 production MessageCoordinationDelegate routing in the next small change unless the corresponding

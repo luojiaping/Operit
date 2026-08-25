@@ -3,7 +3,7 @@ fork: https://github.com/luojiaping/Operit.git
 scope: per-chat Agent activation, pre-Legacy route dispatch, and transient turn bridge
 status: lifecycle_hardened_pending_device_e2e
 implementation_commit: 286c41c04
-build_commit: 792d30e99
+build_commit: 37152bdc7
 route_test_commit: 4e70c2077
 hardening_commit: cfead4225
 ---
@@ -74,7 +74,7 @@ The lifecycle hardening pass also adds:
 
 ## 4. Current Limitations
 
-- The new activation toggle and coordinator tests are source-verified but need the hardened APK.
+- The activation toggle and coordinator tests are included in the hardened APK.
 - Agent reasoning/usage is persisted in Agent step records but is not rendered as a dedicated UI
   section.
 - Tools, permissions, attachments, group orchestration, automatic continuation, and production
@@ -102,5 +102,10 @@ The previous hardened APK build passed for `792d30e99`:
 - SHA-256: `2370ea65359d79aab27cb26ca83db9a1a0ca95612b55bce821a135c224904b7f`
 
 The hardened targeted JVM suite passed 36/36 on `cfead4225`; main compilation and Android test
-source compilation passed. A new APK build for `cfead4225` is pending. Device E2E and production
-send-path verification remain pending.
+source compilation passed. Final hardened APK build passed for `37152bdc7`:
+
+- artifact: `operit-dev-development-37152bdc.apk`
+- size: `403236511`
+- SHA-256: `7f0c33bdd337478cdaf3bcaa65c4ab7a79d37e9172702a582debd03785db0bb0`
+
+Device E2E and production send-path verification remain pending.
