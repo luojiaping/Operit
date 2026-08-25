@@ -51,4 +51,30 @@ class JsToolPkgRegistrationTest {
         assertTrue(bridge.contains("_m: captureMarketOrigin"))
         assertTrue(bridge.contains("captureToolPkgMarketOrigin"))
     }
+
+    @Test
+    fun `captures agent profile registration`() {
+        val session = JsToolPkgRegistrationSession()
+        session.begin()
+
+        session.appendAgentProfile(
+            """
+            {
+              "agentId":"writer",
+              "displayName":"Writer",
+              "profileVersion":"1",
+              "modeId":"text",
+              "promptKey":"writer.prompt",
+              "promptSnapshot":"Write text only.",
+              "capabilities":["agent_runtime_v1"]
+            }
+            """.trimIndent()
+        )
+
+        val capture = session.finish(null)
+
+        assertEquals(1, capture.agentProfiles.size)
+        assertTrue(buildToolPkgRegistrationBridgeScript().contains("registerAgentProfile"))
+        session.end()
+    }
 }
