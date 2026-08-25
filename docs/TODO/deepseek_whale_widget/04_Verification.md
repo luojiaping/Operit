@@ -1,6 +1,6 @@
 ---
 title: 验证与交付
-status: complete
+status: in_progress
 ---
 
 # 验证与交付
@@ -17,8 +17,6 @@ status: complete
 - `jq empty examples/deepseek_whale_widget/manifest.json` 通过
 - `file examples/deepseek_whale_widget/resources/whale.png` 确认为 610x610 RGBA PNG
 - `git diff --check` 通过
-- 独立仓库 `sh scripts/build.sh`、`sh scripts/pack.sh` 和 `.toolpkg` ZIP 校验通过
-- 远程 `assembleRelease` 构建通过，目标提交 `4da5364b0`
-- Release APK SHA-256：`7d3796331f7de2d14cc81fa73f3b41fb9d9606a8103eca56044764c910065cb4`
-- ToolPkg `v0.1.4` SHA-256：`bd76ed16677a7830238b5129b85bcc682e5f02d87a88ae44ea9f0faf2044b57b`
-- `v0.1.4` manifest、音效、GIF、Slider 和 `src/dist` 同步校验通过
+- 上一轮 `v0.1.4` 构建记录保留在历史提交；本轮 `v0.2.0` 尚未重新打包
+- 待验证宿主协议 `toolpkg.floating_window.v2`、双浮窗恢复顺序和拖动跟随位置
+- 待验证 `0.6x - 2.5x` 下鲸鱼窗口、气泡窗口和内部文字的比例一致

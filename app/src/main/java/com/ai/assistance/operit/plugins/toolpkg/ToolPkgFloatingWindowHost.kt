@@ -6,7 +6,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import org.json.JSONObject
 
 internal object ToolPkgFloatingWindowHost {
-    const val CAPABILITY = "toolpkg.floating_window.v1"
+    const val CAPABILITY = "toolpkg.floating_window.v2"
     private val registered = AtomicBoolean(false)
 
     fun register() {
@@ -73,6 +73,9 @@ internal object ToolPkgFloatingWindowHost {
             .put("draggable", window.draggable)
             .put("resizable", window.resizable)
             .put("snapMode", window.snapMode)
+            .put("followWindowId", window.followWindowId ?: JSONObject.NULL)
+            .put("followPlacement", window.followPlacement)
+            .put("followGapDp", window.followGapDp)
             .put("pressSoundResource", window.pressSoundResource ?: JSONObject.NULL)
             .put("releaseSoundResource", window.releaseSoundResource ?: JSONObject.NULL)
             .put("refreshIntervalMs", window.refreshIntervalMs)

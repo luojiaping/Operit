@@ -386,6 +386,9 @@ function registerToolPkg() {
     draggable: true,
     resizable: true,
     snapMode: "quarter",
+    followWindowId: "anchor_window",
+    followPlacement: "above",
+    followGapDp: 8,
     pressSoundResource: "press_sound",
     releaseSoundResource: "release_sound"
   });
@@ -485,6 +488,9 @@ exports.onInputMenuToggle = onInputMenuToggle;
 | `ToolPkg.registerFloatingWindow` | `draggable` | 否 | 是否允许拖动 |
 | `ToolPkg.registerFloatingWindow` | `resizable` | 否 | 是否允许调整尺寸 |
 | `ToolPkg.registerFloatingWindow` | `snapMode` | 否 | `quarter` 边缘吸附或 `none` 自由定位，默认 `quarter` |
+| `ToolPkg.registerFloatingWindow` | `followWindowId` | 否 | 同一 ToolPkg 内的锚定窗口 ID |
+| `ToolPkg.registerFloatingWindow` | `followPlacement` | 否 | 当前支持 `above` |
+| `ToolPkg.registerFloatingWindow` | `followGapDp` | 否 | 跟随窗口与锚定窗口之间的间距 |
 | `ToolPkg.registerFloatingWindow` | `pressSoundResource` / `releaseSoundResource` | 否 | 按压和松开反馈音效资源 key |
 | `ToolPkg.registerFloatingWindow` | `refreshIntervalMs` | 否 | 刷新函数周期，0 表示关闭 |
 | `ToolPkg.registerFloatingWindow` | `onRefresh` | 否 | 长驻浮窗的刷新函数 |

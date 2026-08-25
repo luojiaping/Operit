@@ -1,7 +1,7 @@
 ---
 title: DeepSeek Whale Overlay ToolPkg
 fork: https://github.com/tuxKOH/Operit
-status: complete
+status: in_progress
 ---
 
 # DeepSeek Whale Overlay ToolPkg
@@ -25,11 +25,12 @@ Operit 当前已经支持 ToolPkg 页面和消息 Hook，但没有通用的长�
 1. [DONE: 宿主桥接契约](./01_HostBridge.md)
 2. [DONE: DeepSeek 数据服务](./02_DeepSeekData.md)
 3. [DONE: ToolPkg 与悬浮窗](./03_ToolPkg.md)
-4. [DONE: 验证与交付](./04_Verification.md)
+4. [IN_PROGRESS: 验证与交付](./04_Verification.md)
+5. [IN_PROGRESS: 触控与双浮窗改造](./05_Interaction.md)
 
 ## 执行约束
 
-- 当前 Operit 版本已经发布，新增接口必须向前兼容
+- 当前 UI 方案仍在开发阶段，本轮允许删除旧的单窗口浮窗方案
 - 不向 ToolPkg 传递 API Key、Cookie、Authorization header 或宿主对象
 - 不在悬浮窗 Compose renderer 中执行网络请求
 - 本次执行不触发构建、编译或测试命令
@@ -40,10 +41,10 @@ Operit 当前已经支持 ToolPkg 页面和消息 Hook，但没有通用的长�
 - 新增 DeepSeek 余额、平台用量、Token 统计、加密平台凭据和余额快照服务
 - 新增 `examples/deepseek_whale_widget` 包及 Whale PNG 资源
 - 插件禁用后，已显示的悬浮窗立即移除，不再执行已禁用包的 renderer；显式显示状态支持进程回收恢复
-- 悬浮窗采用新的方形鲸鱼布局，拖动中跟手，中央位置保持自由定位，边缘区域按释放位置吸附
+- 悬浮窗改为独立鲸鱼窗口和跟随气泡窗口，拖动中跟手，气泡拥有独立触控区域
 - 删除了上一轮临时 DesktopWidget 注册、Glance 宿主、配置 Activity 和示例
 - 独立公开仓库：[luojiaping/operit-deepseek-whale-widget](https://github.com/luojiaping/operit-deepseek-whale-widget)
-- 发布包更新为 [`v0.1.4`](https://github.com/luojiaping/operit-deepseek-whale-widget/releases/tag/v0.1.4)，包含侧边栏浮窗设置、可选边缘吸附、音效和居中气泡排版
+- 下一版开发包更新为 `v0.2.0`，删除旧的单窗口气泡布局
 - 宿主 Release 构建提交为 `4da5364b0`，远程构建通过
-- 本轮新增通用浮窗 `get()`、`snapMode`、透明度、声音反馈和 `Slider` 设置控件，已完成打包验证
+- 本轮新增通用浮窗 `get()`、`snapMode`、透明度、声音反馈和 `Slider` 设置控件，并正在改为双浮窗交互
 - `jq`、`file`、`git diff --check` 和 `.toolpkg` ZIP 校验已通过；环境没有 `node`，未执行 JavaScript 语法检查

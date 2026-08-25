@@ -366,7 +366,7 @@ internal object ToolPkgMainRegistrationScriptParser {
             }
             val widthDp = item.optInt("widthDp", 320)
             val heightDp = item.optInt("heightDp", 420)
-            if (widthDp !in 120..1200 || heightDp !in 120..1600) {
+            if (widthDp !in 72..1200 || heightDp !in 72..1600) {
                 throw IllegalArgumentException(
                     "$TOOLPKG_REGISTRATION_FLOATING_WINDOW[$index] size is outside supported bounds"
                 )
@@ -390,6 +390,19 @@ internal object ToolPkgMainRegistrationScriptParser {
                     "$TOOLPKG_REGISTRATION_FLOATING_WINDOW[$index].snapMode must be none or quarter"
                 )
             }
+            val followWindowId = item.optString("followWindowId").trim().ifBlank { null }
+            val followPlacement = item.optString("followPlacement", "above").trim().lowercase()
+            if (followPlacement != "above") {
+                throw IllegalArgumentException(
+                    "$TOOLPKG_REGISTRATION_FLOATING_WINDOW[$index].followPlacement must be above"
+                )
+            }
+            val followGapDp = item.optInt("followGapDp", 8)
+            if (followGapDp !in 0..120) {
+                throw IllegalArgumentException(
+                    "$TOOLPKG_REGISTRATION_FLOATING_WINDOW[$index].followGapDp is outside supported bounds"
+                )
+            }
             windows.add(
                 ToolPkgRegisteredFloatingWindow(
                     id = id,
@@ -402,6 +415,9 @@ internal object ToolPkgMainRegistrationScriptParser {
                     draggable = item.optBoolean("draggable", true),
                     resizable = item.optBoolean("resizable", true),
                     snapMode = snapMode,
+                    followWindowId = followWindowId,
+                    followPlacement = followPlacement,
+                    followGapDp = followGapDp,
                     pressSoundResource = item.optString("pressSoundResource").trim().ifBlank { null },
                     releaseSoundResource = item.optString("releaseSoundResource").trim().ifBlank { null },
                     refreshIntervalMs = refreshIntervalMs,
@@ -410,7 +426,31 @@ internal object ToolPkgMainRegistrationScriptParser {
                 )
             )
         }
-        return windows
+        val windowIds = windows.map { it.id.lowercase() }.toSet()
+        windows.forEach { window ->
+            val followWindowId = window.followWindowId ?: return@forEach
+            require(followWindowId.lowercase() in windowIds) {
+                "$TOOLPKG_REGISTRATION_FLOATING_WINDOW.followWindowId not found: $followWindowId"
+            }
+            require(!followWindowId.equals(window.id, ignoreCase = true)) {
+                "$TOOLPKG_REGISTRATION_FLOATING_WINDOW.followWindowId cannot reference itself: ${window.id}"
+            }
+        }
+        val followById = windows.associate { it.id.lowercase() to it.followWindowId?.lowercase() }
+        fun visit(windowId: String, path: Set<String>) {
+            val next = followById[windowId] ?: return
+            require(next !in path) {
+                "$TOOLPKG_REGISTRATION_FLOATING_WINDOW followWindowId cycle detected"
+            }
+            visit(next, path + windowId)
+        }
+        followById.keys.forEach { windowId -> visit(windowId, emptySet()) }
+        return windows.map { window ->
+            val followWindowId = window.followWindowId?.let { followId ->
+                windows.first { candidate -> candidate.id.equals(followId, ignoreCase = true) }.id
+            }
+            window.copy(followWindowId = followWindowId)
+        }
     }
 
     private fun parseNavigationEntryAction(

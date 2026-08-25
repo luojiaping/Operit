@@ -724,6 +724,9 @@ export namespace ToolPkg {
         draggable?: boolean;
         resizable?: boolean;
         snapMode?: "none" | "quarter";
+        followWindowId?: string;
+        followPlacement?: "above";
+        followGapDp?: number;
         pressSoundResource?: string;
         releaseSoundResource?: string;
         refreshIntervalMs?: number;
@@ -745,6 +748,9 @@ export namespace ToolPkg {
         x?: number;
         y?: number;
         snapMode?: "none" | "quarter";
+        followWindowId?: string | null;
+        followPlacement?: "above";
+        followGapDp?: number;
         soundEnabled?: boolean;
         soundVolume?: number;
         pressSoundResource?: string | null;

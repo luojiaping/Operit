@@ -1,6 +1,7 @@
 const PACKAGE_ID = "dsh-whale-widget";
 const DASHBOARD_ROUTE = `toolpkg:${PACKAGE_ID}:ui:dashboard`;
-const FLOATING_ROUTE = `toolpkg:${PACKAGE_ID}:ui:overlay`;
+const WHALE_ROUTE = `toolpkg:${PACKAGE_ID}:ui:whale`;
+const BUBBLE_ROUTE = `toolpkg:${PACKAGE_ID}:ui:bubble`;
 
 function configuredValue(key) {
   return getEnv(key) ?? "";
@@ -36,14 +37,26 @@ function registerToolPkg() {
   });
 
   ToolPkg.registerUiRoute({
-    id: "overlay",
-    route: FLOATING_ROUTE,
+    id: "whale",
+    route: WHALE_ROUTE,
     runtime: "compose_dsl",
-    screen: "src/ui/deepseek_whale/overlay.ui.js",
+    screen: "src/ui/deepseek_whale/whale.ui.js",
     params: {},
     title: {
       zh: "鲸鱼悬浮窗",
       en: "Whale Overlay",
+    },
+  });
+
+  ToolPkg.registerUiRoute({
+    id: "bubble",
+    route: BUBBLE_ROUTE,
+    runtime: "compose_dsl",
+    screen: "src/ui/deepseek_whale/bubble.ui.js",
+    params: {},
+    title: {
+      zh: "鲸鱼气泡",
+      en: "Whale Bubble",
     },
   });
 
@@ -61,7 +74,7 @@ function registerToolPkg() {
 
   ToolPkg.registerFloatingWindow({
     id: "whale",
-    contentRoute: FLOATING_ROUTE,
+    contentRoute: WHALE_ROUTE,
     title: {
       zh: "鲸鱼余额",
       en: "Whale Balance",
@@ -80,6 +93,28 @@ function registerToolPkg() {
     releaseSoundResource: "sound_duck_release",
     refreshIntervalMs: 60000,
     onRefresh: refreshWhaleData,
+  });
+
+  ToolPkg.registerFloatingWindow({
+    id: "bubble",
+    contentRoute: BUBBLE_ROUTE,
+    title: {
+      zh: "鲸鱼气泡",
+      en: "Whale Bubble",
+    },
+    description: {
+      zh: "跟随鲸鱼显示余额和随机台词。",
+      en: "A separate bubble that follows the whale overlay.",
+    },
+    widthDp: 140,
+    heightDp: 140,
+    draggable: false,
+    resizable: false,
+    snapMode: "none",
+    followWindowId: "whale",
+    followPlacement: "above",
+    followGapDp: 8,
+    refreshIntervalMs: 0,
   });
 
   return true;

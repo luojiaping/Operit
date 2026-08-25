@@ -576,7 +576,7 @@ const snapshot = await ToolPkg.host.call(
 
 ### `ToolPkg.floatingWindow`
 
-`ToolPkg.registerFloatingWindow()` 注册一个由同一 ToolPkg `compose_dsl` route 承载的系统悬浮窗。注册不会自动显示，只有调用 `show()` 后宿主才会创建 Overlay 服务和该窗口的 Compose/JavaScript runtime。
+`ToolPkg.registerFloatingWindow()` 注册一个由同一 ToolPkg `compose_dsl` route 承载的系统悬浮窗。注册不会自动显示，只有调用 `show()` 后宿主才会创建 Overlay 服务和该窗口的 Compose/JavaScript runtime。当前浮窗 capability 为 `toolpkg.floating_window.v2`。
 
 ```ts
 ToolPkg.registerFloatingWindow({
@@ -587,6 +587,9 @@ ToolPkg.registerFloatingWindow({
   draggable: true,
   resizable: true,
   snapMode: "quarter",
+  followWindowId: "anchor_window",
+  followPlacement: "above",
+  followGapDp: 8,
   pressSoundResource: "press_sound",
   releaseSoundResource: "release_sound",
   refreshIntervalMs: 60000,
@@ -733,6 +736,8 @@ await ToolPkg.floatingWindow.show('demo_window');
 - `contentRoute` 必须指向同一 ToolPkg 已注册的 `compose_dsl` UI route。
 - `show()`、`hide()`、`get()` 和 `update()` 控制单实例浮窗的生命周期和运行配置。
 - `snapMode` 支持 `quarter`（屏幕四分之一边缘吸附）和 `none`（自由定位）。
+- `followWindowId` 将窗口锚定到同一 ToolPkg 的另一个浮窗；锚定窗口移动时，当前窗口在其上方同步移动。
+- `followPlacement` 当前固定为 `above`，`followGapDp` 设置两个窗口之间的间距。
 - `get()` / `update()` 状态包含尺寸、透明度、位置、吸附模式和声音配置。
 - 浮窗隐藏或插件停用后，宿主会释放该窗口的 Compose 和 JavaScript runtime。
 
