@@ -46,6 +46,7 @@ class AgentChatTurnCoordinatorTest {
 
         assertEquals(session, activated)
         verify(repository).bindRootSession("chat", session.sessionId, any())
+        Unit
     }
 
     @Test
@@ -115,6 +116,7 @@ class AgentChatTurnCoordinatorTest {
         } finally {
             scope.cancel()
         }
+        Unit
     }
 
     private fun coordinator(
