@@ -1,10 +1,11 @@
 ---
 fork: https://github.com/luojiaping/Operit.git
 scope: per-chat Agent activation, pre-Legacy route dispatch, and transient turn bridge
-status: build_verified_route_coordinator_pending_ui
+status: lifecycle_hardened_pending_device_e2e
 implementation_commit: 286c41c04
 build_commit: 940c85554
 route_test_commit: 4e70c2077
+hardening_commit: 41e2297be
 ---
 
 # Agent Chat Route Bridge
@@ -57,10 +58,23 @@ runtime:
 The transient preview is never sent through the Legacy persistence path. The Repository remains the
 only writer for Agent-owned user/output messages.
 
+The lifecycle hardening pass also adds:
+
+- a per-chat shared response stream for WebChat and other stream consumers
+- turn IDs so stale completion/cancellation cannot clear a newer chat runtime
+- tracked pre-route send jobs for immediate cancellation
+- destructive-mutation cancellation through ChatServiceCore
+- Legacy runtime history filtering for Agent-owned assistant messages
+- current-chat guards around display-window reloads
+- reuse of the latest open root session after deactivate/reactivate
+- OpenAI provider/model and usage metrics on persisted Agent output
+- monotonic Agent user/assistant timestamps
+- a Hub activation toggle in the published Agent-style input without changing its existing send
+  behavior
+
 ## 4. Current Limitations
 
-- No user-visible activation control has been added yet.
-- No route-bridge JVM integration test exists yet.
+- The new activation toggle and coordinator tests are source-verified but need the hardened APK.
 - Agent reasoning/usage is persisted in Agent step records but is not rendered as a dedicated UI
   section.
 - Tools, permissions, attachments, group orchestration, automatic continuation, and production
@@ -70,12 +84,13 @@ only writer for Agent-owned user/output messages.
 ## 5. Verification
 
 On the route implementation commit, the Agent/Kernel/Responses targeted JVM suite passed 34/34,
-and `:app:compileDebugAndroidTestKotlin` passed. Remote `development` sync and `build_dev` also
-passed for `940c85554`:
+and `:app:compileDebugAndroidTestKotlin` passed. The lifecycle hardening source compiled and the
+targeted suite plus coordinator tests passed 36/36. Remote `development` sync and `build_dev`
+passed for `940c85554` before the hardening pass:
 
 - artifact: `operit-dev-development-940c8555.apk`
 - size: `403232415`
 - SHA-256: `072b0320df37431be3d072c85c315795f60e0c65a9580be30dd81906d377a4d4`
 
-The coordinator tests pass; the bridge still needs production send-path integration coverage and a
-user-visible activation control before it can be called an MVP release candidate.
+The hardening pass needs a new APK build. It still needs device E2E verification and production
+send-path integration coverage before it can be called an MVP release candidate.
