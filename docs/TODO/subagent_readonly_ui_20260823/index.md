@@ -58,6 +58,7 @@ opencode_commit: 9d466cd8497d02db40010077201e07bd10ac33b4
 13. [`13_agent_invocation_entry_and_startup_recovery.md`](13_agent_invocation_entry_and_startup_recovery.md)：内部 Agent invocation entry 与启动恢复协调器
 14. [`14_room_repository_acceptance_and_cancellation.md`](14_room_repository_acceptance_and_cancellation.md)：真实 Repository、Room migration 与 SSE cancellation 验收覆盖
 15. [`15_agent_chat_route_bridge.md`](15_agent_chat_route_bridge.md)：per-chat Agent activation、发送路由和 transient UI bridge
+16. [`16_toolpkg_agent_profile_registry.md`](16_toolpkg_agent_profile_registry.md)：ToolPkg Agent profile capture、codec、registry 和 host bridge
 
 上一轮接口的移植记录仍保留在 [`chat_view_slot_plugin`](../chat_view_slot_plugin/index.md)。
 
