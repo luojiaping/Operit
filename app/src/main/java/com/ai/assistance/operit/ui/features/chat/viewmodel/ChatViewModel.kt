@@ -1487,6 +1487,28 @@ class ChatViewModel(private val context: Context) : ViewModel() {
         )
     }
 
+    fun activateAgentForChat(chatId: String) {
+        viewModelScope.launch {
+            try {
+                mainChatCore.activateAgentForChat(chatId)
+            } catch (error: Throwable) {
+                AppLogger.e(TAG, "激活 Agent 对话失败", error)
+                uiStateDelegate.showErrorMessage(error.message ?: "Agent activation failed")
+            }
+        }
+    }
+
+    fun deactivateAgentForChat(chatId: String) {
+        viewModelScope.launch {
+            try {
+                mainChatCore.deactivateAgentForChat(chatId)
+            } catch (error: Throwable) {
+                AppLogger.e(TAG, "停用 Agent 对话失败", error)
+                uiStateDelegate.showErrorMessage(error.message ?: "Agent deactivation failed")
+            }
+        }
+    }
+
     fun enqueuePendingQueueMessage(chatId: String, text: String, isQueueBlocked: Boolean) {
         pendingMessageQueueStore.enqueue(chatId, text, isQueueBlocked)
     }
@@ -1649,6 +1671,7 @@ class ChatViewModel(private val context: Context) : ViewModel() {
     fun cancelMessage(chatId: String) {
         if (::messageCoordinationDelegate.isInitialized) {
             messageCoordinationDelegate.cancelSummaryForChat(chatId)
+            messageCoordinationDelegate.cancelAgentMessage(chatId)
         }
         messageProcessingDelegate.cancelMessage(chatId)
     }

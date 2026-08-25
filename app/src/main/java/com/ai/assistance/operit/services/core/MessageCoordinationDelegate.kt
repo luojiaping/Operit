@@ -5,6 +5,8 @@ import com.ai.assistance.operit.R
 import com.ai.assistance.operit.util.AppLogger
 import com.ai.assistance.operit.api.chat.EnhancedAIService
 import com.ai.assistance.operit.core.chat.AIMessageManager
+import com.ai.assistance.operit.core.agent.routing.AgentRoute
+import com.ai.assistance.operit.core.agent.runtime.AgentInvocationRequest
 import com.ai.assistance.operit.core.chat.hooks.PromptTurn
 import com.ai.assistance.operit.core.chat.hooks.PromptTurnKind
 import com.ai.assistance.operit.core.config.FunctionalPrompts
@@ -105,7 +107,16 @@ class MessageCoordinationDelegate(
     private val characterGroupCardManager = CharacterGroupCardManager.getInstance(context)
     private val activePromptManager = ActivePromptManager.getInstance(context)
     private val displayPreferencesManager = DisplayPreferencesManager.getInstance(context)
+    private val functionalConfigManager = FunctionalConfigManager(context)
     private val plannerServiceManager = MultiServiceManager(context)
+    private val agentChatTurnCoordinator by lazy {
+        AgentChatTurnCoordinator.create(
+            context = context,
+            coroutineScope = coroutineScope,
+            chatHistoryDelegate = chatHistoryDelegate,
+            messageProcessingDelegate = messageProcessingDelegate,
+        )
+    }
     private data class PendingAutoContinuationRequest(
         val chatId: String,
         val promptFunctionType: PromptFunctionType,
@@ -376,18 +387,30 @@ class MessageCoordinationDelegate(
             }
         } else {
             // 已有对话，直接发送消息
-            sendMessageInternal(
-                promptFunctionType,
-                roleCardIdOverride = roleCardIdOverride,
-                preferActiveRoleCard = preferActiveRoleCard,
-                chatIdOverride = chatIdOverride,
-                messageTextOverride = messageTextOverride,
-                proxySenderNameOverride = proxySenderNameOverride,
-                chatModelConfigIdOverride = chatModelConfigIdOverride,
-                chatModelIndexOverride = chatModelIndexOverride,
-                turnOptions = turnOptions
-            )
+            coroutineScope.launch {
+                sendMessageInternal(
+                    promptFunctionType,
+                    roleCardIdOverride = roleCardIdOverride,
+                    preferActiveRoleCard = preferActiveRoleCard,
+                    chatIdOverride = chatIdOverride,
+                    messageTextOverride = messageTextOverride,
+                    proxySenderNameOverride = proxySenderNameOverride,
+                    chatModelConfigIdOverride = chatModelConfigIdOverride,
+                    chatModelIndexOverride = chatModelIndexOverride,
+                    turnOptions = turnOptions
+                )
+            }
         }
+    }
+
+    suspend fun activateAgentForChat(chatId: String) =
+        agentChatTurnCoordinator.activateAgentForChat(chatId)
+
+    suspend fun deactivateAgentForChat(chatId: String) =
+        agentChatTurnCoordinator.deactivateAgentForChat(chatId)
+
+    fun cancelAgentMessage(chatId: String) {
+        agentChatTurnCoordinator.cancel(chatId)
     }
 
     suspend fun regenerateSingleAiMessage(index: Int) {
@@ -514,7 +537,96 @@ class MessageCoordinationDelegate(
     /**
      * 内部发送消息的逻辑
      */
-    private fun sendMessageInternal(
+    private suspend fun dispatchAgentTurn(
+        chatId: String,
+        promptFunctionType: PromptFunctionType,
+        isContinuation: Boolean,
+        isAutoContinuation: Boolean,
+        roleCardIdOverride: String?,
+        preferActiveRoleCard: Boolean,
+        messageTextOverride: String?,
+        proxySenderNameOverride: String?,
+        chatModelConfigIdOverride: String?,
+        chatModelIndexOverride: Int?,
+        isGroupOrchestrationTurn: Boolean,
+        turnOptions: ChatTurnOptions,
+    ) {
+        val unsupportedTurn =
+            when {
+                promptFunctionType != PromptFunctionType.CHAT ->
+                    "Agent route supports chat turns only"
+                isContinuation || isAutoContinuation ->
+                    "Agent route does not support automatic continuation yet"
+                isGroupOrchestrationTurn ->
+                    "Agent route does not support group orchestration"
+                !turnOptions.persistTurn ->
+                    "Agent route requires persisted turns"
+                turnOptions.hideUserMessage ->
+                    "Agent route does not support hidden user messages"
+                !proxySenderNameOverride.isNullOrBlank() ->
+                    "Agent route does not support proxy senders"
+                attachmentDelegate.attachments.value.isNotEmpty() ->
+                    "Agent route supports text messages without attachments only"
+                else -> null
+            }
+        if (unsupportedTurn != null) {
+            messageProcessingDelegate.setInputProcessingStateForChat(
+                chatId,
+                InputProcessingState.Error(unsupportedTurn),
+            )
+            return
+        }
+
+        val userText = (messageTextOverride ?: messageProcessingDelegate.userMessage.value.text).trim()
+        if (userText.isBlank()) {
+            messageProcessingDelegate.setInputProcessingStateForChat(
+                chatId,
+                InputProcessingState.Error("Agent user text must not be blank"),
+            )
+            return
+        }
+
+        val roleCardId = resolveRoleCardId(
+            chatId = chatId,
+            roleCardId = roleCardIdOverride,
+            preferActiveRoleCard = preferActiveRoleCard,
+        )
+        val roleCardModelOverride = resolveRoleCardChatModelOverrides(roleCardId)
+        val modelMapping =
+            when {
+                !chatModelConfigIdOverride.isNullOrBlank() ->
+                    FunctionConfigMapping(
+                        configId = chatModelConfigIdOverride,
+                        modelIndex = (chatModelIndexOverride ?: 0).coerceAtLeast(0),
+                    )
+                !roleCardModelOverride.first.isNullOrBlank() ->
+                    FunctionConfigMapping(
+                        configId = requireNotNull(roleCardModelOverride.first),
+                        modelIndex = (roleCardModelOverride.second ?: 0).coerceAtLeast(0),
+                    )
+                else -> functionalConfigManager.getConfigMappingForFunction(FunctionType.CHAT)
+            }
+        val request =
+            AgentInvocationRequest(
+                chatId = chatId,
+                userText = userText,
+                modelConfigId = modelMapping.configId,
+                modelIndex = modelMapping.modelIndex,
+                promptSnapshot = AgentChatTurnCoordinator.TEXT_ONLY_SYSTEM_PROMPT,
+                permissionSnapshotJson = "[]",
+                toolSnapshotJson = "[]",
+            )
+        if (agentChatTurnCoordinator.start(request)) {
+            messageProcessingDelegate.clearUserMessageDraftForChat(chatId)
+        } else {
+            messageProcessingDelegate.setInputProcessingStateForChat(
+                chatId,
+                InputProcessingState.Error("Agent chat is already processing"),
+            )
+        }
+    }
+
+    private suspend fun sendMessageInternal(
         promptFunctionType: PromptFunctionType,
         isContinuation: Boolean = false,
         skipSummaryCheck: Boolean = false,
@@ -551,6 +663,31 @@ class MessageCoordinationDelegate(
         }
         if (!isAutoContinuation) {
             cancelPendingAutoContinuation(chatId, restoreIdleIfPendingState = false)
+        }
+        val route =
+            try {
+                agentChatTurnCoordinator.resolveRoute(chatId)
+            } catch (error: Throwable) {
+                AppLogger.e(TAG, "解析 Agent 路由失败: chatId=$chatId", error)
+                uiStateDelegate.showErrorMessage(error.message ?: "Agent route resolution failed")
+                return
+            }
+        if (route is AgentRoute.Plugin) {
+            dispatchAgentTurn(
+                chatId = chatId,
+                promptFunctionType = promptFunctionType,
+                isContinuation = isContinuation,
+                isAutoContinuation = isAutoContinuation,
+                roleCardIdOverride = roleCardIdOverride,
+                preferActiveRoleCard = preferActiveRoleCard,
+                messageTextOverride = messageTextOverride,
+                proxySenderNameOverride = proxySenderNameOverride,
+                chatModelConfigIdOverride = chatModelConfigIdOverride,
+                chatModelIndexOverride = chatModelIndexOverride,
+                isGroupOrchestrationTurn = isGroupOrchestrationTurn,
+                turnOptions = turnOptions,
+            )
+            return
         }
         if (
             turnOptions.persistTurn &&

@@ -306,6 +306,40 @@ class MessageProcessingDelegate(
         setChatInputProcessingState(chatId, state)
     }
 
+    fun beginExternalAgentTurn(chatId: String): Boolean {
+        val runtime = runtimeFor(chatId)
+        if (runtime.isLoading.value) {
+            return false
+        }
+        runtime.isLoading.value = true
+        updateGlobalLoadingState()
+        setChatInputProcessingState(
+            chatId,
+            EnhancedInputProcessingState.Processing("Agent"),
+        )
+        return true
+    }
+
+    fun finishExternalAgentTurn(
+        chatId: String,
+        state: EnhancedInputProcessingState,
+    ) {
+        val runtime = runtimeFor(chatId)
+        runtime.isLoading.value = false
+        runtime.responseStream = null
+        runtime.activeStreamingTurn = null
+        updateGlobalLoadingState()
+        setChatInputProcessingState(chatId, state)
+    }
+
+    fun requestExternalScrollToBottom(chatId: String) {
+        forceEmitScrollToBottom(chatId)
+    }
+
+    fun clearUserMessageDraftForChat(chatId: String) {
+        clearUserMessageDraft(chatId)
+    }
+
     suspend fun buildUserMessageContentForGroupOrchestration(
         messageText: String,
         attachments: List<AttachmentInfo>,

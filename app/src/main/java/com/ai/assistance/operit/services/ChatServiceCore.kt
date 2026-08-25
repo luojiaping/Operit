@@ -2,6 +2,7 @@ package com.ai.assistance.operit.services
 
 import android.content.Context
 import com.ai.assistance.operit.util.AppLogger
+import com.ai.assistance.operit.core.agent.contract.AgentSessionSnapshot
 import androidx.compose.ui.text.input.TextFieldValue
 import com.ai.assistance.operit.api.chat.EnhancedAIService
 import com.ai.assistance.operit.data.model.AttachmentInfo
@@ -273,6 +274,14 @@ class ChatServiceCore(
         )
     }
 
+    suspend fun activateAgentForChat(chatId: String): AgentSessionSnapshot {
+        return messageCoordinationDelegate.activateAgentForChat(chatId)
+    }
+
+    suspend fun deactivateAgentForChat(chatId: String) {
+        messageCoordinationDelegate.deactivateAgentForChat(chatId)
+    }
+
     /** 取消当前消息 */
     fun cancelCurrentMessage() {
         // 先取消总结（如果正在进行）
@@ -280,17 +289,20 @@ class ChatServiceCore(
         // 然后取消“当前聊天”的消息处理
         val chatId = chatHistoryDelegate.currentChatId.value
         if (chatId != null) {
+            messageCoordinationDelegate.cancelAgentMessage(chatId)
             messageProcessingDelegate.cancelMessage(chatId)
         }
     }
 
     fun cancelMessage(chatId: String) {
         messageCoordinationDelegate.cancelSummaryForChat(chatId)
+        messageCoordinationDelegate.cancelAgentMessage(chatId)
         messageProcessingDelegate.cancelMessage(chatId)
     }
 
     suspend fun cancelMessageForDestructiveMutation(chatId: String) {
         messageCoordinationDelegate.cancelSummaryForDestructiveMutation(chatId)
+        messageCoordinationDelegate.cancelAgentMessage(chatId)
         messageProcessingDelegate.cancelMessageForDestructiveMutation(chatId)
     }
 
