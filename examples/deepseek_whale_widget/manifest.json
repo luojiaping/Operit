@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "toolpkg_id": "dsh-whale-widget",
-  "version": "0.1.0",
+  "version": "0.1.3",
   "main": "src/main.js",
   "display_name": {
     "zh": "DeepSeek 鲸鱼余额",

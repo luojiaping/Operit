@@ -71,10 +71,10 @@ function registerToolPkg() {
       en: "A lightweight persistent DeepSeek balance and usage overlay.",
     },
     icon: "AccountBalanceWallet",
-    widthDp: 300,
-    heightDp: 520,
+    widthDp: 140,
+    heightDp: 140,
     draggable: true,
-    resizable: true,
+    resizable: false,
     refreshIntervalMs: 60000,
     onRefresh: refreshWhaleData,
   });

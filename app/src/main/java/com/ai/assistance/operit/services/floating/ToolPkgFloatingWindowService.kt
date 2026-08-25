@@ -55,6 +55,8 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.json.JSONObject
 
+private const val TOOLPKG_FLOATING_PREFS_NAME = "toolpkg_floating_windows_v2"
+
 class ToolPkgFloatingWindowService : Service() {
     companion object {
         private const val TAG = "ToolPkgFloatingWindowService"
@@ -62,7 +64,6 @@ class ToolPkgFloatingWindowService : Service() {
         private const val CHANNEL_ID = "toolpkg_floating_window"
         private const val EXTRA_COMMAND_ID = "toolpkg_command_id"
         private const val EXTRA_COMMAND_JSON = "toolpkg_command_json"
-        private const val PREFS_NAME = "toolpkg_floating_windows"
         private const val VISIBLE_PREFIX = "visible:"
         private const val ARGS_PREFIX = "args:"
 
@@ -94,7 +95,7 @@ class ToolPkgFloatingWindowService : Service() {
 
         fun onToolPkgRuntimeChanged(context: Context, activePackageNames: Set<String>) {
             instance?.removeDisabledPackages(activePackageNames)
-            val preferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            val preferences = context.getSharedPreferences(TOOLPKG_FLOATING_PREFS_NAME, Context.MODE_PRIVATE)
             val editor = preferences.edit()
             preferences.all.keys
                 .filter { key -> key.startsWith(VISIBLE_PREFIX) }
@@ -128,7 +129,7 @@ class ToolPkgFloatingWindowService : Service() {
     override fun onCreate() {
         super.onCreate()
         instance = this
-        preferences = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        preferences = getSharedPreferences(TOOLPKG_FLOATING_PREFS_NAME, Context.MODE_PRIVATE)
         lifecycleOwner = ServiceLifecycleOwner()
         lifecycleOwner.handleLifecycleEvent(Lifecycle.Event.ON_CREATE)
         createNotificationChannel()
@@ -463,6 +464,7 @@ private class ToolPkgFloatingWindowInstance(
         lifecycleOwner.handleLifecycleEvent(Lifecycle.Event.ON_START)
         lifecycleOwner.handleLifecycleEvent(Lifecycle.Event.ON_RESUME)
         val view = ComposeView(service).apply {
+            isClickable = true
             setViewTreeLifecycleOwner(lifecycleOwner)
             setViewTreeViewModelStoreOwner(lifecycleOwner)
             setViewTreeSavedStateRegistryOwner(lifecycleOwner)
@@ -534,7 +536,7 @@ private class ToolPkgFloatingWindowInstance(
             (service.getSystemService(Context.WINDOW_SERVICE) as WindowManager)
                 .updateViewLayout(view, params)
         }
-        persistSize(params)
+        persistLayout(params)
         requestRender()
     }
 
@@ -765,19 +767,22 @@ private class ToolPkgFloatingWindowInstance(
     }
 
     private fun createLayoutParams(): WindowManager.LayoutParams {
-        val prefs = service.getSharedPreferences("toolpkg_floating_windows", Context.MODE_PRIVATE)
+        val prefs = service.getSharedPreferences(TOOLPKG_FLOATING_PREFS_NAME, Context.MODE_PRIVATE)
         val key = "${spec.packageName}:${spec.windowId}"
+        val width = dpToPx(prefs.getInt("widthDp:$key", spec.widthDp))
+        val height = dpToPx(prefs.getInt("heightDp:$key", spec.heightDp))
+        val displayMetrics = service.resources.displayMetrics
         return WindowManager.LayoutParams(
-            dpToPx(prefs.getInt("widthDp:$key", spec.widthDp)),
-            dpToPx(prefs.getInt("heightDp:$key", spec.heightDp)),
+            width,
+            height,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                 WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
-            x = prefs.getInt("x:$key", 24)
-            y = prefs.getInt("y:$key", (service.resources.displayMetrics.heightPixels * 0.35f).toInt())
+            x = prefs.getInt("x:$key", (displayMetrics.widthPixels - width).coerceAtLeast(0))
+            y = prefs.getInt("y:$key", (displayMetrics.heightPixels - height).coerceAtLeast(0))
         }
     }
 
@@ -802,32 +807,36 @@ private class ToolPkgFloatingWindowInstance(
                     spec.resizable &&
                         event.x >= viewWidth() - dpToPx(36) &&
                         event.y >= viewHeight() - dpToPx(36)
+                view.parent?.requestDisallowInterceptTouchEvent(true)
                 return false
             }
             MotionEvent.ACTION_MOVE -> {
                 val dx = event.rawX - lastTouchX
                 val dy = event.rawY - lastTouchY
                 if (resizing) {
-                    params.width = (originWidth + dx.toInt()).coerceIn(dpToPx(160), dpToPx(1200))
-                    params.height = (originHeight + dy.toInt()).coerceIn(dpToPx(160), dpToPx(1600))
+                    params.width = (originWidth + dx.toInt()).coerceIn(dpToPx(120), dpToPx(1200))
+                    params.height = (originHeight + dy.toInt()).coerceIn(dpToPx(120), dpToPx(1600))
                     updatePosition(params)
                     return true
                 }
                 if (!dragging && dx * dx + dy * dy < 64f) return false
                 dragging = true
-                params.x = originX + dx.toInt()
-                params.y = originY + dy.toInt()
+                val displayMetrics = service.resources.displayMetrics
+                params.x = (originX + dx.toInt())
+                    .coerceIn(0, (displayMetrics.widthPixels - params.width).coerceAtLeast(0))
+                params.y = (originY + dy.toInt())
+                    .coerceIn(0, (displayMetrics.heightPixels - params.height).coerceAtLeast(0))
                 updatePosition(params)
                 return true
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                 if (resizing) {
-                    persistSize(params)
+                    persistLayout(params)
                     resizing = false
                     return true
                 }
                 if (!dragging) return false
-                snapToNearestEdge(params)
+                settlePosition(params)
                 dragging = false
                 return true
             }
@@ -847,26 +856,39 @@ private class ToolPkgFloatingWindowInstance(
         }
     }
 
-    private fun snapToNearestEdge(params: WindowManager.LayoutParams) {
+    private fun settlePosition(params: WindowManager.LayoutParams) {
         val screenWidth = service.resources.displayMetrics.widthPixels
-        val targetX = if (params.x + params.width / 2 < screenWidth / 2) 0 else screenWidth - params.width
-        params.x = targetX.coerceAtLeast(0)
+        val screenHeight = service.resources.displayMetrics.heightPixels
+        val centerX = params.x + params.width / 2
+        val centerY = params.y + params.height / 2
+        params.x = when {
+            centerX < screenWidth / 4 -> 0
+            centerX > screenWidth * 3 / 4 -> (screenWidth - params.width).coerceAtLeast(0)
+            else -> params.x.coerceIn(0, (screenWidth - params.width).coerceAtLeast(0))
+        }
+        params.y = when {
+            centerY < screenHeight / 4 -> 0
+            centerY > screenHeight * 3 / 4 -> (screenHeight - params.height).coerceAtLeast(0)
+            else -> params.y.coerceIn(0, (screenHeight - params.height).coerceAtLeast(0))
+        }
         updatePosition(params)
         val key = "${spec.packageName}:${spec.windowId}"
-        service.getSharedPreferences("toolpkg_floating_windows", Context.MODE_PRIVATE)
+        service.getSharedPreferences(TOOLPKG_FLOATING_PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
             .putInt("x:$key", params.x)
             .putInt("y:$key", params.y)
             .apply()
     }
 
-    private fun persistSize(params: WindowManager.LayoutParams) {
+    private fun persistLayout(params: WindowManager.LayoutParams) {
         val density = service.resources.displayMetrics.density
         val key = "${spec.packageName}:${spec.windowId}"
-        service.getSharedPreferences("toolpkg_floating_windows", Context.MODE_PRIVATE)
+        service.getSharedPreferences(TOOLPKG_FLOATING_PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
             .putInt("widthDp:$key", (params.width / density).toInt())
             .putInt("heightDp:$key", (params.height / density).toInt())
+            .putInt("x:$key", params.x)
+            .putInt("y:$key", params.y)
             .apply()
     }
 
