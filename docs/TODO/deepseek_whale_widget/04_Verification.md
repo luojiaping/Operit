@@ -1,6 +1,6 @@
 ---
 title: 验证与交付
-status: in_progress
+status: complete
 ---
 
 # 验证与交付
@@ -18,7 +18,7 @@ status: in_progress
 - `file examples/deepseek_whale_widget/resources/whale.png` 确认为 610x610 RGBA PNG
 - `git diff --check` 通过
 - 独立仓库 `sh scripts/build.sh`、`sh scripts/pack.sh` 和 `.toolpkg` ZIP 校验通过
-- 远程 `assembleRelease` 构建通过，目标提交 `29f07e491`
-- Release APK SHA-256：`2e7299d5e999dbe243eb0f000b47ea53c389d4075eb707cce228e37673eed400`
-- ToolPkg `v0.1.3` SHA-256：`039d37ac0d8d9601b8c938afdd12c50125b1fd6969e9b75d552b17aa370aaea4`
-- 待完成：`v0.1.4` 音效资源、Slider、透明度和可选吸附静态校验
+- 远程 `assembleRelease` 构建通过，目标提交 `4da5364b0`
+- Release APK SHA-256：`7d3796331f7de2d14cc81fa73f3b41fb9d9606a8103eca56044764c910065cb4`
+- ToolPkg `v0.1.4` SHA-256：`bd76ed16677a7830238b5129b85bcc682e5f02d87a88ae44ea9f0faf2044b57b`
+- `v0.1.4` manifest、音效、GIF、Slider 和 `src/dist` 同步校验通过
