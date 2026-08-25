@@ -1,9 +1,10 @@
 ---
 fork: https://github.com/luojiaping/Operit.git
 scope: per-chat Agent activation, pre-Legacy route dispatch, and transient turn bridge
-status: build_verified_pending_route_ui_tests
+status: build_verified_route_coordinator_pending_ui
 implementation_commit: 286c41c04
 build_commit: 940c85554
+route_test_commit: 4e70c2077
 ---
 
 # Agent Chat Route Bridge
@@ -76,5 +77,5 @@ passed for `940c85554`:
 - size: `403232415`
 - SHA-256: `072b0320df37431be3d072c85c315795f60e0c65a9580be30dd81906d377a4d4`
 
-The route bridge still needs route-specific integration tests and a user-visible activation
-control before it can be called an MVP release candidate.
+The coordinator tests pass; the bridge still needs production send-path integration coverage and a
+user-visible activation control before it can be called an MVP release candidate.

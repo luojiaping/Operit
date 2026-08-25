@@ -239,6 +239,9 @@ The Stage 15 route bridge build passed after sync to `940c85554`:
 - size: `403232415`
 - SHA-256: `072b0320df37431be3d072c85c315795f60e0c65a9580be30dd81906d377a4d4`
 
+Route coordinator JVM coverage was added after the build and passed on test commit `4e70c2077`:
+2 tests executed, 2 passed, 0 failures, 0 errors.
+
 The temporary worktree was removed after the report was collected.
 
 ## 7. Remaining Gates
