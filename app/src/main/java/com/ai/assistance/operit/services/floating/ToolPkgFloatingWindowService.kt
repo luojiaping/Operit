@@ -424,6 +424,41 @@ private data class FloatingWindowSpec(
     }
 }
 
+private enum class FloatingWindowTouchResult {
+    Pass,
+    DragStarted,
+    Dragging,
+    Finished
+}
+
+private class ToolPkgFloatingWindowComposeView(
+    context: Context,
+    private val touchHandler: (View, MotionEvent) -> FloatingWindowTouchResult
+) : ComposeView(context) {
+    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+        val result = touchHandler(this, event)
+        return when (result) {
+            FloatingWindowTouchResult.DragStarted -> {
+                cancelComposeGesture(event)
+                true
+            }
+            FloatingWindowTouchResult.Dragging,
+            FloatingWindowTouchResult.Finished -> true
+            FloatingWindowTouchResult.Pass -> {
+                val dispatched = super.dispatchTouchEvent(event)
+                if (event.actionMasked == MotionEvent.ACTION_DOWN) true else dispatched
+            }
+        }
+    }
+
+    private fun cancelComposeGesture(event: MotionEvent) {
+        val cancelEvent = MotionEvent.obtain(event)
+        cancelEvent.action = MotionEvent.ACTION_CANCEL
+        super.dispatchTouchEvent(cancelEvent)
+        cancelEvent.recycle()
+    }
+}
+
 private class ToolPkgFloatingWindowInstance(
     private val service: ToolPkgFloatingWindowService,
     private val spec: FloatingWindowSpec,
@@ -463,12 +498,13 @@ private class ToolPkgFloatingWindowInstance(
         lifecycleOwner.handleLifecycleEvent(Lifecycle.Event.ON_CREATE)
         lifecycleOwner.handleLifecycleEvent(Lifecycle.Event.ON_START)
         lifecycleOwner.handleLifecycleEvent(Lifecycle.Event.ON_RESUME)
-        val view = ComposeView(service).apply {
+        val view = ToolPkgFloatingWindowComposeView(service) { target, event ->
+            handleTouch(target, event)
+        }.apply {
             isClickable = true
             setViewTreeLifecycleOwner(lifecycleOwner)
             setViewTreeViewModelStoreOwner(lifecycleOwner)
             setViewTreeSavedStateRegistryOwner(lifecycleOwner)
-            setOnTouchListener(::handleTouch)
             setContent {
                 MaterialTheme {
                     val result = renderState.value
@@ -791,9 +827,9 @@ private class ToolPkgFloatingWindowInstance(
     }
 
     @Suppress("UNUSED_PARAMETER")
-    private fun handleTouch(view: View, event: MotionEvent): Boolean {
-        if (!spec.draggable || disposed) return false
-        val params = layoutParams ?: return false
+    private fun handleTouch(view: View, event: MotionEvent): FloatingWindowTouchResult {
+        if (!spec.draggable || disposed) return FloatingWindowTouchResult.Pass
+        val params = layoutParams ?: return FloatingWindowTouchResult.Pass
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 lastTouchX = event.rawX
@@ -807,19 +843,27 @@ private class ToolPkgFloatingWindowInstance(
                     spec.resizable &&
                         event.x >= viewWidth() - dpToPx(36) &&
                         event.y >= viewHeight() - dpToPx(36)
-                view.parent?.requestDisallowInterceptTouchEvent(true)
-                return false
+                return FloatingWindowTouchResult.Pass
             }
             MotionEvent.ACTION_MOVE -> {
                 val dx = event.rawX - lastTouchX
                 val dy = event.rawY - lastTouchY
                 if (resizing) {
+                    val wasDragging = dragging
                     params.width = (originWidth + dx.toInt()).coerceIn(dpToPx(120), dpToPx(1200))
                     params.height = (originHeight + dy.toInt()).coerceIn(dpToPx(120), dpToPx(1600))
                     updatePosition(params)
-                    return true
+                    dragging = true
+                    return if (wasDragging) {
+                        FloatingWindowTouchResult.Dragging
+                    } else {
+                        FloatingWindowTouchResult.DragStarted
+                    }
                 }
-                if (!dragging && dx * dx + dy * dy < 64f) return false
+                val wasDragging = dragging
+                if (!wasDragging && dx * dx + dy * dy < 64f) {
+                    return FloatingWindowTouchResult.Pass
+                }
                 dragging = true
                 val displayMetrics = service.resources.displayMetrics
                 params.x = (originX + dx.toInt())
@@ -827,21 +871,25 @@ private class ToolPkgFloatingWindowInstance(
                 params.y = (originY + dy.toInt())
                     .coerceIn(0, (displayMetrics.heightPixels - params.height).coerceAtLeast(0))
                 updatePosition(params)
-                return true
+                return if (wasDragging) {
+                    FloatingWindowTouchResult.Dragging
+                } else {
+                    FloatingWindowTouchResult.DragStarted
+                }
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                 if (resizing) {
                     persistLayout(params)
                     resizing = false
-                    return true
+                    return FloatingWindowTouchResult.Finished
                 }
-                if (!dragging) return false
+                if (!dragging) return FloatingWindowTouchResult.Pass
                 settlePosition(params)
                 dragging = false
-                return true
+                return FloatingWindowTouchResult.Finished
             }
         }
-        return false
+        return FloatingWindowTouchResult.Pass
     }
 
     private fun updatePosition(params: WindowManager.LayoutParams) {
