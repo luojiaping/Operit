@@ -366,7 +366,7 @@ internal object ToolPkgMainRegistrationScriptParser {
             }
             val widthDp = item.optInt("widthDp", 320)
             val heightDp = item.optInt("heightDp", 420)
-            if (widthDp !in 160..1200 || heightDp !in 160..1600) {
+            if (widthDp !in 120..1200 || heightDp !in 120..1600) {
                 throw IllegalArgumentException(
                     "$TOOLPKG_REGISTRATION_FLOATING_WINDOW[$index] size is outside supported bounds"
                 )

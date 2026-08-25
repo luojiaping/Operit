@@ -1,7 +1,7 @@
 ---
 title: DeepSeek Whale Overlay ToolPkg
 fork: https://github.com/tuxKOH/Operit
-status: complete
+status: in_progress
 ---
 
 # DeepSeek Whale Overlay ToolPkg
@@ -16,7 +16,7 @@ Operit 当前已经支持 ToolPkg 页面和消息 Hook，但没有通用的长�
 
 - 新增版本化的 ToolPkg 宿主桥接，不修改现有 ToolPkg API
 - 宿主持有凭据并执行 DeepSeek 网络请求，沙盒只接收能力受限 DTO
-- 新增 `dsh-whale-widget` ToolPkg，提供设置页、余额页和长期驻留悬浮窗
+- 新增 `dsh-whale-widget` ToolPkg，提供设置页、余额页和小尺寸气泡悬浮窗
 - 插件启停状态控制页面和悬浮窗的有效显示状态
 - 复用现有 Token usage、价格和配置服务，不改变现有 Room 数据结构
 
@@ -40,7 +40,8 @@ Operit 当前已经支持 ToolPkg 页面和消息 Hook，但没有通用的长�
 - 新增 DeepSeek 余额、平台用量、Token 统计、加密平台凭据和余额快照服务
 - 新增 `examples/deepseek_whale_widget` 包及 Whale PNG 资源
 - 插件禁用后，已显示的悬浮窗立即移除，不再执行已禁用包的 renderer；显式显示状态支持进程回收恢复
+- 悬浮窗采用新的方形鲸鱼布局，拖动中跟手，中央位置保持自由定位，边缘区域按释放位置吸附
 - 删除了上一轮临时 DesktopWidget 注册、Glance 宿主、配置 Activity 和示例
 - 独立公开仓库：[luojiaping/operit-deepseek-whale-widget](https://github.com/luojiaping/operit-deepseek-whale-widget)
-- 发布包：[v0.1.2](https://github.com/luojiaping/operit-deepseek-whale-widget/releases/tag/v0.1.2)
+- 发布包更新为 `v0.1.3`，包含小尺寸气泡悬浮窗
 - `jq`、`file`、`git diff --check` 和 `.toolpkg` ZIP 校验已通过；环境没有 `node`，未执行 JavaScript 语法检查
