@@ -1,7 +1,7 @@
 ---
 title: DeepSeek Whale Overlay ToolPkg
 fork: https://github.com/tuxKOH/Operit
-status: complete
+status: in_progress
 ---
 
 # DeepSeek Whale Overlay ToolPkg
@@ -43,6 +43,7 @@ Operit 当前已经支持 ToolPkg 页面和消息 Hook，但没有通用的长�
 - 悬浮窗采用新的方形鲸鱼布局，拖动中跟手，中央位置保持自由定位，边缘区域按释放位置吸附
 - 删除了上一轮临时 DesktopWidget 注册、Glance 宿主、配置 Activity 和示例
 - 独立公开仓库：[luojiaping/operit-deepseek-whale-widget](https://github.com/luojiaping/operit-deepseek-whale-widget)
-- 发布包更新为 [`v0.1.3`](https://github.com/luojiaping/operit-deepseek-whale-widget/releases/tag/v0.1.3)，包含小尺寸气泡悬浮窗
+- 发布包更新为 [`v0.1.4`](https://github.com/luojiaping/operit-deepseek-whale-widget/releases/tag/v0.1.4)，包含侧边栏浮窗设置、可选边缘吸附、音效和居中气泡排版
 - 宿主 Release 构建提交为 `29f07e491`，远程构建通过
+- 本轮新增通用浮窗 `get()`、`snapMode`、透明度、声音反馈和 `Slider` 设置控件，待完成打包验证
 - `jq`、`file`、`git diff --check` 和 `.toolpkg` ZIP 校验已通过；环境没有 `node`，未执行 JavaScript 语法检查

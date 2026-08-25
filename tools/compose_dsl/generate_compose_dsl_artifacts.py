@@ -51,6 +51,7 @@ COMPONENTS: Tuple[ComponentSpec, ...] = (
     ComponentSpec("Icon", "material3", "androidx.compose.material3", "Icon", ("imageVector", "contentDescription", "modifier", "tint")),
     ComponentSpec("LinearProgressIndicator", "material3", "androidx.compose.material3", "LinearProgressIndicator", ("progress", "modifier", "color")),
     ComponentSpec("CircularProgressIndicator", "material3", "androidx.compose.material3", "CircularProgressIndicator", ("modifier", "strokeWidth", "color")),
+    ComponentSpec("Slider", "material3", "androidx.compose.material3", "Slider", ("value", "onValueChange", "modifier", "enabled", "valueRange", "steps", "onValueChangeFinished")),
     ComponentSpec("SnackbarHost", "material3", "androidx.compose.material3", "SnackbarHost", ("hostState", "modifier", "snackbar")),
 )
 
@@ -797,6 +798,7 @@ RENDERER_REQUIRED_PARAMS: Dict[str, Tuple[str, ...]] = {
     "Icon": ("imageVector", "modifier"),
     "LinearProgressIndicator": ("modifier",),
     "CircularProgressIndicator": ("modifier",),
+    "Slider": ("value", "onValueChange", "modifier", "enabled"),
     "SnackbarHost": ("modifier",),
 }
 
@@ -1457,6 +1459,42 @@ def build_component_renderer_function(spec: ComponentSpec, params: Sequence[Para
                     modifier = applyScopedCommonModifier(Modifier, props, modifierResolver),
                     strokeWidth = if (strokeWidth != null) strokeWidth.dp else 4.dp,
                     color = color ?: MaterialTheme.colorScheme.primary
+                )
+            }
+            """
+        ).strip()
+
+    if component == "Slider":
+        return textwrap.dedent(
+            """
+            @Composable
+            internal fun renderSliderNode(
+                node: ToolPkgComposeDslNode,
+                onAction: (String, Any?) -> Unit,
+                nodePath: String,
+                modifierResolver: ComposeDslModifierResolver
+            ) {
+                val props = node.props
+                val onValueChangeActionId = ToolPkgComposeDslParser.extractActionId(props["onValueChange"])
+                val onValueChangeFinishedActionId =
+                    ToolPkgComposeDslParser.extractActionId(props["onValueChangeFinished"])
+                Slider(
+                    value = (props.floatOrNull("value") ?: 0f).coerceIn(0f, 1f),
+                    onValueChange = { value ->
+                        if (!onValueChangeActionId.isNullOrBlank()) {
+                            onAction(onValueChangeActionId, value.toDouble())
+                        }
+                    },
+                    modifier = applyScopedCommonModifier(Modifier, props, modifierResolver),
+                    enabled = props.bool("enabled", true),
+                    valueRange = 0f..1f,
+                    steps = props.int("steps", 0),
+                    onValueChangeFinished =
+                        if (onValueChangeFinishedActionId.isNullOrBlank()) {
+                            null
+                        } else {
+                            { onAction(onValueChangeFinishedActionId, null) }
+                        }
                 )
             }
             """

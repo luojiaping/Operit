@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "toolpkg_id": "dsh-whale-widget",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "main": "src/main.js",
   "display_name": {
     "zh": "DeepSeek 鲸鱼余额",
@@ -30,6 +30,31 @@
       "key": "whale_image",
       "path": "resources/whale.png",
       "mime": "image/png"
+    },
+    {
+      "key": "sound_duck_press",
+      "path": "resources/Ya1.mp3",
+      "mime": "audio/mpeg"
+    },
+    {
+      "key": "sound_duck_release",
+      "path": "resources/Ya2.mp3",
+      "mime": "audio/mpeg"
+    },
+    {
+      "key": "sound_fx_press",
+      "path": "resources/D1.mp3",
+      "mime": "audio/mpeg"
+    },
+    {
+      "key": "sound_fx_release",
+      "path": "resources/D2.mp3",
+      "mime": "audio/mpeg"
+    },
+    {
+      "key": "whale_gif",
+      "path": "resources/rua.gif",
+      "mime": "image/gif"
     }
   ],
   "workflow_templates": [],

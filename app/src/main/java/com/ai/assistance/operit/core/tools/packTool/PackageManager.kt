@@ -243,6 +243,9 @@ private constructor(private val context: Context, private val aiToolHandler: AIT
         val heightDp: Int,
         val draggable: Boolean,
         val resizable: Boolean,
+        val snapMode: String,
+        val pressSoundResource: String?,
+        val releaseSoundResource: String?,
         val refreshIntervalMs: Long,
         val refreshFunction: String?,
         val refreshFunctionSource: String?

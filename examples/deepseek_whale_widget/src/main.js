@@ -75,6 +75,9 @@ function registerToolPkg() {
     heightDp: 140,
     draggable: true,
     resizable: false,
+    snapMode: "quarter",
+    pressSoundResource: "sound_duck_press",
+    releaseSoundResource: "sound_duck_release",
     refreshIntervalMs: 60000,
     onRefresh: refreshWhaleData,
   });

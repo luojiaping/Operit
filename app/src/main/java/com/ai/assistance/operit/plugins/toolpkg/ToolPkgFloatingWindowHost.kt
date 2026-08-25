@@ -19,7 +19,7 @@ internal object ToolPkgFloatingWindowHost {
     private fun handle(request: ToolPkgHostBridge.Request): JSONObject {
         val operation = request.payload.optString("operation").trim().lowercase()
         val windowId = request.payload.optString("windowId").trim()
-        require(operation == "show" || operation == "hide" || operation == "update") {
+        require(operation == "show" || operation == "hide" || operation == "update" || operation == "get") {
             "Unsupported floating window operation: $operation"
         }
         require(windowId.isNotBlank()) { "Floating window id is required" }
@@ -44,7 +44,12 @@ internal object ToolPkgFloatingWindowHost {
         request.payload.optJSONObject("patch")?.let { patch ->
             command.put("patch", patch)
         }
-        val result = ToolPkgFloatingWindowService.dispatch(request.context, command)
+        val result =
+            if (operation == "get") {
+                ToolPkgFloatingWindowService.getPersistedState(request.context, command)
+            } else {
+                ToolPkgFloatingWindowService.dispatch(request.context, command)
+            }
         if (result.optString("status").equals("error", ignoreCase = true)) {
             throw IllegalStateException(
                 result.optString("errorMessage").trim().ifBlank {
@@ -67,6 +72,9 @@ internal object ToolPkgFloatingWindowHost {
             .put("heightDp", window.heightDp)
             .put("draggable", window.draggable)
             .put("resizable", window.resizable)
+            .put("snapMode", window.snapMode)
+            .put("pressSoundResource", window.pressSoundResource ?: JSONObject.NULL)
+            .put("releaseSoundResource", window.releaseSoundResource ?: JSONObject.NULL)
             .put("refreshIntervalMs", window.refreshIntervalMs)
             .put("refreshFunction", window.refreshFunction ?: JSONObject.NULL)
             .put("refreshFunctionSource", window.refreshFunctionSource ?: JSONObject.NULL)

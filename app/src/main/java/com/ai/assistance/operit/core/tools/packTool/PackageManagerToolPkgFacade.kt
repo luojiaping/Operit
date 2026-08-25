@@ -171,6 +171,9 @@ internal class PackageManagerToolPkgFacade(
                 heightDp = window.heightDp,
                 draggable = window.draggable,
                 resizable = window.resizable,
+                snapMode = window.snapMode,
+                pressSoundResource = window.pressSoundResource,
+                releaseSoundResource = window.releaseSoundResource,
                 refreshIntervalMs = window.refreshIntervalMs,
                 refreshFunction = window.refreshFunction,
                 refreshFunctionSource = window.refreshFunctionSource
