@@ -2,7 +2,7 @@
 fork: https://github.com/luojiaping/Operit.git
 scope: context compression recovery summary for Agent stages
 status: active
-current_commit: 73b99d052
+current_commit: 286c41c04
 ---
 
 # Agent Workstream Stage Summary
@@ -14,7 +14,7 @@ Agent, Room, provider, ToolPkg, ChatView, or Legacy chat code. Stage 13 is imple
 ## 1. Current Repository State
 
 - Branch: `development`
-- functional implementation commit: `73b99d052`
+- functional implementation commit: `286c41c04`
 - build commit: `2ff742ae9`
 - latest documentation/schema commit: `11a9a650a`
 - Previous related commits:
@@ -239,8 +239,9 @@ The temporary worktree was removed after the report was collected.
 
 Before production Agent routing:
 
-1. Run Android migration and Repository instrumentation when an adb device is available.
-2. Only after those gates, connect `AgentRouter` before group orchestration and role-card parsing.
+1. Add route-bridge tests and a user-visible per-chat Agent activation control.
+2. Run Android migration and Repository instrumentation when an adb device is available.
+3. Only after those gates, add tools/permissions and expand production Agent routing.
 
 Do not implement ToolPkg Agent registration, permissions, tool materialization, Plan/Build UI, or
 production MessageCoordinationDelegate routing in the next small change unless the corresponding
