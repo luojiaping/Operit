@@ -8,17 +8,15 @@ current_commit: 30ec55b62
 # Agent Workstream Stage Summary
 
 This document is the recovery entry point after context compression. Read it before changing
-Agent, Room, provider, ToolPkg, ChatView, or Legacy chat code. Stage 13 is implemented in commit
-`d87481a78` after `3615e37c0`.
+Agent, Room, provider, ToolPkg, ChatView, or Legacy chat code. Stages 13-16 are implemented
+through `30ec55b62`; the latest APK predates Stage 16.
 
 ## 1. Current Repository State
 
 - Branch: `development`
 - functional implementation commit: `6a6472bd1`
-- latest test commit: `30ec55b62`
+- latest test/documentation commit: `30ec55b62`
 - build commit: `940c85554`
-- latest implementation commit: `6a6472bd1`
-- latest test commit: `30ec55b62`
 - Previous related commits:
   - `30d6c0124`: Chat View Slot baseline
   - `c295a4d28`: Room identity repair and Agent foundation persistence
@@ -27,7 +25,8 @@ Agent, Room, provider, ToolPkg, ChatView, or Legacy chat code. Stage 13 is imple
   - `3615e37c0`: official OpenAI Responses typed adapter and fixtures
 - The local worktree has one pre-existing user change outside this workstream:
   `docs/TODO/chat_view_slot_plugin/index.md`. Do not revert or include it accidentally.
-- The workstream does not modify the production sender or public ToolPkg/ChatView API.
+- Previous ToolPkg/ChatView APIs remain unchanged; Stage 16 adds a new draft Agent profile
+  registration API.
 
 ## 2. Implemented Architecture
 
@@ -47,7 +46,8 @@ OpenAI adapter
   official Responses SSE -> typed AgentModelEvent -> AgentKernel
 ```
 
-The last arrow is tested only in JVM integration code. It is not a production route.
+The OpenAI arrow is available through the host route bridge, but no ToolPkg profile can invoke an
+Agent directly yet.
 
 ## 3. Room And Persistence
 
@@ -253,6 +253,9 @@ The lifecycle hardening build passed after sync to `37152bdc7`:
 The hardened targeted JVM suite contains 36 tests, all passed on `cfead4225`. Main app compilation
 and Android test source compilation also passed.
 
+Stage 16 registry/codec/coordinator tests and ToolPkg compatibility tests passed on `30ec55b62`;
+the selected registry/capture suites were all green. No APK build has been triggered for Stage 16.
+
 The temporary worktree was removed after the report was collected.
 
 ## 7. Remaining Gates
@@ -260,7 +263,9 @@ The temporary worktree was removed after the report was collected.
 Before production Agent routing:
 
 1. Run Android migration and Repository instrumentation when an adb device is available.
-2. Only after those gates, add tools/permissions and expand production Agent routing.
+2. Add a real ToolPkg archive-to-runtime registration test.
+3. Add profile-specific model/executor resolution and direct plugin invocation.
+4. Only after those gates, add permission evaluation and typed tool execution.
 
 Do not implement ToolPkg Agent registration, permissions, tool materialization, Plan/Build UI, or
 production MessageCoordinationDelegate routing in the next small change unless the corresponding

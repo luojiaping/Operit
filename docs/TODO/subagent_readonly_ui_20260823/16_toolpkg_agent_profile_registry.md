@@ -1,7 +1,7 @@
 ---
 fork: https://github.com/luojiaping/Operit.git
 scope: ToolPkg Agent profile capture, validation, registry, and host bridge
-status: implemented_pending_tool_execution
+status: tests_verified_pending_build
 implementation_commit: 6a6472bd1
 test_commit: 30ec55b62
 ---
@@ -66,6 +66,9 @@ Executed suites on the isolated builder worktree:
 - `:app:compileDebugAndroidTestKotlin`: passed
 
 No device instrumentation was run, by explicit decision.
+
+No APK build has been triggered for this stage. The latest recorded APK predates the registry
+implementation and must not be used to claim ToolPkg Agent registration is installed.
 
 ## 4. Not Yet Implemented
 
