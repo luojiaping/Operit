@@ -250,7 +250,7 @@ class ChatViewModel(private val context: Context) : ViewModel() {
     val currentChatId: StateFlow<String?> by lazy { chatHistoryDelegate.currentChatId }
     private val _agentActiveChatIds = MutableStateFlow<Set<String>>(emptySet())
     val agentActiveChatIds: StateFlow<Set<String>> = _agentActiveChatIds.asStateFlow()
-    val currentChatAgentActive: StateFlow<Boolean> by lazy {
+    val isCurrentChatAgentActive: StateFlow<Boolean> by lazy {
         combine(currentChatId, agentActiveChatIds) { chatId, activeChatIds ->
             chatId != null && chatId in activeChatIds
         }.stateIn(
