@@ -57,6 +57,6 @@ interface FloatingWindowRegistration {
 - 媒体反馈改用 `MediaPlayer` 与 `USAGE_MEDIA`，资源每次按源文件名重新物化后异步准备
 - Compose DSL 新增 `lineHeight`，Canvas 描边支持带单位的数值
 - 插件删除 `routeArgs.scale`、逐项字体缩放和逐项内容偏移缩放，改为固定设计坐标
-- 远程 Release 编译通过，宿主提交 `1ca6480b8`
-- 测试 ToolPkg `v0.4.0-test.2` 待作为下一次测试 prerelease 上传
+- 远程 Release 编译通过，宿主提交 `88e850cfa`
+- 测试 ToolPkg `v0.4.0-test.2` 已作为 GitHub prerelease 上传
 - 待执行设备上的音频和多缩放档截图验证
