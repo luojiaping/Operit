@@ -2858,8 +2858,13 @@ private fun applySingleModifierOp(
             modifier.rotate(value)
         }
         "scale" -> {
-            val value = op.args.getOrNull(0).floatArg() ?: return modifier
-            modifier.scale(value)
+            val scaleX = op.args.getOrNull(0).floatArg() ?: return modifier
+            val scaleY = op.args.getOrNull(1).floatArg()
+            if (scaleY != null) {
+                modifier.scale(scaleX, scaleY)
+            } else {
+                modifier.scale(scaleX)
+            }
         }
         "zindex" -> {
             val value = op.args.getOrNull(0).floatArg() ?: return modifier

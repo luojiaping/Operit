@@ -30,6 +30,7 @@ Operit 当前已经支持 ToolPkg 页面和消息 Hook，但没有通用的长�
 6. [DONE: 通用浮窗反馈与跟随机制](./06_FloatingWindowV3.md)
 7. [IN_PROGRESS: 固定视口与媒体反馈重做](./07_FloatingWindowV4.md)
 8. [IN_PROGRESS: 连续点按与设置页密度优化](./08_InteractionAndSidebar.md)
+9. [IN_PROGRESS: 鲸鱼悬浮窗镜像](./09_Mirror.md)
 
 ## 执行约束
 
