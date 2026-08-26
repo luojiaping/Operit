@@ -32,3 +32,14 @@ status: in_progress
 - 气泡文字和 gif 镜像后保持可读
 - `src` 和 `dist` 内容一致
 - 待执行设备上的镜像截图验证
+
+## 实现记录
+
+- 宿主浮窗状态新增 `widthPx`、`heightPx`、`screenWidthPx`、`screenHeightPx`
+- 拖拽松手、吸附落位和尺寸调整结束后宿主重渲染窗口及其跟随窗口
+- Compose DSL `Modifier.scale` 支持 `scale(scaleX, scaleY)` 水平镜像
+- 插件使用 `DEEPSEEK_WHALE_MIRROR_MODE`（`auto` / `on` / `off`）控制镜像，
+  鲸鱼窗口根节点翻转，气泡文字和 gif 反向翻回保持可读
+- 宿主提交 `014d8d3b7` 已通过远程 Release 编译
+- 插件测试包 [`v0.4.0-test.3`](https://github.com/luojiaping/operit-deepseek-whale-widget/releases/tag/v0.4.0-test.3) 已上传
+- 待执行设备上的镜像截图验证
