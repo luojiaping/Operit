@@ -60,4 +60,6 @@ Hook 返回值支持：
 - `toolpkg_hook_runner.js` 已支持 `input_slot` 重放
 - `examples/input_slot_demo` 已提供文本和 Compose DSL 示例
 - 文档已接入 `package-dev/toolpkg.md` 和 `TOOLPKG_FORMAT_GUIDE.md`
-- 待完成：静态检查、远程构建和设备验证
+- `git diff --check`、示例 manifest JSON 和 src/dist 一致性检查通过
+- 远程 `build_release` 已通过，宿主提交 `cd33dce5c`
+- 待完成：设备验证

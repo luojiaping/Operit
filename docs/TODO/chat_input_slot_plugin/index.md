@@ -32,9 +32,9 @@ Operit 已有聊天输入 Hook，可以监听输入和提交行为，但 ToolPkg
 
 ## 步骤
 
-1. [IN_PROGRESS: 接口、注册管线和 renderer](./01_InterfaceAndRendering.md)
-2. 待完成：Classic/Agent 输入区接入和示例包验证
-3. 待完成：文档、静态检查和设备验证
+1. [DONE: 接口、注册管线和 renderer](./01_InterfaceAndRendering.md)
+2. [DONE: Classic/Agent 输入区接入和示例包验证](./01_InterfaceAndRendering.md)
+3. [IN_PROGRESS: 文档、静态检查和设备验证](./01_InterfaceAndRendering.md)
 
 ## 约束
 
@@ -42,3 +42,12 @@ Operit 已有聊天输入 Hook，可以监听输入和提交行为，但 ToolPkg
 - capability 不属于 `required_host_capabilities`；插槽使用 ToolPkg 注册 API
 - `composeDsl.screen` 必须是当前 ToolPkg 归档内可解析的 Compose DSL screen
 - Hook 失败、超时和空返回不应破坏原有输入区
+
+## 完成记录
+
+- 宿主提交 `cd33dce5c` 已推送到 `fix/api-interface`
+- 远程 `build_release` 已通过
+- Release APK：`operit-release-fix_api-interface-cd33dce5.apk`
+- Release APK SHA-256：`b173d2beabe5649b08ba765bb7d082e1a6e5d901c08cc2bcf2e55741aaf964d4`
+- `examples/input_slot_demo` 已加入，覆盖三个 slot 和两种返回形式
+- 待设备验证三个 slot 的实际布局、输入焦点状态和 Compose DSL 交互
