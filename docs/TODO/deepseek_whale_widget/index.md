@@ -29,6 +29,7 @@ Operit 当前已经支持 ToolPkg 页面和消息 Hook，但没有通用的长�
 5. [DONE: 触控与双浮窗改造](./05_Interaction.md)
 6. [DONE: 通用浮窗反馈与跟随机制](./06_FloatingWindowV3.md)
 7. [IN_PROGRESS: 固定视口与媒体反馈重做](./07_FloatingWindowV4.md)
+8. [IN_PROGRESS: 连续点按与设置页密度优化](./08_InteractionAndSidebar.md)
 
 ## 执行约束
 
@@ -54,6 +55,6 @@ Operit 当前已经支持 ToolPkg 页面和消息 Hook，但没有通用的长�
 - 已将旧浮窗能力重做为通用 `toolpkg.floating_window.v3`，该测试接口现已废弃
 - `v0.3.0` 测试包的音频和缩放实现存在缺陷，已删除误发布的 GitHub Release 与 tag
 - 当前测试迭代重做为 `toolpkg.floating_window.v4`；旧 v3 配置、持久化和插件接口不保留
-- 当前测试包版本为 `0.4.0-test.1`，宿主仓库不重复存放鲸鱼插件资源和 UI
+- 当前测试包版本为 `0.4.0-test.2`，宿主仓库不重复存放鲸鱼插件资源和 UI
 - 宿主提交 `1ca6480b8` 已通过远程 Release 编译；插件提交 `710e4c5` 对应本地测试归档
-- 独立插件 [`v0.4.0-test.1` prerelease](https://github.com/luojiaping/operit-deepseek-whale-widget/releases/tag/v0.4.0-test.1) 已上传测试 ToolPkg
+- 独立插件 `v0.4.0-test.2` 待上传测试 ToolPkg

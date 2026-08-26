@@ -548,9 +548,9 @@ class ToolPkgFloatingWindowService : Service() {
         }
         val existing = instances[key]
         if (existing != null) {
-            existing.updateRouteArgs(routeArgs)
+            val routeArgsChanged = existing.updateRouteArgs(routeArgs)
             persistVisibility(key, true, routeArgs)
-            existing.requestRender()
+            if (routeArgsChanged) existing.requestRender()
             positionWindowFromAnchor(existing)
             return existing.state("visible")
         }
@@ -1061,6 +1061,10 @@ private class ToolPkgFloatingWindowInstance(
     private var scriptScreenPath = ""
     private var script: String? = null
     private var firstRender = true
+    private var renderJob: Job? = null
+    private var pendingForceRender = false
+    private var onLoadDispatched = false
+    private val activeClickActionIds = mutableSetOf<String>()
     private var lastTouchX = 0f
     private var lastTouchY = 0f
     private var originX = 0
@@ -1180,13 +1184,23 @@ private class ToolPkgFloatingWindowInstance(
 
     fun requestRender(forceLoad: Boolean = false) {
         if (disposed) return
-        instanceScope.launch {
-            renderInitialOrCurrent(forceLoad)
+        pendingForceRender = pendingForceRender || forceLoad
+        if (renderJob?.isActive == true) return
+        renderJob = instanceScope.launch {
+            while (isActive && !disposed) {
+                val nextForceLoad = pendingForceRender
+                pendingForceRender = false
+                renderInitialOrCurrent(nextForceLoad)
+                if (!pendingForceRender) break
+            }
+            renderJob = null
         }
     }
 
-    fun updateRouteArgs(routeArgsJson: String) {
+    fun updateRouteArgs(routeArgsJson: String): Boolean {
+        if (routeArgsJsonValue == routeArgsJson) return false
         routeArgsJsonValue = routeArgsJson
+        return true
     }
 
     fun applyPatch(patch: JSONObject) {
@@ -1257,6 +1271,9 @@ private class ToolPkgFloatingWindowInstance(
         disposed = true
         refreshJob?.cancel()
         refreshJob = null
+        pendingForceRender = false
+        renderJob?.cancel()
+        renderJob = null
         soundLoadGeneration += 1
         if (positionFrameScheduled) {
             choreographer.removeFrameCallback(positionFrameCallback)
@@ -1316,9 +1333,15 @@ private class ToolPkgFloatingWindowInstance(
     }
 
     private fun dispatchAction(actionId: String, payload: Any?) {
+        val isClickAction = payload == null
+        if (isClickAction && !activeClickActionIds.add(actionId)) return
         instanceScope.launch {
-            renderMutex.withLock {
-                renderAction(actionId, payload)
+            try {
+                renderMutex.withLock {
+                    renderAction(actionId, payload)
+                }
+            } finally {
+                if (isClickAction) activeClickActionIds.remove(actionId)
             }
         }
     }
@@ -1333,7 +1356,8 @@ private class ToolPkgFloatingWindowInstance(
             val options = buildRuntimeOptions(routeInfo, renderState.value)
             try {
                 val raw = withContext(Dispatchers.IO) {
-                    if (firstRender || forceLoad) {
+                    val shouldExecuteScript = firstRender || forceLoad
+                    if (shouldExecuteScript) {
                         firstRender = false
                         engine.executeComposeDslScript(
                             script = resolveScript(),
@@ -1345,7 +1369,12 @@ private class ToolPkgFloatingWindowInstance(
                 }
                 val parsed = ToolPkgComposeDslParser.parseRenderResult(raw)
                     ?: error("Invalid compose_dsl floating window result")
-                val finalResult = dispatchInitialLoadIfNeeded(engine, options, parsed)
+                val finalResult = if (onLoadDispatched) {
+                    parsed
+                } else {
+                    onLoadDispatched = true
+                    dispatchInitialLoadIfNeeded(engine, options, parsed)
+                }
                 withContext(Dispatchers.Main.immediate) {
                     renderError.value = null
                     renderState.value = finalResult
@@ -1914,8 +1943,8 @@ private class ToolPkgFloatingWindowInstance(
         val player = if (press) pressPlayer else releasePlayer
         if (player == null) return
         try {
+            if (player.isPlaying) return
             player.setVolume(soundVolume, soundVolume)
-            if (player.isPlaying) player.pause()
             player.seekTo(0)
             player.start()
         } catch (error: Exception) {
