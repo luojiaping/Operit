@@ -49,5 +49,8 @@ Operit 已有聊天输入 Hook，可以监听输入和提交行为，但 ToolPkg
 - 远程 `build_release` 已通过
 - Release APK：`operit-release-fix_api-interface-cd33dce5.apk`
 - Release APK SHA-256：`b173d2beabe5649b08ba765bb7d082e1a6e5d901c08cc2bcf2e55741aaf964d4`
+- 最新文档提交 `0b5f0e290` 对应的远程 `build_release` 已通过
+- 最新 Release APK：`operit-release-fix_api-interface-0b5f0e29.apk`
+- 最新 Release APK SHA-256：`046325a6d2dfb42b0787162af5b99e4472b8da65345aa23b69d9b9339455c4ac`
 - `examples/input_slot_demo` 已加入，覆盖三个 slot 和两种返回形式
 - 待设备验证三个 slot 的实际布局、输入焦点状态和 Compose DSL 交互
