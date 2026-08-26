@@ -238,6 +238,13 @@ private constructor(private val context: Context, private val aiToolHandler: AIT
         val offsetYDp: Float
     )
 
+    data class ToolPkgFloatingWindowContentLayout(
+        val mode: String,
+        val widthDp: Int,
+        val heightDp: Int,
+        val scaleMode: String
+    )
+
     data class ToolPkgFloatingWindowAnimation(
         val scaleX: Float,
         val scaleY: Float,
@@ -268,6 +275,7 @@ private constructor(private val context: Context, private val aiToolHandler: AIT
         val draggable: Boolean,
         val resizable: Boolean,
         val snapMode: String,
+        val contentLayout: ToolPkgFloatingWindowContentLayout,
         val follow: ToolPkgFloatingWindowFollow?,
         val pressFeedback: ToolPkgFloatingWindowFeedback,
         val releaseFeedback: ToolPkgFloatingWindowFeedback,

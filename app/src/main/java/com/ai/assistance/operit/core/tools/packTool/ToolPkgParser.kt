@@ -82,6 +82,13 @@ internal data class ToolPkgFloatingWindowFollow(
     val offsetYDp: Float = 0f
 )
 
+internal data class ToolPkgFloatingWindowContentLayout(
+    val mode: String,
+    val widthDp: Int,
+    val heightDp: Int,
+    val scaleMode: String
+)
+
 internal data class ToolPkgFloatingWindowAnimation(
     val scaleX: Float = 1f,
     val scaleY: Float = 1f,
@@ -121,6 +128,7 @@ internal data class ToolPkgFloatingWindowRuntime(
     val draggable: Boolean = true,
     val resizable: Boolean = true,
     val snapMode: String = "quarter",
+    val contentLayout: ToolPkgFloatingWindowContentLayout,
     val follow: ToolPkgFloatingWindowFollow? = null,
     val pressFeedback: ToolPkgFloatingWindowFeedback = ToolPkgFloatingWindowFeedback(),
     val releaseFeedback: ToolPkgFloatingWindowFeedback = ToolPkgFloatingWindowFeedback(),
@@ -308,6 +316,7 @@ internal data class ToolPkgRegisteredFloatingWindow(
     val draggable: Boolean = true,
     val resizable: Boolean = true,
     val snapMode: String = "quarter",
+    val contentLayout: ToolPkgFloatingWindowContentLayout,
     val follow: ToolPkgFloatingWindowFollow? = null,
     val pressFeedback: ToolPkgFloatingWindowFeedback = ToolPkgFloatingWindowFeedback(),
     val releaseFeedback: ToolPkgFloatingWindowFeedback = ToolPkgFloatingWindowFeedback(),
@@ -900,6 +909,7 @@ internal object ToolPkgArchiveParser {
                     draggable = window.draggable,
                     resizable = window.resizable,
                     snapMode = window.snapMode,
+                    contentLayout = window.contentLayout,
                     follow = window.follow,
                     pressFeedback = window.pressFeedback,
                     releaseFeedback = window.releaseFeedback,

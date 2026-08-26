@@ -576,7 +576,7 @@ const snapshot = await ToolPkg.host.call(
 
 ### `ToolPkg.floatingWindow`
 
-`ToolPkg.registerFloatingWindow()` 注册一个由同一 ToolPkg `compose_dsl` route 承载的系统悬浮窗。注册不会自动显示，只有调用 `show()` 后宿主才会创建 Overlay 服务和该窗口的 Compose/JavaScript runtime。当前浮窗 capability 为 `toolpkg.floating_window.v3`。
+`ToolPkg.registerFloatingWindow()` 注册一个由同一 ToolPkg `compose_dsl` route 承载的系统悬浮窗。注册不会自动显示，只有调用 `show()` 后宿主才会创建 Overlay 服务和该窗口的 Compose/JavaScript runtime。当前浮窗 capability 为 `toolpkg.floating_window.v4`。
 
 ```ts
 ToolPkg.registerFloatingWindow({
@@ -587,6 +587,12 @@ ToolPkg.registerFloatingWindow({
   draggable: true,
   resizable: true,
   snapMode: "quarter",
+  contentLayout: {
+    mode: "fixed",
+    widthDp: 320,
+    heightDp: 420,
+    scaleMode: "fit",
+  },
   follow: {
     windowId: "anchor_window",
     placement: "above",
@@ -747,7 +753,13 @@ ToolPkg.registerFloatingWindow({
   widthDp: 320,
   heightDp: 420,
   draggable: true,
-  resizable: true
+  resizable: true,
+  contentLayout: {
+    mode: 'fixed',
+    widthDp: 320,
+    heightDp: 420,
+    scaleMode: 'fit'
+  }
 });
 
 await ToolPkg.floatingWindow.show('demo_window');
@@ -758,8 +770,9 @@ await ToolPkg.floatingWindow.show('demo_window');
 - `contentRoute` 必须指向同一 ToolPkg 已注册的 `compose_dsl` UI route。
 - `show()`、`hide()`、`get()` 和 `update()` 控制单实例浮窗的生命周期和运行配置。
 - `snapMode` 支持 `quarter`（屏幕四分之一边缘吸附）和 `none`（自由定位）。
+- `contentLayout` 是必填的固定设计视口。宿主按照最终窗口尺寸做一次 `fit` 缩放，并在该视口内统一设计密度和字体比例。
 - `follow` 将窗口锚定到同一 ToolPkg 的另一个浮窗，并按 `placement` 和 `offsetDp` 计算位置。支持 `above`、`below`、`start`、`end` 和 `center`。
-- `pressFeedback` 和 `releaseFeedback` 分别声明按下、松开时的资源 key 与动画。宿主会在窗口显示时预加载音效，动画由注册参数执行。
+- `pressFeedback` 和 `releaseFeedback` 分别声明按下、松开时的资源 key 与动画。宿主会在窗口显示时物化资源文件并异步准备媒体流音频。
 - 动画支持 `scaleX`、`scaleY`、`alpha`、`translationXDp`、`translationYDp`、`durationMs`、`pivotX`、`pivotY` 和 `linear`、`accelerate`、`decelerate`、`accelerateDecelerate`、`overshoot` 缓动。
 - `get()` / `update()` 状态包含尺寸、透明度、位置、吸附模式和反馈配置。
 - 浮窗隐藏或插件停用后，宿主会释放该窗口的 Compose 和 JavaScript runtime。

@@ -6,7 +6,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import org.json.JSONObject
 
 internal object ToolPkgFloatingWindowHost {
-    const val CAPABILITY = "toolpkg.floating_window.v3"
+    const val CAPABILITY = "toolpkg.floating_window.v4"
     private val registered = AtomicBoolean(false)
 
     fun register() {
@@ -38,11 +38,11 @@ internal object ToolPkgFloatingWindowHost {
                 .put("packageName", request.packageName)
                 .put("windowId", window.windowId)
                 .put("spec", serializeWindow(window))
-        request.payload.optJSONObject("routeArgs")?.let { routeArgs ->
-            command.put("routeArgs", routeArgs)
+        if (request.payload.has("routeArgs")) {
+            command.put("routeArgs", request.payload.getJSONObject("routeArgs"))
         }
-        request.payload.optJSONObject("patch")?.let { patch ->
-            command.put("patch", patch)
+        if (request.payload.has("patch")) {
+            command.put("patch", request.payload.getJSONObject("patch"))
         }
         val result =
             if (operation == "get") {
@@ -73,12 +73,23 @@ internal object ToolPkgFloatingWindowHost {
             .put("draggable", window.draggable)
             .put("resizable", window.resizable)
             .put("snapMode", window.snapMode)
+            .put("contentLayout", serializeContentLayout(window.contentLayout))
             .put("follow", window.follow?.let(::serializeFollow) ?: JSONObject.NULL)
             .put("pressFeedback", serializeFeedback(window.pressFeedback))
             .put("releaseFeedback", serializeFeedback(window.releaseFeedback))
             .put("refreshIntervalMs", window.refreshIntervalMs)
             .put("refreshFunction", window.refreshFunction ?: JSONObject.NULL)
             .put("refreshFunctionSource", window.refreshFunctionSource ?: JSONObject.NULL)
+    }
+
+    private fun serializeContentLayout(
+        layout: PackageManager.ToolPkgFloatingWindowContentLayout
+    ): JSONObject {
+        return JSONObject()
+            .put("mode", layout.mode)
+            .put("widthDp", layout.widthDp)
+            .put("heightDp", layout.heightDp)
+            .put("scaleMode", layout.scaleMode)
     }
 
     private fun serializeFollow(follow: PackageManager.ToolPkgFloatingWindowFollow): JSONObject {

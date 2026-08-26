@@ -724,6 +724,13 @@ export namespace ToolPkg {
         };
     }
 
+    export interface FloatingWindowContentLayout {
+        mode: "fixed";
+        widthDp: number;
+        heightDp: number;
+        scaleMode: "fit";
+    }
+
     export type FloatingWindowAnimationEasing =
         | "linear"
         | "accelerate"
@@ -759,6 +766,7 @@ export namespace ToolPkg {
         draggable?: boolean;
         resizable?: boolean;
         snapMode?: "none" | "quarter";
+        contentLayout: FloatingWindowContentLayout;
         follow?: FloatingWindowFollow;
         pressFeedback?: FloatingWindowFeedback;
         releaseFeedback?: FloatingWindowFeedback;
@@ -781,6 +789,7 @@ export namespace ToolPkg {
         x?: number;
         y?: number;
         snapMode?: "none" | "quarter";
+        contentLayout: FloatingWindowContentLayout;
         follow?: FloatingWindowFollow | null;
         soundEnabled?: boolean;
         soundVolume?: number;

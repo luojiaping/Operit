@@ -880,6 +880,7 @@ export interface TextProps extends ComposeCommonProps {
   color?: ComposeColor;
   fontWeight?: string;
   fontSize?: number;
+  lineHeight?: number;
   fontFamily?: string;
   textAlign?: ComposeTextAlign;
   maxLines?: number;

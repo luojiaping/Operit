@@ -1989,7 +1989,7 @@ private data class CanvasCommand(
     val color: Color,
     val brush: Brush?,
     val alpha: Float?,
-    val strokeWidth: Float,
+    val strokeWidth: Any?,
     val textAlign: TextAlign?
 )
 
@@ -2045,7 +2045,6 @@ private fun parseCanvasCommands(raw: Any?): List<CanvasCommand> {
                 ?: values["unit"]?.toString()?.trim()?.lowercase(Locale.ROOT)
                 ?: "fraction"
         val alpha = canvasNumberFromValue(values["alpha"])
-        val strokeWidth = canvasNumberFromValue(values["strokeWidth"]) ?: 1f
         val resolvedColor = resolveColorValue(values["color"])
         val color = resolvedColor ?: Color.Unspecified
         val brush = parseCanvasBrush(values["brush"])
@@ -2056,7 +2055,7 @@ private fun parseCanvasCommands(raw: Any?): List<CanvasCommand> {
             color = color,
             brush = brush,
             alpha = alpha,
-            strokeWidth = strokeWidth,
+            strokeWidth = values["strokeWidth"],
             textAlign = textAlignFromToken(values["textAlign"]?.toString())
         )
     }
@@ -2145,11 +2144,20 @@ private fun renderCanvasNode(
             }
         }
 
+        fun resolveStrokeWidth(value: Any?): Float {
+            val numeric = canvasNumberFromValue(value) ?: 1f
+            return when (canvasUnitFromValue(value)) {
+                "dp" -> numeric.dp.toPx()
+                "fraction" -> numeric * minOf(widthPx, heightPx)
+                else -> numeric
+            }
+        }
+
         fun drawCommands() {
             commands.forEach { command ->
             val values = command.values
             val unit = command.unit
-            val strokeWidth = command.strokeWidth
+            val strokeWidth = resolveStrokeWidth(command.strokeWidth)
             val color = if (command.alpha != null) command.color.copy(alpha = command.alpha) else command.color
             val brush = command.brush
             val brushAlpha = command.alpha ?: 1f
@@ -3975,6 +3983,9 @@ internal fun Map<String, Any?>.resolvedTextStyle(
     }
     floatOrNull("fontSize")?.let { fontSize ->
         nextStyle = nextStyle.copy(fontSize = fontSize.sp)
+    }
+    floatOrNull("lineHeight")?.let { lineHeight ->
+        nextStyle = nextStyle.copy(lineHeight = lineHeight.sp)
     }
     fontFamilyOrNull("fontFamily")?.let { fontFamily ->
         nextStyle = nextStyle.copy(fontFamily = fontFamily)
