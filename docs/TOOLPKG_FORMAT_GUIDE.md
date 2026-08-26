@@ -176,6 +176,9 @@ windows_control.toolpkg (ZIP 压缩包)
 | `workflow_templates` | array | 否 | 注册到宿主“工作流”入口的工作流模板列表 |
 | `workspace_templates` | array | 否 | 注册到宿主“工作区创建”入口的工作区模板列表 |
 
+ToolPkg 宿主扩展 capability 的声明、调用、版本、错误和 DTO 规范见
+[ToolPkg 宿主能力开发规范](./doc-src/package-dev/host-capabilities.md)。
+
 发布 ToolPkg 时仅使用归档中已有的 `manifest.logo` 资源。客户端不会上传或托管
 Logo，也不会在市场发布、更新或新版本请求中发送 Logo 字段。
 

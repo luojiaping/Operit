@@ -563,6 +563,9 @@ ToolPkg 可以把包 Logo 作为普通资源随归档分发。`logo` 填写资�
 
 `ToolPkg.host.call()` 是由宿主声明 capability 后提供的异步 JSON 桥接。包必须在 `manifest.json` 的 `required_host_capabilities` 中声明 capability，宿主会同时校验包是否启用和当前运行时的包身份。
 
+完整的 capability 清单、请求响应字段、状态语义和悬浮窗开发规范见
+[ToolPkg 宿主能力开发规范](./host-capabilities.md)。
+
 桥接只返回 capability 对应的 DTO，不向沙盒传递 API Key、Cookie、Authorization header 或宿主对象。大整数和金额应按字符串处理，返回值中的 `state` 用于区分 `ready`、`credential_required`、`baseline` 和 `error` 等明确状态。
 
 ```ts
@@ -577,6 +580,9 @@ const snapshot = await ToolPkg.host.call(
 ### `ToolPkg.floatingWindow`
 
 `ToolPkg.registerFloatingWindow()` 注册一个由同一 ToolPkg `compose_dsl` route 承载的系统悬浮窗。注册不会自动显示，只有调用 `show()` 后宿主才会创建 Overlay 服务和该窗口的 Compose/JavaScript runtime。当前浮窗 capability 为 `toolpkg.floating_window.v4`。
+
+固定视口、跟随窗口、媒体反馈、刷新函数、持久化和并发语义见
+[ToolPkg 宿主能力开发规范](./host-capabilities.md) 的固定视口悬浮窗章节。
 
 ```ts
 ToolPkg.registerFloatingWindow({
@@ -636,7 +642,7 @@ await ToolPkg.floatingWindow.update("whale", { routeArgs: {} });
 await ToolPkg.floatingWindow.hide("whale");
 ```
 
-每个窗口 ID 是单实例。`hide()` 会取消宿主刷新任务并释放窗口运行时；插件停用时宿主也会立即清理所有窗口。用户显式显示的窗口位置和显示状态会在进程被系统回收后恢复，显式隐藏、强制停止应用或插件停用不会恢复。
+每个窗口 ID 是单实例。`hide()` 会取消宿主刷新任务并释放窗口运行时；插件停用时宿主也会立即清理所有窗口。用户显式显示的窗口位置和显示状态会在进程被系统回收后恢复，显式隐藏和插件停用会清除恢复标记。应用强制停止会终止当前服务，插件不应依赖强制停止后的恢复时机。
 
 ## AssemblyScript WASM 模块
 
