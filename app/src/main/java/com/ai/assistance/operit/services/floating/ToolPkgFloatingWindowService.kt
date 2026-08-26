@@ -240,13 +240,13 @@ private fun readPersistedFloatingWindowFeedback(
     registration: ToolPkgFloatingWindowFeedback
 ): ToolPkgFloatingWindowFeedback {
     val soundResource = preferences.getString(
-        "$prefixSoundResource:$storageKey",
+        "${prefix}SoundResource:$storageKey",
         registration.soundResource
     )?.trim()?.ifBlank { null }
-    val animation = if (!preferences.contains("$prefixAnimation:$storageKey")) {
+    val animation = if (!preferences.contains("${prefix}Animation:$storageKey")) {
         registration.animation
     } else {
-        preferences.getString("$prefixAnimation:$storageKey", "")
+        preferences.getString("${prefix}Animation:$storageKey", "")
             .orEmpty()
             .takeIf { it.isNotBlank() }
             ?.let { raw -> parseFloatingWindowAnimation(JSONObject(raw)) }
@@ -659,9 +659,9 @@ class ToolPkgFloatingWindowService : Service() {
             null
         }
         fun persistFeedback(prefix: String, feedback: ToolPkgFloatingWindowFeedback) {
-            editor.putString("$prefixSoundResource:$storageKey", feedback.soundResource.orEmpty())
+            editor.putString("${prefix}SoundResource:$storageKey", feedback.soundResource.orEmpty())
             editor.putString(
-                "$prefixAnimation:$storageKey",
+                "${prefix}Animation:$storageKey",
                 feedback.animation?.let(::serializeFloatingWindowAnimation)?.toString().orEmpty()
             )
         }
