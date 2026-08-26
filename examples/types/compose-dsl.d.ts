@@ -786,6 +786,7 @@ export interface ComposeModifierProxy extends ComposeModifierValue {
   alpha(value: number): ComposeModifierProxy;
   rotate(value: number): ComposeModifierProxy;
   scale(value: number): ComposeModifierProxy;
+  scale(scaleX: number, scaleY: number): ComposeModifierProxy;
   zIndex(value: number): ComposeModifierProxy;
   background(value: ComposeColor, shape?: ComposeShape): ComposeModifierProxy;
   background(value: ComposeCanvasBrush, shape?: ComposeShape): ComposeModifierProxy;

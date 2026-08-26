@@ -358,6 +358,10 @@ class ToolPkgFloatingWindowService : Service() {
                 .put("status", "hidden")
                 .put("widthDp", widthDp)
                 .put("heightDp", heightDp)
+                .put("widthPx", widthPx)
+                .put("heightPx", heightPx)
+                .put("screenWidthPx", context.resources.displayMetrics.widthPixels)
+                .put("screenHeightPx", context.resources.displayMetrics.heightPixels)
                 .put("draggable", spec.draggable)
                 .put("resizable", spec.resizable)
                 .put("alpha", prefs.getFloat("alpha:$key", 1f).coerceIn(MIN_FLOATING_ALPHA, MAX_FLOATING_ALPHA).toDouble())
@@ -566,6 +570,7 @@ class ToolPkgFloatingWindowService : Service() {
             persistVisibility(key, true, routeArgs)
             created.show()
             positionWindowFromAnchor(created)
+            if (created.spec.follow != null) created.requestRender()
             created.state("visible")
         } catch (error: Exception) {
             instances.remove(key)
@@ -679,6 +684,18 @@ class ToolPkgFloatingWindowService : Service() {
         }
     }
 
+    internal fun onWindowDragSettled(packageName: String, windowId: String) {
+        instances[WindowKey(packageName, windowId)]?.let { window ->
+            positionFollowersOf(window)
+        }
+        instances.values
+            .filter { candidate ->
+                candidate.spec.packageName == packageName &&
+                    candidate.spec.follow?.windowId.equals(windowId, ignoreCase = true)
+            }
+            .forEach { follower -> follower.requestRender() }
+    }
+
     private fun positionFollowersOf(anchor: ToolPkgFloatingWindowInstance) {
         instances.values
             .filter { candidate ->
@@ -786,6 +803,8 @@ class ToolPkgFloatingWindowService : Service() {
         val density = resources.displayMetrics.density
         val widthDp = preferences.getInt("widthDp:$storageKey", spec.widthDp)
         val heightDp = preferences.getInt("heightDp:$storageKey", spec.heightDp)
+        val widthPx = dpToPx(widthDp, density)
+        val heightPx = dpToPx(heightDp, density)
         return JSONObject()
             .put("schemaVersion", FLOATING_WINDOW_STATE_SCHEMA_VERSION)
             .put("windowId", spec.windowId)
@@ -793,11 +812,15 @@ class ToolPkgFloatingWindowService : Service() {
             .put("status", status)
             .put("widthDp", widthDp)
             .put("heightDp", heightDp)
+            .put("widthPx", widthPx)
+            .put("heightPx", heightPx)
+            .put("screenWidthPx", resources.displayMetrics.widthPixels)
+            .put("screenHeightPx", resources.displayMetrics.heightPixels)
             .put("draggable", spec.draggable)
             .put("resizable", spec.resizable)
             .put("alpha", preferences.getFloat("alpha:$storageKey", 1f).toDouble())
-            .put("x", preferences.getInt("x:$storageKey", (resources.displayMetrics.widthPixels - dpToPx(widthDp, density)).coerceAtLeast(0)))
-            .put("y", preferences.getInt("y:$storageKey", (resources.displayMetrics.heightPixels - dpToPx(heightDp, density)).coerceAtLeast(0)))
+            .put("x", preferences.getInt("x:$storageKey", (resources.displayMetrics.widthPixels - widthPx).coerceAtLeast(0)))
+            .put("y", preferences.getInt("y:$storageKey", (resources.displayMetrics.heightPixels - heightPx).coerceAtLeast(0)))
             .put("snapMode", normalizeSnapMode(preferences.getString("snapMode:$storageKey", spec.snapMode)))
             .put("contentLayout", serializeFloatingWindowContentLayout(spec.contentLayout))
             .put("follow", spec.follow?.let(::serializeFloatingWindowFollow) ?: JSONObject.NULL)
@@ -1309,6 +1332,7 @@ private class ToolPkgFloatingWindowInstance(
     fun state(status: String): JSONObject {
         val params = layoutParams ?: createLayoutParams()
         val density = service.resources.displayMetrics.density
+        val displayMetrics = service.resources.displayMetrics
         return JSONObject()
             .put("schemaVersion", FLOATING_WINDOW_STATE_SCHEMA_VERSION)
             .put("windowId", spec.windowId)
@@ -1316,6 +1340,10 @@ private class ToolPkgFloatingWindowInstance(
             .put("status", status)
             .put("widthDp", (params.width / density).toInt())
             .put("heightDp", (params.height / density).toInt())
+            .put("widthPx", params.width)
+            .put("heightPx", params.height)
+            .put("screenWidthPx", displayMetrics.widthPixels)
+            .put("screenHeightPx", displayMetrics.heightPixels)
             .put("draggable", spec.draggable)
             .put("resizable", spec.resizable)
             .put("alpha", params.alpha.toDouble())
@@ -1630,11 +1658,15 @@ private class ToolPkgFloatingWindowInstance(
                     persistLayout(params)
                     resizing = false
                     service.onWindowLayoutChanged(spec.packageName, spec.windowId)
+                    requestRender()
+                    service.onWindowDragSettled(spec.packageName, spec.windowId)
                     return FloatingWindowTouchResult.Finished
                 }
                 if (!dragging) return FloatingWindowTouchResult.Pass
                 settlePosition(params)
                 dragging = false
+                requestRender()
+                service.onWindowDragSettled(spec.packageName, spec.windowId)
                 return FloatingWindowTouchResult.Finished
             }
         }
