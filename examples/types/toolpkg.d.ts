@@ -783,6 +783,10 @@ export namespace ToolPkg {
         status: FloatingWindowStatus;
         widthDp?: number;
         heightDp?: number;
+        widthPx?: number;
+        heightPx?: number;
+        screenWidthPx?: number;
+        screenHeightPx?: number;
         draggable?: boolean;
         resizable?: boolean;
         alpha?: number;
@@ -933,7 +937,6 @@ export namespace ToolPkg {
 
     export interface HostBridgeResponse extends JsonObject {
         schemaVersion: number;
-        state: string;
     }
 
     export interface HostBridgeApi {
