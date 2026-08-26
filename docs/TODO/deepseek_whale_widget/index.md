@@ -59,3 +59,5 @@ Operit 当前已经支持 ToolPkg 页面和消息 Hook，但没有通用的长�
 - 当前测试包版本为 `0.4.0-test.2`，宿主仓库不重复存放鲸鱼插件资源和 UI
 - 宿主提交 `88e850cfa` 已通过远程 Release 编译；插件提交 `40e97ed` 对应测试归档
 - 独立插件 [`v0.4.0-test.2` prerelease](https://github.com/luojiaping/operit-deepseek-whale-widget/releases/tag/v0.4.0-test.2) 已上传测试 ToolPkg
+- 宿主提交 `014d8d3b7` 已通过远程 Release 编译；插件提交 `c2fc75d` 对应镜像测试归档
+- 独立插件 [`v0.4.0-test.3` prerelease](https://github.com/luojiaping/operit-deepseek-whale-widget/releases/tag/v0.4.0-test.3) 已上传镜像测试 ToolPkg

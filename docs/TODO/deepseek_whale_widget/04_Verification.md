@@ -24,8 +24,14 @@ status: in_progress
 - 远程 `sync + build_release` 通过，宿主提交 `88e850cfa`，耗时 `368.05s`
 - Release APK：`operit-release-fix_api-interface-88e850cf.apk`
 - Release APK SHA-256：`b53aaed3bd49fbc74cacbe5d12b9f30f459fc1a80e9b348f414f1fb3969ec3ec`
+- 镜像功能远程 `sync + build_release` 通过，宿主提交 `014d8d3b7`
+- 镜像 Release APK：`operit-release-fix_api-interface-014d8d3b.apk`
+- 镜像 Release APK SHA-256：`59ebe8f67e4c346504ddc01f90a531b8df41ebcd0a1347fcc8b32724c3049516`
 - 独立插件 `sh scripts/pack.sh` 与 ZIP 完整性校验通过
 - 测试 ToolPkg `0.4.0-test.2` 已重新打包并通过 ZIP 校验
 - 测试 ToolPkg SHA-256：`102245e64a83c6f29584f0e436473068e9e5f7eb9542c0e08c51450adfa16bb1`
 - 测试 ToolPkg [`v0.4.0-test.2` prerelease](https://github.com/luojiaping/operit-deepseek-whale-widget/releases/tag/v0.4.0-test.2) 已上传
+- 镜像测试 ToolPkg `0.4.0-test.3` 已打包并通过 ZIP 校验
+- 镜像测试 ToolPkg SHA-256：`2d248ba2a1cbe480b28d095c8271f1a8c1b0db1487afdca4421fdb5a77e334b3`
+- 镜像测试 ToolPkg [`v0.4.0-test.3` prerelease](https://github.com/luojiaping/operit-deepseek-whale-widget/releases/tag/v0.4.0-test.3) 已上传
 - 待执行设备上的按下/松开音频、拖动跟随和 `0.6x - 2.5x` 缩放截图验证
