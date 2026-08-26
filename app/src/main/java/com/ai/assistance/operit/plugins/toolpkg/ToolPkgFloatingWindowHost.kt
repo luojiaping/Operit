@@ -6,7 +6,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import org.json.JSONObject
 
 internal object ToolPkgFloatingWindowHost {
-    const val CAPABILITY = "toolpkg.floating_window.v2"
+    const val CAPABILITY = "toolpkg.floating_window.v3"
     private val registered = AtomicBoolean(false)
 
     fun register() {
@@ -73,13 +73,42 @@ internal object ToolPkgFloatingWindowHost {
             .put("draggable", window.draggable)
             .put("resizable", window.resizable)
             .put("snapMode", window.snapMode)
-            .put("followWindowId", window.followWindowId ?: JSONObject.NULL)
-            .put("followPlacement", window.followPlacement)
-            .put("followGapDp", window.followGapDp)
-            .put("pressSoundResource", window.pressSoundResource ?: JSONObject.NULL)
-            .put("releaseSoundResource", window.releaseSoundResource ?: JSONObject.NULL)
+            .put("follow", window.follow?.let(::serializeFollow) ?: JSONObject.NULL)
+            .put("pressFeedback", serializeFeedback(window.pressFeedback))
+            .put("releaseFeedback", serializeFeedback(window.releaseFeedback))
             .put("refreshIntervalMs", window.refreshIntervalMs)
             .put("refreshFunction", window.refreshFunction ?: JSONObject.NULL)
             .put("refreshFunctionSource", window.refreshFunctionSource ?: JSONObject.NULL)
+    }
+
+    private fun serializeFollow(follow: PackageManager.ToolPkgFloatingWindowFollow): JSONObject {
+        return JSONObject()
+            .put("windowId", follow.windowId)
+            .put("placement", follow.placement)
+            .put(
+                "offsetDp",
+                JSONObject()
+                    .put("x", follow.offsetXDp.toDouble())
+                    .put("y", follow.offsetYDp.toDouble())
+            )
+    }
+
+    private fun serializeFeedback(feedback: PackageManager.ToolPkgFloatingWindowFeedback): JSONObject {
+        return JSONObject()
+            .put("soundResource", feedback.soundResource ?: JSONObject.NULL)
+            .put("animation", feedback.animation?.let(::serializeAnimation) ?: JSONObject.NULL)
+    }
+
+    private fun serializeAnimation(animation: PackageManager.ToolPkgFloatingWindowAnimation): JSONObject {
+        return JSONObject()
+            .put("scaleX", animation.scaleX.toDouble())
+            .put("scaleY", animation.scaleY.toDouble())
+            .put("alpha", animation.alpha.toDouble())
+            .put("translationXDp", animation.translationXDp.toDouble())
+            .put("translationYDp", animation.translationYDp.toDouble())
+            .put("durationMs", animation.durationMs)
+            .put("easing", animation.easing)
+            .put("pivotX", animation.pivotX.toDouble())
+            .put("pivotY", animation.pivotY.toDouble())
     }
 }

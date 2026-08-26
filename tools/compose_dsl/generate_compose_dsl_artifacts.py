@@ -352,9 +352,9 @@ def map_param_to_ts(component: str, param: Param) -> Optional[Tuple[str, str, bo
             return ("horizontalAlignment", "ComposeAlignment", False)
         if "Vertical" in type_name:
             return ("verticalAlignment", "ComposeAlignment", False)
-        return ("contentAlignment", "ComposeAlignment", False)
+        return ("contentAlignment", "ComposeContentAlignment", False)
     if _is_box_alignment_type(type_name):
-        return ("contentAlignment", "ComposeAlignment", False)
+        return ("contentAlignment", "ComposeContentAlignment", False)
     if "DpOffset" in type_name:
         return (name, "number", False)
     if "PopupProperties" in type_name:
@@ -376,6 +376,8 @@ def map_param_to_ts(component: str, param: Param) -> Optional[Tuple[str, str, bo
         if component == "TextField":
             return ("style", "ComposeTextFieldStyle", False)
         return ("style", "ComposeTextStyle", False)
+    if "TextAlign" in type_name:
+        return ("textAlign", "ComposeTextAlign", False)
     if "FontWeight" in type_name:
         return ("fontWeight", "string", False)
     if "FontFamily" in type_name:
@@ -1531,8 +1533,8 @@ def build_component_renderer_function(spec: ComponentSpec, params: Sequence[Para
                     text = props.string("text"),
                     modifier = applyScopedCommonModifier(Modifier, props, modifierResolver),
                     style = props.resolvedTextStyle("style", includeColor = true),
-                    softWrap = props.bool("softWrap", false),
-                    maxLines = props.int("maxLines", 0),
+                    softWrap = props.bool("softWrap", true),
+                    maxLines = props.int("maxLines", Int.MAX_VALUE),
                     overflow = props.textOverflow("overflow"),
                     onTextLayout = {
                         if (!onTextLayoutActionId.isNullOrBlank()) {
@@ -1607,6 +1609,8 @@ def _generic_default_value_expr(component: str, param: Param) -> Optional[str]:
         return f'popupPropertiesFromValue(props["{name}"])'
     if "TextStyle" in type_name:
         return 'props.textStyle("style")'
+    if "TextAlign" in type_name:
+        return 'props.textAlignOrNull("textAlign")'
     if "FontWeight" in type_name:
         return 'props.fontWeightOrNull("fontWeight") ?: FontWeight.Normal'
     if "FontFamily" in type_name:
@@ -1896,11 +1900,13 @@ def build_ts_generated_file(
     lines.append("  ComposeBorder,")
     lines.append("  ComposeChildren,")
     lines.append("  ComposeColor,")
+    lines.append("  ComposeContentAlignment,")
     lines.append("  ComposeCommonProps,")
     lines.append("  ComposeNodeFactory,")
     lines.append("  ComposePadding,")
     lines.append("  ComposeShape,")
     lines.append("  ComposeTextFieldStyle,")
+    lines.append("  ComposeTextAlign,")
     lines.append("  ComposeTextOverflow,")
     lines.append("  ComposeTextStyle,")
     for import_name in extra_ts_imports:
@@ -1946,6 +1952,10 @@ def build_ts_generated_file(
         if component == "Text" or component == "BasicText":
             emitted.setdefault("fontSize", ("number", False))
             emitted.setdefault("fontFamily", ("string", False))
+            emitted.setdefault("textAlign", ("ComposeTextAlign", False))
+
+        if component == "BasicText":
+            emitted.setdefault("onTextLayout", ("() => void | Promise<void>", False))
 
         if component == "Switch":
             emitted.setdefault("checkedThumbColor", ("ComposeColor", False))
@@ -2001,7 +2011,7 @@ def build_ts_generated_file(
             emitted.setdefault("name", ("string", False))
             emitted.setdefault("icon", ("string", False))
             emitted.setdefault("alpha", ("number", False))
-            emitted.setdefault("contentAlignment", ("ComposeAlignment", False))
+            emitted.setdefault("contentAlignment", ("ComposeContentAlignment", False))
             emitted.setdefault("contentScale", ("ComposeContentScale", False))
 
         if component == "Row":

@@ -576,7 +576,7 @@ const snapshot = await ToolPkg.host.call(
 
 ### `ToolPkg.floatingWindow`
 
-`ToolPkg.registerFloatingWindow()` 注册一个由同一 ToolPkg `compose_dsl` route 承载的系统悬浮窗。注册不会自动显示，只有调用 `show()` 后宿主才会创建 Overlay 服务和该窗口的 Compose/JavaScript runtime。当前浮窗 capability 为 `toolpkg.floating_window.v2`。
+`ToolPkg.registerFloatingWindow()` 注册一个由同一 ToolPkg `compose_dsl` route 承载的系统悬浮窗。注册不会自动显示，只有调用 `show()` 后宿主才会创建 Overlay 服务和该窗口的 Compose/JavaScript runtime。当前浮窗 capability 为 `toolpkg.floating_window.v3`。
 
 ```ts
 ToolPkg.registerFloatingWindow({
@@ -587,11 +587,33 @@ ToolPkg.registerFloatingWindow({
   draggable: true,
   resizable: true,
   snapMode: "quarter",
-  followWindowId: "anchor_window",
-  followPlacement: "above",
-  followGapDp: 8,
-  pressSoundResource: "press_sound",
-  releaseSoundResource: "release_sound",
+  follow: {
+    windowId: "anchor_window",
+    placement: "above",
+    offsetDp: { x: 0, y: 0 },
+  },
+  pressFeedback: {
+    soundResource: "press_sound",
+    animation: {
+      scaleX: 1.05,
+      scaleY: 0.9,
+      durationMs: 90,
+      easing: "overshoot",
+      pivotX: 0.5,
+      pivotY: 1,
+    },
+  },
+  releaseFeedback: {
+    soundResource: "release_sound",
+    animation: {
+      scaleX: 1,
+      scaleY: 1,
+      durationMs: 220,
+      easing: "overshoot",
+      pivotX: 0.5,
+      pivotY: 1,
+    },
+  },
   refreshIntervalMs: 60000,
   onRefresh: refreshOverlay,
 });
@@ -736,9 +758,10 @@ await ToolPkg.floatingWindow.show('demo_window');
 - `contentRoute` 必须指向同一 ToolPkg 已注册的 `compose_dsl` UI route。
 - `show()`、`hide()`、`get()` 和 `update()` 控制单实例浮窗的生命周期和运行配置。
 - `snapMode` 支持 `quarter`（屏幕四分之一边缘吸附）和 `none`（自由定位）。
-- `followWindowId` 将窗口锚定到同一 ToolPkg 的另一个浮窗；锚定窗口移动时，当前窗口在其上方同步移动。
-- `followPlacement` 当前固定为 `above`，`followGapDp` 设置两个窗口之间的间距。
-- `get()` / `update()` 状态包含尺寸、透明度、位置、吸附模式和声音配置。
+- `follow` 将窗口锚定到同一 ToolPkg 的另一个浮窗，并按 `placement` 和 `offsetDp` 计算位置。支持 `above`、`below`、`start`、`end` 和 `center`。
+- `pressFeedback` 和 `releaseFeedback` 分别声明按下、松开时的资源 key 与动画。宿主会在窗口显示时预加载音效，动画由注册参数执行。
+- 动画支持 `scaleX`、`scaleY`、`alpha`、`translationXDp`、`translationYDp`、`durationMs`、`pivotX`、`pivotY` 和 `linear`、`accelerate`、`decelerate`、`accelerateDecelerate`、`overshoot` 缓动。
+- `get()` / `update()` 状态包含尺寸、透明度、位置、吸附模式和反馈配置。
 - 浮窗隐藏或插件停用后，宿主会释放该窗口的 Compose 和 JavaScript runtime。
 
 ### 注册应用生命周期钩子

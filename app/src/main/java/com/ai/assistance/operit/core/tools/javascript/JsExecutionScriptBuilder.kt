@@ -1327,7 +1327,7 @@ internal fun buildExecutionRuntimeBridgeScript(): String {
                         if (operation === 'update' && value !== undefined) {
                             payload.patch = value;
                         }
-                        return hostApi.call('toolpkg.floating_window.v2', payload);
+                        return hostApi.call('toolpkg.floating_window.v3', payload);
                     }
                     floatingApi.show = function(windowId, routeArgs) {
                         return command('show', windowId, routeArgs);
