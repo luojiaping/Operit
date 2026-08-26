@@ -26,5 +26,5 @@ status: in_progress
 - Release APK SHA-256：`6d3ef199f6c1e509c4a54f2999d4d431055ca5448c4d280b9c38151cb920f515`
 - 独立插件 `sh scripts/pack.sh` 与 ZIP 完整性校验通过
 - 测试 ToolPkg `0.4.0-test.1` SHA-256：`a5b98796b8f62205bcecdf14f427337cf5336c90aee0fe64803cab9bb56ff284`
-- 测试 ToolPkg 不创建 GitHub Release 或 tag
+- 测试 ToolPkg [`v0.4.0-test.1` prerelease](https://github.com/luojiaping/operit-deepseek-whale-widget/releases/tag/v0.4.0-test.1) 已上传
 - 待执行设备上的按下/松开音频、拖动跟随和 `0.6x - 2.5x` 缩放截图验证
