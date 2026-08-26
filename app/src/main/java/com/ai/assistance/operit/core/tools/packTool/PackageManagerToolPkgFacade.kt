@@ -172,11 +172,16 @@ internal class PackageManagerToolPkgFacade(
                 draggable = window.draggable,
                 resizable = window.resizable,
                 snapMode = window.snapMode,
-                followWindowId = window.followWindowId,
-                followPlacement = window.followPlacement,
-                followGapDp = window.followGapDp,
-                pressSoundResource = window.pressSoundResource,
-                releaseSoundResource = window.releaseSoundResource,
+                follow = window.follow?.let { follow ->
+                    PackageManager.ToolPkgFloatingWindowFollow(
+                        windowId = follow.windowId,
+                        placement = follow.placement,
+                        offsetXDp = follow.offsetXDp,
+                        offsetYDp = follow.offsetYDp
+                    )
+                },
+                pressFeedback = window.pressFeedback.toPackageManagerFeedback(),
+                releaseFeedback = window.releaseFeedback.toPackageManagerFeedback(),
                 refreshIntervalMs = window.refreshIntervalMs,
                 refreshFunction = window.refreshFunction,
                 refreshFunctionSource = window.refreshFunctionSource
@@ -455,6 +460,25 @@ internal class PackageManagerToolPkgFacade(
                     .getOrThrow()
             }
         }
+    }
+
+    private fun ToolPkgFloatingWindowFeedback.toPackageManagerFeedback(): PackageManager.ToolPkgFloatingWindowFeedback {
+        return PackageManager.ToolPkgFloatingWindowFeedback(
+            soundResource = soundResource,
+            animation = animation?.let { value ->
+                PackageManager.ToolPkgFloatingWindowAnimation(
+                    scaleX = value.scaleX,
+                    scaleY = value.scaleY,
+                    alpha = value.alpha,
+                    translationXDp = value.translationXDp,
+                    translationYDp = value.translationYDp,
+                    durationMs = value.durationMs,
+                    easing = value.easing,
+                    pivotX = value.pivotX,
+                    pivotY = value.pivotY
+                )
+            }
+        )
     }
 
     fun getToolPkgWorkspaceTemplates(

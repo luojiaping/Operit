@@ -26,6 +26,14 @@ export type ComposeArrangement =
 
 export type ComposeAlignment = "start" | "center" | "end";
 
+export type ComposeTextAlign =
+  | "start"
+  | "center"
+  | "end"
+  | "left"
+  | "right"
+  | "justify";
+
 export type ComposeShapeType =
   | "rounded"
   | "cut"
@@ -148,6 +156,8 @@ export type ComposeBoxAlignment =
   | "centerBottom"
   | "bottomEnd"
   | "endBottom";
+
+export type ComposeContentAlignment = ComposeBoxAlignment | "start" | "end";
 
 export type ComposeModifierAlign =
   | ComposeHorizontalAlignment
@@ -559,6 +569,7 @@ export interface ComposeCanvasTextCommand {
   maxHeight?: ComposeCanvasNumber;
   maxLines?: number;
   overflow?: ComposeTextOverflow;
+  textAlign?: ComposeTextAlign;
   unit?: ComposeCanvasUnit;
 }
 
@@ -647,6 +658,7 @@ export interface ComposeCanvasDrawTextCommand {
   maxHeight?: ComposeCanvasNumber;
   maxLines?: number;
   overflow?: ComposeTextOverflow;
+  textAlign?: ComposeTextAlign;
   unit?: ComposeCanvasUnit;
 }
 
@@ -854,7 +866,7 @@ export interface RowProps extends ComposeCommonProps {
 
 export interface BoxProps extends ComposeCommonProps {
   content?: ComposeChildren;
-  contentAlignment?: ComposeAlignment;
+  contentAlignment?: ComposeContentAlignment;
 }
 
 export interface SpacerProps {
@@ -869,6 +881,7 @@ export interface TextProps extends ComposeCommonProps {
   fontWeight?: string;
   fontSize?: number;
   fontFamily?: string;
+  textAlign?: ComposeTextAlign;
   maxLines?: number;
   softWrap?: boolean;
   overflow?: ComposeTextOverflow;

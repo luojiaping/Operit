@@ -334,12 +334,7 @@ internal object ToolPkgMainRegistrationScriptParser {
                     )
                 }
             val id = item.optString("id").trim()
-            val contentRouteId =
-                item.optString("contentRoute").trim().ifBlank {
-                    item.optString("content_route").trim()
-                }.ifBlank {
-                    item.optString("route").trim()
-                }
+            val contentRouteId = item.optString("contentRoute").trim()
             if (id.isBlank()) {
                 throw IllegalArgumentException(
                     "$TOOLPKG_REGISTRATION_FLOATING_WINDOW[$index].id is required"
@@ -390,19 +385,9 @@ internal object ToolPkgMainRegistrationScriptParser {
                     "$TOOLPKG_REGISTRATION_FLOATING_WINDOW[$index].snapMode must be none or quarter"
                 )
             }
-            val followWindowId = item.optString("followWindowId").trim().ifBlank { null }
-            val followPlacement = item.optString("followPlacement", "above").trim().lowercase()
-            if (followPlacement != "above") {
-                throw IllegalArgumentException(
-                    "$TOOLPKG_REGISTRATION_FLOATING_WINDOW[$index].followPlacement must be above"
-                )
-            }
-            val followGapDp = item.optInt("followGapDp", 8)
-            if (followGapDp !in 0..120) {
-                throw IllegalArgumentException(
-                    "$TOOLPKG_REGISTRATION_FLOATING_WINDOW[$index].followGapDp is outside supported bounds"
-                )
-            }
+            val follow = parseFloatingWindowFollow(item, index)
+            val pressFeedback = parseFloatingWindowFeedback(item, "pressFeedback", index)
+            val releaseFeedback = parseFloatingWindowFeedback(item, "releaseFeedback", index)
             windows.add(
                 ToolPkgRegisteredFloatingWindow(
                     id = id,
@@ -415,11 +400,9 @@ internal object ToolPkgMainRegistrationScriptParser {
                     draggable = item.optBoolean("draggable", true),
                     resizable = item.optBoolean("resizable", true),
                     snapMode = snapMode,
-                    followWindowId = followWindowId,
-                    followPlacement = followPlacement,
-                    followGapDp = followGapDp,
-                    pressSoundResource = item.optString("pressSoundResource").trim().ifBlank { null },
-                    releaseSoundResource = item.optString("releaseSoundResource").trim().ifBlank { null },
+                    follow = follow,
+                    pressFeedback = pressFeedback,
+                    releaseFeedback = releaseFeedback,
                     refreshIntervalMs = refreshIntervalMs,
                     refreshFunction = refreshFunction,
                     refreshFunctionSource = refreshFunctionSource
@@ -428,29 +411,158 @@ internal object ToolPkgMainRegistrationScriptParser {
         }
         val windowIds = windows.map { it.id.lowercase() }.toSet()
         windows.forEach { window ->
-            val followWindowId = window.followWindowId ?: return@forEach
-            require(followWindowId.lowercase() in windowIds) {
-                "$TOOLPKG_REGISTRATION_FLOATING_WINDOW.followWindowId not found: $followWindowId"
+            val follow = window.follow ?: return@forEach
+            require(follow.windowId.lowercase() in windowIds) {
+                "$TOOLPKG_REGISTRATION_FLOATING_WINDOW.follow.windowId not found: ${follow.windowId}"
             }
-            require(!followWindowId.equals(window.id, ignoreCase = true)) {
-                "$TOOLPKG_REGISTRATION_FLOATING_WINDOW.followWindowId cannot reference itself: ${window.id}"
+            require(!follow.windowId.equals(window.id, ignoreCase = true)) {
+                "$TOOLPKG_REGISTRATION_FLOATING_WINDOW.follow.windowId cannot reference itself: ${window.id}"
             }
         }
-        val followById = windows.associate { it.id.lowercase() to it.followWindowId?.lowercase() }
+        val followById = windows.associate { it.id.lowercase() to it.follow?.windowId?.lowercase() }
         fun visit(windowId: String, path: Set<String>) {
             val next = followById[windowId] ?: return
             require(next !in path) {
-                "$TOOLPKG_REGISTRATION_FLOATING_WINDOW followWindowId cycle detected"
+                "$TOOLPKG_REGISTRATION_FLOATING_WINDOW follow.windowId cycle detected"
             }
             visit(next, path + windowId)
         }
         followById.keys.forEach { windowId -> visit(windowId, emptySet()) }
         return windows.map { window ->
-            val followWindowId = window.followWindowId?.let { followId ->
-                windows.first { candidate -> candidate.id.equals(followId, ignoreCase = true) }.id
+            val follow = window.follow?.let { value ->
+                value.copy(windowId = windows.first { candidate -> candidate.id.equals(value.windowId, ignoreCase = true) }.id)
             }
-            window.copy(followWindowId = followWindowId)
+            window.copy(follow = follow)
         }
+    }
+
+    private fun parseFloatingWindowFollow(
+        item: JSONObject,
+        index: Int
+    ): ToolPkgFloatingWindowFollow? {
+        val field = "$TOOLPKG_REGISTRATION_FLOATING_WINDOW[$index].follow"
+        if (!item.has("follow") || item.isNull("follow")) return null
+        val follow = item.optJSONObject("follow")
+            ?: throw IllegalArgumentException("$field must be a JSON object")
+        val windowId = follow.optString("windowId").trim()
+        require(windowId.isNotBlank()) { "$field.windowId is required" }
+        val placement = follow.optString("placement").trim().lowercase()
+        require(placement in setOf("above", "below", "start", "end", "center")) {
+            "$field.placement is unsupported: $placement"
+        }
+        val offset = if (!follow.has("offsetDp") || follow.isNull("offsetDp")) {
+            null
+        } else {
+            follow.optJSONObject("offsetDp")
+                ?: throw IllegalArgumentException("$field.offsetDp must be a JSON object")
+        }
+        val offsetX = readFloatingWindowFloat(offset, "x", 0f, "$field.offsetDp.x")
+        val offsetY = readFloatingWindowFloat(offset, "y", 0f, "$field.offsetDp.y")
+        require(offsetX in -1200f..1200f && offsetY in -1600f..1600f) {
+            "$field.offsetDp is outside supported bounds"
+        }
+        return ToolPkgFloatingWindowFollow(
+            windowId = windowId,
+            placement = placement,
+            offsetXDp = offsetX,
+            offsetYDp = offsetY
+        )
+    }
+
+    private fun parseFloatingWindowFeedback(
+        item: JSONObject,
+        key: String,
+        index: Int
+    ): ToolPkgFloatingWindowFeedback {
+        val field = "$TOOLPKG_REGISTRATION_FLOATING_WINDOW[$index].$key"
+        if (!item.has(key) || item.isNull(key)) return ToolPkgFloatingWindowFeedback()
+        val feedback = item.optJSONObject(key)
+            ?: throw IllegalArgumentException("$field must be a JSON object")
+        val soundResource = if (!feedback.has("soundResource") || feedback.isNull("soundResource")) {
+            null
+        } else {
+            val value = feedback.opt("soundResource")
+            require(value is String) { "$field.soundResource must be a string" }
+            value.trim().ifBlank { null }
+        }
+        val animation = if (!feedback.has("animation") || feedback.isNull("animation")) {
+            null
+        } else {
+            val animationJson = feedback.optJSONObject("animation")
+                ?: throw IllegalArgumentException("$field.animation must be a JSON object")
+            parseFloatingWindowAnimation(animationJson, "$field.animation")
+        }
+        return ToolPkgFloatingWindowFeedback(
+            soundResource = soundResource,
+            animation = animation
+        )
+    }
+
+    private fun parseFloatingWindowAnimation(
+        json: JSONObject,
+        field: String
+    ): ToolPkgFloatingWindowAnimation {
+        val scaleX = readFloatingWindowFloat(json, "scaleX", 1f, "$field.scaleX")
+        val scaleY = readFloatingWindowFloat(json, "scaleY", 1f, "$field.scaleY")
+        val alpha = readFloatingWindowFloat(json, "alpha", 1f, "$field.alpha")
+        val translationX = readFloatingWindowFloat(json, "translationXDp", 0f, "$field.translationXDp")
+        val translationY = readFloatingWindowFloat(json, "translationYDp", 0f, "$field.translationYDp")
+        val durationMs = readFloatingWindowLong(json, "durationMs", 0L, "$field.durationMs")
+        val easing = normalizeToolPkgFloatingWindowAnimationEasing(json.optString("easing", "linear"))
+        val pivotX = readFloatingWindowFloat(json, "pivotX", 0.5f, "$field.pivotX")
+        val pivotY = readFloatingWindowFloat(json, "pivotY", 0.5f, "$field.pivotY")
+        require(scaleX in 0f..4f && scaleY in 0f..4f) {
+            "$field scale is outside supported bounds"
+        }
+        require(alpha in 0f..1f) { "$field.alpha is outside supported bounds" }
+        require(translationX in -1200f..1200f && translationY in -1600f..1600f) {
+            "$field translation is outside supported bounds"
+        }
+        require(durationMs in 0L..5000L) { "$field.durationMs is outside supported bounds" }
+        require(pivotX in 0f..1f && pivotY in 0f..1f) {
+            "$field pivot is outside supported bounds"
+        }
+        return ToolPkgFloatingWindowAnimation(
+            scaleX = scaleX,
+            scaleY = scaleY,
+            alpha = alpha,
+            translationXDp = translationX,
+            translationYDp = translationY,
+            durationMs = durationMs,
+            easing = easing,
+            pivotX = pivotX,
+            pivotY = pivotY
+        )
+    }
+
+    private fun readFloatingWindowFloat(
+        json: JSONObject?,
+        key: String,
+        default: Float,
+        field: String
+    ): Float {
+        if (json == null || !json.has(key) || json.isNull(key)) return default
+        val value = json.opt(key)
+        require(value is Number) { "$field must be a number" }
+        val result = value.toFloat()
+        require(result.isFinite()) { "$field must be finite" }
+        return result
+    }
+
+    private fun readFloatingWindowLong(
+        json: JSONObject,
+        key: String,
+        default: Long,
+        field: String
+    ): Long {
+        if (!json.has(key) || json.isNull(key)) return default
+        val value = json.opt(key)
+        require(value is Number) { "$field must be an integer" }
+        val doubleValue = value.toDouble()
+        require(doubleValue.isFinite() && doubleValue % 1.0 == 0.0) {
+            "$field must be an integer"
+        }
+        return value.toLong()
     }
 
     private fun parseNavigationEntryAction(

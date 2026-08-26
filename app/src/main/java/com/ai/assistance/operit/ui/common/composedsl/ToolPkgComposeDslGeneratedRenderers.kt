@@ -3301,8 +3301,8 @@ internal fun renderBasicTextNode(
         text = props.string("text"),
         modifier = applyScopedCommonModifier(Modifier, props, modifierResolver),
         style = props.resolvedTextStyle("style", includeColor = true),
-        softWrap = props.bool("softWrap", false),
-        maxLines = props.int("maxLines", 0),
+        softWrap = props.bool("softWrap", true),
+        maxLines = props.int("maxLines", Int.MAX_VALUE),
         overflow = props.textOverflow("overflow"),
         onTextLayout = {
             if (!onTextLayoutActionId.isNullOrBlank()) {

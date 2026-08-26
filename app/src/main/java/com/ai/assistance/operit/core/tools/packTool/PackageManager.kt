@@ -231,6 +231,30 @@ private constructor(private val context: Context, private val aiToolHandler: AIT
         val functionSource: String? = null
     )
 
+    data class ToolPkgFloatingWindowFollow(
+        val windowId: String,
+        val placement: String,
+        val offsetXDp: Float,
+        val offsetYDp: Float
+    )
+
+    data class ToolPkgFloatingWindowAnimation(
+        val scaleX: Float,
+        val scaleY: Float,
+        val alpha: Float,
+        val translationXDp: Float,
+        val translationYDp: Float,
+        val durationMs: Long,
+        val easing: String,
+        val pivotX: Float,
+        val pivotY: Float
+    )
+
+    data class ToolPkgFloatingWindowFeedback(
+        val soundResource: String?,
+        val animation: ToolPkgFloatingWindowAnimation?
+    )
+
     data class ToolPkgFloatingWindow(
         val containerPackageName: String,
         val toolPkgId: String,
@@ -244,11 +268,9 @@ private constructor(private val context: Context, private val aiToolHandler: AIT
         val draggable: Boolean,
         val resizable: Boolean,
         val snapMode: String,
-        val followWindowId: String?,
-        val followPlacement: String,
-        val followGapDp: Int,
-        val pressSoundResource: String?,
-        val releaseSoundResource: String?,
+        val follow: ToolPkgFloatingWindowFollow?,
+        val pressFeedback: ToolPkgFloatingWindowFeedback,
+        val releaseFeedback: ToolPkgFloatingWindowFeedback,
         val refreshIntervalMs: Long,
         val refreshFunction: String?,
         val refreshFunctionSource: String?

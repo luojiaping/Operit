@@ -4,11 +4,13 @@ import type {
   ComposeBorder,
   ComposeChildren,
   ComposeColor,
+  ComposeContentAlignment,
   ComposeCommonProps,
   ComposeNodeFactory,
   ComposePadding,
   ComposeShape,
   ComposeTextFieldStyle,
+  ComposeTextAlign,
   ComposeTextOverflow,
   ComposeTextStyle,
   ComposeCanvasCommand,
@@ -37,7 +39,7 @@ export interface ComposeGeneratedRowProps extends ComposeCommonProps {
 
 export interface ComposeGeneratedBoxProps extends ComposeCommonProps {
   content?: ComposeChildren;
-  contentAlignment?: ComposeAlignment;
+  contentAlignment?: ComposeContentAlignment;
   propagateMinConstraints?: boolean;
   zIndex?: number;
 }
@@ -74,6 +76,7 @@ export interface ComposeGeneratedTextProps extends ComposeCommonProps {
   softWrap?: boolean;
   style?: ComposeTextStyle;
   text: string;
+  textAlign?: ComposeTextAlign;
   zIndex?: number;
 }
 
@@ -565,7 +568,7 @@ export interface ComposeGeneratedProvideTextStyleProps extends ComposeCommonProp
 
 export interface ComposeGeneratedPullToRefreshBoxProps extends ComposeCommonProps {
   content?: ComposeChildren;
-  contentAlignment?: ComposeAlignment;
+  contentAlignment?: ComposeContentAlignment;
   indicator?: ComposeChildren;
   isRefreshing: boolean;
   onRefresh: () => void | Promise<void>;
@@ -710,7 +713,7 @@ export interface ComposeGeneratedWideNavigationRailItemProps extends ComposeComm
 
 export interface ComposeGeneratedBoxWithConstraintsProps extends ComposeCommonProps {
   content?: ComposeChildren;
-  contentAlignment?: ComposeAlignment;
+  contentAlignment?: ComposeContentAlignment;
   propagateMinConstraints?: boolean;
   zIndex?: number;
 }
@@ -719,10 +722,12 @@ export interface ComposeGeneratedBasicTextProps extends ComposeCommonProps {
   fontFamily?: string;
   fontSize?: number;
   maxLines?: number;
+  onTextLayout?: () => void | Promise<void>;
   overflow?: ComposeTextOverflow;
   softWrap?: boolean;
   style?: ComposeTextStyle;
   text: string;
+  textAlign?: ComposeTextAlign;
   zIndex?: number;
 }
 
@@ -733,7 +738,7 @@ export interface ComposeGeneratedDisableSelectionProps extends ComposeCommonProp
 
 export interface ComposeGeneratedImageProps extends ComposeCommonProps {
   alpha?: number;
-  contentAlignment?: ComposeAlignment;
+  contentAlignment?: ComposeContentAlignment;
   contentDescription?: string;
   contentScale?: ComposeContentScale;
   fileUri?: string;

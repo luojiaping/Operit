@@ -75,6 +75,41 @@ internal data class ToolPkgNavigationActionHookRuntime(
     val functionSource: String? = null
 )
 
+internal data class ToolPkgFloatingWindowFollow(
+    val windowId: String,
+    val placement: String,
+    val offsetXDp: Float = 0f,
+    val offsetYDp: Float = 0f
+)
+
+internal data class ToolPkgFloatingWindowAnimation(
+    val scaleX: Float = 1f,
+    val scaleY: Float = 1f,
+    val alpha: Float = 1f,
+    val translationXDp: Float = 0f,
+    val translationYDp: Float = 0f,
+    val durationMs: Long = 0L,
+    val easing: String = "linear",
+    val pivotX: Float = 0.5f,
+    val pivotY: Float = 0.5f
+)
+
+internal data class ToolPkgFloatingWindowFeedback(
+    val soundResource: String? = null,
+    val animation: ToolPkgFloatingWindowAnimation? = null
+)
+
+internal fun normalizeToolPkgFloatingWindowAnimationEasing(raw: String): String {
+    return when (raw.trim().lowercase()) {
+        "linear" -> "linear"
+        "accelerate" -> "accelerate"
+        "decelerate" -> "decelerate"
+        "acceleratedecelerate" -> "accelerateDecelerate"
+        "overshoot" -> "overshoot"
+        else -> throw IllegalArgumentException("Unsupported floating window animation easing: $raw")
+    }
+}
+
 internal data class ToolPkgFloatingWindowRuntime(
     val id: String,
     val contentRouteId: String,
@@ -86,11 +121,9 @@ internal data class ToolPkgFloatingWindowRuntime(
     val draggable: Boolean = true,
     val resizable: Boolean = true,
     val snapMode: String = "quarter",
-    val followWindowId: String? = null,
-    val followPlacement: String = "above",
-    val followGapDp: Int = 8,
-    val pressSoundResource: String? = null,
-    val releaseSoundResource: String? = null,
+    val follow: ToolPkgFloatingWindowFollow? = null,
+    val pressFeedback: ToolPkgFloatingWindowFeedback = ToolPkgFloatingWindowFeedback(),
+    val releaseFeedback: ToolPkgFloatingWindowFeedback = ToolPkgFloatingWindowFeedback(),
     val refreshIntervalMs: Long = 60_000L,
     val refreshFunction: String? = null,
     val refreshFunctionSource: String? = null
@@ -275,11 +308,9 @@ internal data class ToolPkgRegisteredFloatingWindow(
     val draggable: Boolean = true,
     val resizable: Boolean = true,
     val snapMode: String = "quarter",
-    val followWindowId: String? = null,
-    val followPlacement: String = "above",
-    val followGapDp: Int = 8,
-    val pressSoundResource: String? = null,
-    val releaseSoundResource: String? = null,
+    val follow: ToolPkgFloatingWindowFollow? = null,
+    val pressFeedback: ToolPkgFloatingWindowFeedback = ToolPkgFloatingWindowFeedback(),
+    val releaseFeedback: ToolPkgFloatingWindowFeedback = ToolPkgFloatingWindowFeedback(),
     val refreshIntervalMs: Long = 60_000L,
     val refreshFunction: String? = null,
     val refreshFunctionSource: String? = null
@@ -869,11 +900,9 @@ internal object ToolPkgArchiveParser {
                     draggable = window.draggable,
                     resizable = window.resizable,
                     snapMode = window.snapMode,
-                    followWindowId = window.followWindowId,
-                    followPlacement = window.followPlacement,
-                    followGapDp = window.followGapDp,
-                    pressSoundResource = window.pressSoundResource,
-                    releaseSoundResource = window.releaseSoundResource,
+                    follow = window.follow,
+                    pressFeedback = window.pressFeedback,
+                    releaseFeedback = window.releaseFeedback,
                     refreshIntervalMs = window.refreshIntervalMs,
                     refreshFunction = window.refreshFunction,
                     refreshFunctionSource = window.refreshFunctionSource

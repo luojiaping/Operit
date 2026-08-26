@@ -1,7 +1,7 @@
 ---
 title: DeepSeek Whale Overlay ToolPkg
 fork: https://github.com/tuxKOH/Operit
-status: complete
+status: in_progress
 ---
 
 # DeepSeek Whale Overlay ToolPkg
@@ -14,7 +14,7 @@ Operit 当前已经支持 ToolPkg 页面和消息 Hook，但没有通用的长�
 
 ## 预期结果
 
-- 新增版本化的 ToolPkg 宿主桥接，不修改现有 ToolPkg API
+- 重做版本化的 ToolPkg 浮窗宿主桥接，清理未正式稳定的旧浮窗契约
 - 宿主持有凭据并执行 DeepSeek 网络请求，沙盒只接收能力受限 DTO
 - 新增 `dsh-whale-widget` ToolPkg，提供设置页、余额页和小尺寸气泡悬浮窗
 - 插件启停状态控制页面和悬浮窗的有效显示状态
@@ -25,8 +25,9 @@ Operit 当前已经支持 ToolPkg 页面和消息 Hook，但没有通用的长�
 1. [DONE: 宿主桥接契约](./01_HostBridge.md)
 2. [DONE: DeepSeek 数据服务](./02_DeepSeekData.md)
 3. [DONE: ToolPkg 与悬浮窗](./03_ToolPkg.md)
-4. [DONE: 验证与交付](./04_Verification.md)
+4. [IN_PROGRESS: 验证与交付](./04_Verification.md)
 5. [DONE: 触控与双浮窗改造](./05_Interaction.md)
+6. [DONE: 通用浮窗反馈与跟随机制](./06_FloatingWindowV3.md)
 
 ## 执行约束
 
@@ -39,13 +40,15 @@ Operit 当前已经支持 ToolPkg 页面和消息 Hook，但没有通用的长�
 
 - 新增通用 `ToolPkg.host.call()`、`ToolPkg.registerFloatingWindow()`、`ToolPkg.floatingWindow` 和 `required_host_capabilities`
 - 新增 DeepSeek 余额、平台用量、Token 统计、加密平台凭据和余额快照服务
-- 新增 `examples/deepseek_whale_widget` 包及 Whale PNG 资源
+- 新增独立 `dsh-whale-widget` 包及 Whale PNG 资源
 - 插件禁用后，已显示的悬浮窗立即移除，不再执行已禁用包的 renderer；显式显示状态支持进程回收恢复
 - 悬浮窗改为独立鲸鱼窗口和跟随气泡窗口，拖动中跟手，气泡拥有独立触控区域
 - 删除了上一轮临时 DesktopWidget 注册、Glance 宿主、配置 Activity 和示例
 - 独立公开仓库：[luojiaping/operit-deepseek-whale-widget](https://github.com/luojiaping/operit-deepseek-whale-widget)
-- 下一版开发包更新为 `v0.2.0`，删除旧的单窗口气泡布局
+- 上一版开发包为 `v0.2.0`，删除了旧的单窗口气泡布局
 - 宿主 Release 构建提交为 `75004e544`，远程构建通过
 - 独立插件发布 [`v0.2.0`](https://github.com/luojiaping/operit-deepseek-whale-widget/releases/tag/v0.2.0)，包含独立鲸鱼/气泡窗口和跟随触控修复
 - 本轮新增通用浮窗 `get()`、`snapMode`、透明度、声音反馈和 `Slider` 设置控件，并完成双浮窗交互改造
 - `jq`、`file`、`git diff --check` 和 `.toolpkg` ZIP 校验已通过；环境没有 `node`，未执行 JavaScript 语法检查
+- 本轮将旧浮窗能力重做为通用 `toolpkg.floating_window.v3`，不保留旧字段兼容路径
+- 当前开发包版本为 `v0.3.0`，宿主仓库不再重复存放鲸鱼插件资源和 UI

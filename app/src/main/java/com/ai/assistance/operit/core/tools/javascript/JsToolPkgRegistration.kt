@@ -444,9 +444,9 @@ internal fun buildToolPkgRegistrationBridgeScript(): String {
                     throw new Error(label + ' expects an object');
                 }
                 var normalized = copyObject(definition, 'onRefresh');
-                var contentRoute = String(
-                    definition.contentRoute || definition.content_route || definition.route || ''
-                ).trim();
+                var contentRoute = typeof definition.contentRoute === 'string'
+                    ? definition.contentRoute.trim()
+                    : '';
                 if (!contentRoute) {
                     throw new Error(label + ' requires contentRoute');
                 }

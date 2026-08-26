@@ -148,6 +148,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit.Companion.Unspecified
@@ -1988,7 +1989,8 @@ private data class CanvasCommand(
     val color: Color,
     val brush: Brush?,
     val alpha: Float?,
-    val strokeWidth: Float
+    val strokeWidth: Float,
+    val textAlign: TextAlign?
 )
 
 private fun canvasNumberFromValue(value: Any?): Float? {
@@ -2054,7 +2056,8 @@ private fun parseCanvasCommands(raw: Any?): List<CanvasCommand> {
             color = color,
             brush = brush,
             alpha = alpha,
-            strokeWidth = strokeWidth
+            strokeWidth = strokeWidth,
+            textAlign = textAlignFromToken(values["textAlign"]?.toString())
         )
     }
 }
@@ -2314,7 +2317,11 @@ private fun renderCanvasNode(
                             if (overflowToken == "ellipsis") TextOverflow.Ellipsis else TextOverflow.Clip
                         val layout = textMeasurer.measure(
                             text = AnnotatedString(text),
-                            style = TextStyle(color = color, fontSize = fontSize.sp),
+                            style = TextStyle(
+                                color = color,
+                                fontSize = fontSize.sp,
+                                textAlign = command.textAlign ?: TextAlign.Unspecified
+                            ),
                             maxLines = maxLines,
                             overflow = overflow,
                             constraints = if (minWidth != null || maxWidth != null || minHeight != null || maxHeight != null) {
@@ -2353,7 +2360,11 @@ private fun renderCanvasNode(
                             if (overflowToken == "ellipsis") TextOverflow.Ellipsis else TextOverflow.Clip
                         val layout = textMeasurer.measure(
                             text = AnnotatedString(text),
-                            style = TextStyle(color = color, fontSize = fontSize.sp),
+                            style = TextStyle(
+                                color = color,
+                                fontSize = fontSize.sp,
+                                textAlign = command.textAlign ?: TextAlign.Unspecified
+                            ),
                             maxLines = maxLines,
                             overflow = overflow,
                             constraints = if (minWidth != null || maxWidth != null || minHeight != null || maxHeight != null) {
@@ -3785,6 +3796,24 @@ internal fun horizontalAlignmentFromToken(raw: String?): Alignment.Horizontal {
     }
 }
 
+internal fun textAlignFromToken(raw: String?): TextAlign? {
+    val token = normalizeToken(raw.orEmpty())
+    if (token.isBlank()) return null
+    return when (token) {
+        "start" -> TextAlign.Start
+        "center" -> TextAlign.Center
+        "end" -> TextAlign.End
+        "left" -> TextAlign.Left
+        "right" -> TextAlign.Right
+        "justify" -> TextAlign.Justify
+        else -> throw IllegalArgumentException("Unsupported textAlign token: $raw")
+    }
+}
+
+internal fun Map<String, Any?>.textAlignOrNull(key: String): TextAlign? {
+    return textAlignFromToken(stringOrNull(key))
+}
+
 internal fun Map<String, Any?>.verticalAlignment(key: String): Alignment.Vertical {
     return verticalAlignmentFromToken(stringOrNull(key))
 }
@@ -3949,6 +3978,9 @@ internal fun Map<String, Any?>.resolvedTextStyle(
     }
     fontFamilyOrNull("fontFamily")?.let { fontFamily ->
         nextStyle = nextStyle.copy(fontFamily = fontFamily)
+    }
+    textAlignOrNull("textAlign")?.let { textAlign ->
+        nextStyle = nextStyle.copy(textAlign = textAlign)
     }
     if (includeColor) {
         colorOrNull("color")?.let { color ->

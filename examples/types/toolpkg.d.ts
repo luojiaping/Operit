@@ -713,6 +713,41 @@ export namespace ToolPkg {
 
     export type FloatingWindowRefreshHandler = () => HookReturn;
 
+    export type FloatingWindowFollowPlacement = "above" | "below" | "start" | "end" | "center";
+
+    export interface FloatingWindowFollow {
+        windowId: string;
+        placement: FloatingWindowFollowPlacement;
+        offsetDp?: {
+            x?: number;
+            y?: number;
+        };
+    }
+
+    export type FloatingWindowAnimationEasing =
+        | "linear"
+        | "accelerate"
+        | "decelerate"
+        | "accelerateDecelerate"
+        | "overshoot";
+
+    export interface FloatingWindowAnimation {
+        scaleX?: number;
+        scaleY?: number;
+        alpha?: number;
+        translationXDp?: number;
+        translationYDp?: number;
+        durationMs?: number;
+        easing?: FloatingWindowAnimationEasing;
+        pivotX?: number;
+        pivotY?: number;
+    }
+
+    export interface FloatingWindowFeedback {
+        soundResource?: string | null;
+        animation?: FloatingWindowAnimation | null;
+    }
+
     export interface FloatingWindowRegistration {
         id: string;
         contentRoute: string;
@@ -724,11 +759,9 @@ export namespace ToolPkg {
         draggable?: boolean;
         resizable?: boolean;
         snapMode?: "none" | "quarter";
-        followWindowId?: string;
-        followPlacement?: "above";
-        followGapDp?: number;
-        pressSoundResource?: string;
-        releaseSoundResource?: string;
+        follow?: FloatingWindowFollow;
+        pressFeedback?: FloatingWindowFeedback;
+        releaseFeedback?: FloatingWindowFeedback;
         refreshIntervalMs?: number;
         onRefresh?: FloatingWindowRefreshHandler;
     }
@@ -748,13 +781,11 @@ export namespace ToolPkg {
         x?: number;
         y?: number;
         snapMode?: "none" | "quarter";
-        followWindowId?: string | null;
-        followPlacement?: "above";
-        followGapDp?: number;
+        follow?: FloatingWindowFollow | null;
         soundEnabled?: boolean;
         soundVolume?: number;
-        pressSoundResource?: string | null;
-        releaseSoundResource?: string | null;
+        pressFeedback: FloatingWindowFeedback;
+        releaseFeedback: FloatingWindowFeedback;
         instanceId?: string;
         updatedAtMs: string;
         errorCode?: string;

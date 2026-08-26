@@ -386,11 +386,33 @@ function registerToolPkg() {
     draggable: true,
     resizable: true,
     snapMode: "quarter",
-    followWindowId: "anchor_window",
-    followPlacement: "above",
-    followGapDp: 8,
-    pressSoundResource: "press_sound",
-    releaseSoundResource: "release_sound"
+    follow: {
+      windowId: "anchor_window",
+      placement: "above",
+      offsetDp: { x: 0, y: 0 }
+    },
+    pressFeedback: {
+      soundResource: "press_sound",
+      animation: {
+        scaleX: 1.05,
+        scaleY: 0.9,
+        durationMs: 90,
+        easing: "overshoot",
+        pivotX: 0.5,
+        pivotY: 1
+      }
+    },
+    releaseFeedback: {
+      soundResource: "release_sound",
+      animation: {
+        scaleX: 1,
+        scaleY: 1,
+        durationMs: 220,
+        easing: "overshoot",
+        pivotX: 0.5,
+        pivotY: 1
+      }
+    }
   });
 
   ToolPkg.registerAppLifecycleHook({
@@ -488,10 +510,9 @@ exports.onInputMenuToggle = onInputMenuToggle;
 | `ToolPkg.registerFloatingWindow` | `draggable` | 否 | 是否允许拖动 |
 | `ToolPkg.registerFloatingWindow` | `resizable` | 否 | 是否允许调整尺寸 |
 | `ToolPkg.registerFloatingWindow` | `snapMode` | 否 | `quarter` 边缘吸附或 `none` 自由定位，默认 `quarter` |
-| `ToolPkg.registerFloatingWindow` | `followWindowId` | 否 | 同一 ToolPkg 内的锚定窗口 ID |
-| `ToolPkg.registerFloatingWindow` | `followPlacement` | 否 | 当前支持 `above` |
-| `ToolPkg.registerFloatingWindow` | `followGapDp` | 否 | 跟随窗口与锚定窗口之间的间距 |
-| `ToolPkg.registerFloatingWindow` | `pressSoundResource` / `releaseSoundResource` | 否 | 按压和松开反馈音效资源 key |
+| `ToolPkg.registerFloatingWindow` | `follow` | 否 | 同一 ToolPkg 内的锚定窗口、相对方向和二维偏移 |
+| `ToolPkg.registerFloatingWindow` | `pressFeedback` | 否 | 按下时的音效资源 key 和动画 |
+| `ToolPkg.registerFloatingWindow` | `releaseFeedback` | 否 | 松开时的音效资源 key 和动画 |
 | `ToolPkg.registerFloatingWindow` | `refreshIntervalMs` | 否 | 刷新函数周期，0 表示关闭 |
 | `ToolPkg.registerFloatingWindow` | `onRefresh` | 否 | 长驻浮窗的刷新函数 |
 | `ToolPkg.registerAppLifecycleHook` | `id` | 是 | 生命周期钩子唯一标识 |
@@ -1084,6 +1105,8 @@ exports.default = Screen;
 - `Icon`：图标
 - `AiChat`：嵌入当前主聊天的消息列表和输入区，不包含工作区
 - `AdaptiveSidePanel`：宽屏可拖拽分栏、窄屏覆盖层的自适应侧栏
+
+`Text` 和 `BasicText` 支持 `textAlign: "start" | "center" | "end" | "left" | "right" | "justify"`。当文本需要在固定宽度内逐行对齐时，同时给节点设置 `fillMaxWidth: true`。Canvas 的 `text` 和 `drawText` 命令也支持同名属性。
 
 `AdaptiveSidePanel` 的第二个参数是主内容，`side` 是侧栏内容。两者都必须恰好传入一个节点；`open` 与 `onOpenChanged` 由插件状态管理。默认在 600dp 以上使用分栏，侧栏初始宽度为 360dp，最小宽度为 280dp，主内容至少保留 320dp。
 
