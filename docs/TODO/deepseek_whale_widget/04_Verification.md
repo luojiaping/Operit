@@ -23,4 +23,7 @@ status: in_progress
 - 远程 `sync + build_release` 通过，宿主提交 `a9fe57d88`，耗时 `415.02s`
 - Release APK：`operit-release-fix_api-interface-a9fe57d8.apk`
 - Release APK SHA-256：`e47e10ebeb70ba19bcccff1c4f72ed56dcff911bea0a00910abe548681820875`
-- 待执行独立 ToolPkg 重新打包，以及设备上的动画、音频、跟随与对齐验证
+- 独立插件 `sh scripts/pack.sh` 与 ZIP 完整性校验通过
+- ToolPkg `v0.3.0` SHA-256：`22c8e89732936dd1a19d9eb304395809e95ec5d0478f8220b955aa620334259c`
+- ToolPkg [`v0.3.0` Release](https://github.com/luojiaping/operit-deepseek-whale-widget/releases/tag/v0.3.0) 已发布
+- 待执行设备上的动画、音频、跟随与对齐验证
