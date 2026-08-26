@@ -174,6 +174,12 @@ export namespace NativeInterface {
     function registerToolPkgChatInputHook(specJson: string): void;
 
     /**
+     * Register a renderer for a chat input UI slot in the current toolpkg main registration session.
+     * @param specJson - JSON object string describing an input slot plugin
+     */
+    function registerToolPkgInputSlotPlugin(specJson: string): void;
+
+    /**
      * Register a chat message hook for current toolpkg main registration session.
      * @param specJson - JSON object string describing a chat message hook
      */

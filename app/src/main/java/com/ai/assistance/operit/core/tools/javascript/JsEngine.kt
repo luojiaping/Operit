@@ -1896,6 +1896,11 @@ class JsEngine(private val context: Context) {
         }
 
         @JavascriptInterface
+        fun registerToolPkgInputSlotPlugin(specJson: String) {
+            toolPkgRegistrationSession.appendInputSlotPlugin(specJson)
+        }
+
+        @JavascriptInterface
         fun registerToolPkgChatMessageHook(specJson: String) {
             toolPkgRegistrationSession.appendChatMessageHook(specJson)
         }

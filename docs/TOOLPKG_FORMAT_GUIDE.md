@@ -535,6 +535,9 @@ exports.onInputMenuToggle = onInputMenuToggle;
 | `ToolPkg.registerXmlRenderPlugin` | `function` | 是 | 函数引用（支持箭头函数） |
 | `ToolPkg.registerInputMenuTogglePlugin` | `id` | 是 | 输入菜单开关插件唯一标识 |
 | `ToolPkg.registerInputMenuTogglePlugin` | `function` | 是 | 函数引用（支持箭头函数） |
+| `ToolPkg.registerInputSlotPlugin` | `id` | 是 | 聊天输入区插槽 renderer 唯一标识 |
+| `ToolPkg.registerInputSlotPlugin` | `slot` | 是 | `above_input`、`input_drawer` 或 `input_toolbar_right` |
+| `ToolPkg.registerInputSlotPlugin` | `function` | 是 | 返回文本或 Compose DSL 内容的函数引用 |
 
 `ToolPkg.registerAppLifecycleHook` 支持的 `event`：
 

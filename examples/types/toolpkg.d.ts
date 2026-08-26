@@ -33,6 +33,7 @@ export namespace ToolPkg {
         | "input_menu_toggle"
         | ChatInputEventName
         | ChatViewEventName
+        | InputSlotEventName
         | ChatMessageEventName
         | "navigation_entry_action"
         | ToolLifecycleEventName
@@ -126,6 +127,42 @@ export namespace ToolPkg {
         | "view_opened"
         | "view_updated"
         | "view_closed";
+
+    export type InputSlotName =
+        | "above_input"
+        | "input_drawer"
+        | "input_toolbar_right";
+
+    export type InputSlotEventName = "render";
+
+    export interface InputSlotEventPayload extends JsonObject {
+        slot?: InputSlotName | string;
+        chatId?: string;
+        runtime?: string;
+        inputStyle?: string;
+        isProcessing?: boolean;
+        isInputFocused?: boolean;
+        inputText?: string;
+    }
+
+    export interface InputSlotRenderObjectResult extends JsonObject {
+        handled?: boolean;
+        text?: string;
+        content?: string;
+        composeDsl?: {
+            screen: string;
+            state?: JsonObject;
+            memo?: JsonObject;
+            moduleSpec?: JsonObject;
+        };
+    }
+
+    export type InputSlotRenderReturn =
+        | string
+        | InputSlotRenderObjectResult
+        | null
+        | void
+        | Promise<string | InputSlotRenderObjectResult | null | void>;
 
     export type ChatMessageEventName =
         | "message_persisted";
@@ -376,6 +413,9 @@ export namespace ToolPkg {
     export type ChatInputHookHandler =
         (event: ChatInputHookEvent) => ChatInputHookReturn;
 
+    export type InputSlotHookHandler =
+        (event: InputSlotHookEvent) => InputSlotRenderReturn;
+
     export type ChatMessageHookHandler =
         (event: ChatMessageHookEvent) => HookReturn;
 
@@ -518,6 +558,9 @@ export namespace ToolPkg {
 
     export interface ChatViewHookEvent
         extends HookEventBase<ChatViewEventName, ChatViewEventPayload> {}
+
+    export interface InputSlotHookEvent
+        extends HookEventBase<InputSlotEventName, InputSlotEventPayload> {}
 
     export interface ChatMessageHookEvent
         extends HookEventBase<ChatMessageEventName, ChatMessageEventPayload> {}
@@ -844,6 +887,12 @@ export namespace ToolPkg {
         function: HookHandler<ChatViewHookEvent>;
     }
 
+    export interface InputSlotPluginRegistration {
+        id: string;
+        slot: InputSlotName;
+        function: InputSlotHookHandler;
+    }
+
     export interface ChatMessageHookRegistration {
         id: string;
         function: ChatMessageHookHandler;
@@ -997,6 +1046,7 @@ export namespace ToolPkg {
         registerInputMenuTogglePlugin(definition: InputMenuTogglePluginRegistration): void;
         registerChatInputHook(definition: ChatInputHookRegistration): void;
         registerChatViewHook(definition: ChatViewHookRegistration): void;
+        registerInputSlotPlugin(definition: InputSlotPluginRegistration): void;
         registerChatMessageHook(definition: ChatMessageHookRegistration): void;
         registerToolLifecycleHook(definition: ToolLifecycleHookRegistration): void;
         registerPromptInputHook(definition: PromptInputHookRegistration): void;
@@ -1037,6 +1087,8 @@ declare global {
     function registerToolPkgChatInputHook(definition: ToolPkg.ChatInputHookRegistration): void;
 
     function registerToolPkgChatViewHook(definition: ToolPkg.ChatViewHookRegistration): void;
+
+    function registerToolPkgInputSlotPlugin(definition: ToolPkg.InputSlotPluginRegistration): void;
 
     function registerToolPkgChatMessageHook(definition: ToolPkg.ChatMessageHookRegistration): void;
 

@@ -61,6 +61,11 @@ internal object ToolPkgMainRegistrationScriptParser {
                     registrations = captured.chatViewHooks,
                     registryName = TOOLPKG_REGISTRATION_CHAT_VIEW_HOOK
                 )
+            val inputSlotPlugins =
+                parseRegisteredInputSlotPlugins(
+                    registrations = captured.inputSlotPlugins,
+                    registryName = TOOLPKG_REGISTRATION_INPUT_SLOT_PLUGIN
+                )
             val chatMessageHooks =
                 parseRegisteredFunctionHooks(
                     registrations = captured.chatMessageHooks,
@@ -134,6 +139,7 @@ internal object ToolPkgMainRegistrationScriptParser {
                         inputMenuTogglePlugins = inputMenuTogglePlugins,
                         chatInputHooks = chatInputHooks,
                         chatViewHooks = chatViewHooks,
+                        inputSlotPlugins = inputSlotPlugins,
                         chatMessageHooks = chatMessageHooks,
                         toolLifecycleHooks = toolLifecycleHooks,
                         promptInputHooks = promptInputHooks,
@@ -696,6 +702,46 @@ internal object ToolPkgMainRegistrationScriptParser {
             )
         }
         return hooks
+    }
+
+    private fun parseRegisteredInputSlotPlugins(
+        registrations: List<String>,
+        registryName: String
+    ): List<ToolPkgRegisteredInputSlotPlugin> {
+        val plugins = mutableListOf<ToolPkgRegisteredInputSlotPlugin>()
+        registrations.forEachIndexed { index, raw ->
+            val item =
+                try {
+                    JSONObject(raw)
+                } catch (error: Exception) {
+                    throw IllegalArgumentException(
+                        "$registryName payload[$index] must be a JSON object",
+                        error
+                    )
+                }
+            val id = item.optString("id").trim()
+            val slot = item.optString("slot").trim().lowercase()
+            val functionName = item.optString("function").trim()
+            val functionSource = item.optString("function_source").trim().ifBlank { null }
+            if (id.isBlank()) {
+                throw IllegalArgumentException("$registryName[$index].id is required")
+            }
+            if (slot !in setOf("above_input", "input_drawer", "input_toolbar_right")) {
+                throw IllegalArgumentException("$registryName[$index].slot is unsupported: $slot")
+            }
+            if (functionName.isBlank()) {
+                throw IllegalArgumentException("$registryName[$index].function is required")
+            }
+            plugins.add(
+                ToolPkgRegisteredInputSlotPlugin(
+                    id = id,
+                    slot = slot,
+                    function = functionName,
+                    functionSource = functionSource
+                )
+            )
+        }
+        return plugins
     }
 
     private fun parseRegisteredTagFunctionHooks(

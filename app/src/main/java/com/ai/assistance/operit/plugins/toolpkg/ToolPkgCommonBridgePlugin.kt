@@ -911,6 +911,7 @@ object ToolPkgCommonBridgePlugin : OperitPlugin {
         ToolPkgChatInputHookBridge.register()
         ToolPkgChatViewHookBridge.register()
         ToolPkgChatMessageHookBridge.register()
+        ToolPkgInputSlotBridge.register()
         ToolPkgAiProviderRegistry.register()
         ToolPkgFloatingWindowHost.register()
 

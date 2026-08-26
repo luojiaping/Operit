@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "toolpkg_id": "com.operit.input_slot_demo",
+  "version": "0.1.0",
+  "main": "dist/main.js",
+  "display_name": {
+    "zh": "输入区插槽示例",
+    "en": "Input Slot Demo"
+  },
+  "description": {
+    "zh": "演示聊天输入区三个 ToolPkg UI 插槽的注册和渲染返回值。",
+    "en": "Demonstrates registration and render results for the three ToolPkg chat input UI slots."
+  },
+  "enabled_by_default": false,
+  "subpackages": []
+}

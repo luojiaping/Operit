@@ -86,6 +86,7 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isShiftPressed
@@ -132,6 +133,9 @@ import com.ai.assistance.operit.data.preferences.ModelConfigManager
 import com.ai.assistance.operit.data.preferences.MemorySearchSettingsPreferences
 import com.ai.assistance.operit.data.preferences.UserPreferencesManager
 import com.ai.assistance.operit.data.repository.MemoryAutoSaveCandidateRepository
+import com.ai.assistance.operit.plugins.chatview.ChatInputSlotPluginRegistry
+import com.ai.assistance.operit.plugins.chatview.ChatInputSlotRenderParams
+import com.ai.assistance.operit.plugins.chatview.ChatInputSlots
 import com.ai.assistance.operit.ui.common.icons.MaterialIconNameResolver
 import com.ai.assistance.operit.ui.common.animations.SimpleAnimatedVisibility
 import com.ai.assistance.operit.ui.features.chat.components.AttachmentChip
@@ -237,6 +241,7 @@ fun AgentChatInputSection(
     val showFullscreenInput = remember { mutableStateOf(false) }
     val showModelSelectorPopup = remember { mutableStateOf(false) }
     val showExtraSettingsPopup = remember { mutableStateOf(false) }
+    var isInputFocused by remember { mutableStateOf(false) }
     var showCharacterCardBindingSwitchConfirm by remember { mutableStateOf(false) }
     var pendingCharacterCardModelSelection by remember { mutableStateOf<Pair<String, Int>?>(null) }
     var showCharacterCardMemoryBindingSwitchConfirm by remember { mutableStateOf(false) }
@@ -660,6 +665,22 @@ fun AgentChatInputSection(
 
     Surface(color = Color.Transparent, modifier = floatingContainerModifier) {
         Column {
+            ChatInputSlotPluginRegistry.RenderSlot(
+                params = ChatInputSlotRenderParams(
+                    context = context,
+                    slot = ChatInputSlots.ABOVE_INPUT,
+                    chatId = currentChatId,
+                    runtime = inputMenuRuntime,
+                    inputStyle = "agent",
+                    isProcessing = isProcessing,
+                    isInputFocused = isInputFocused,
+                    inputText = userMessage.text
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 4.dp)
+            )
+
             replyToMessage?.let { message ->
                 Surface(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
@@ -833,6 +854,20 @@ fun AgentChatInputSection(
                             .fillMaxWidth()
                             .padding(horizontal = 12.dp, vertical = 8.dp),
                 ) {
+                    ChatInputSlotPluginRegistry.RenderSlot(
+                        params = ChatInputSlotRenderParams(
+                            context = context,
+                            slot = ChatInputSlots.INPUT_DRAWER,
+                            chatId = currentChatId,
+                            runtime = inputMenuRuntime,
+                            inputStyle = "agent",
+                            isProcessing = isProcessing,
+                            isInputFocused = isInputFocused,
+                            inputText = userMessage.text
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
                     OutlinedTextField(
                         value = userMessage,
                         onValueChange = onUserMessageChange,
@@ -847,7 +882,11 @@ fun AgentChatInputSection(
                                 style = inputTextStyle,
                             )
                         },
-                        modifier = Modifier.fillMaxWidth().heightIn(min = 44.dp).onPreviewKeyEvent(onEnterToSendKeyEvent),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 44.dp)
+                            .onFocusChanged { state -> isInputFocused = state.isFocused }
+                            .onPreviewKeyEvent(onEnterToSendKeyEvent),
                         textStyle = inputTextStyle,
                         maxLines = 6,
                         minLines = 1,
@@ -935,6 +974,22 @@ fun AgentChatInputSection(
                                 }
                             }
                         }
+
+                        ChatInputSlotPluginRegistry.RenderSlot(
+                            params = ChatInputSlotRenderParams(
+                                context = context,
+                                slot = ChatInputSlots.INPUT_TOOLBAR_RIGHT,
+                                chatId = currentChatId,
+                                runtime = inputMenuRuntime,
+                                inputStyle = "agent",
+                                isProcessing = isProcessing,
+                                isInputFocused = isInputFocused,
+                                inputText = userMessage.text
+                            ),
+                            modifier = Modifier
+                                .padding(start = 6.dp)
+                                .widthIn(max = 180.dp)
+                        )
 
                         Box(
                             modifier =
@@ -1133,6 +1188,20 @@ fun AgentChatInputSection(
                                 .fillMaxWidth()
                                 .padding(horizontal = 12.dp, vertical = 8.dp),
                     ) {
+                        ChatInputSlotPluginRegistry.RenderSlot(
+                            params = ChatInputSlotRenderParams(
+                                context = context,
+                                slot = ChatInputSlots.INPUT_DRAWER,
+                                chatId = currentChatId,
+                                runtime = inputMenuRuntime,
+                                inputStyle = "agent",
+                                isProcessing = isProcessing,
+                                isInputFocused = isInputFocused,
+                                inputText = userMessage.text
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
                         OutlinedTextField(
                             value = userMessage,
                             onValueChange = onUserMessageChange,
@@ -1147,7 +1216,11 @@ fun AgentChatInputSection(
                                     style = inputTextStyle,
                                 )
                             },
-                            modifier = Modifier.fillMaxWidth().heightIn(min = 44.dp).onPreviewKeyEvent(onEnterToSendKeyEvent),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 44.dp)
+                                .onFocusChanged { state -> isInputFocused = state.isFocused }
+                                .onPreviewKeyEvent(onEnterToSendKeyEvent),
                             textStyle = inputTextStyle,
                             maxLines = 6,
                             minLines = 1,
@@ -1232,11 +1305,27 @@ fun AgentChatInputSection(
                                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                             modifier = Modifier.size(18.dp),
                                         )
-                                    }
                                 }
                             }
+                        }
 
-                                Box(
+                        ChatInputSlotPluginRegistry.RenderSlot(
+                            params = ChatInputSlotRenderParams(
+                                context = context,
+                                slot = ChatInputSlots.INPUT_TOOLBAR_RIGHT,
+                                chatId = currentChatId,
+                                runtime = inputMenuRuntime,
+                                inputStyle = "agent",
+                                isProcessing = isProcessing,
+                                isInputFocused = isInputFocused,
+                                inputText = userMessage.text
+                            ),
+                            modifier = Modifier
+                                .padding(start = 6.dp)
+                                .widthIn(max = 180.dp)
+                        )
+
+                        Box(
                                     modifier =
                                         Modifier
                                             .padding(start = 6.dp)

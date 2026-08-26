@@ -12,6 +12,7 @@
 - XML 渲染插件。
 - 输入菜单开关插件。
 - AI 聊天输入框监听和提交 Hook。
+- 聊天输入区 UI 插槽渲染插件。
 - 聊天消息持久化通知 Hook。
 - 工具执行生命周期钩子。
 - Prompt 输入、历史、系统提示词、工具提示词、最终发送前的各类钩子。
@@ -51,6 +52,7 @@ ToolPkg.registerMessageProcessingPlugin(...)
 - `registerToolPkgXmlRenderPlugin(...)`
 - `registerToolPkgInputMenuTogglePlugin(...)`
 - `registerToolPkgChatInputHook(...)`
+- `registerToolPkgInputSlotPlugin(...)`
 - `registerToolPkgChatMessageHook(...)`
 - `registerToolPkgToolLifecycleHook(...)`
 - `registerToolPkgPromptInputHook(...)`
@@ -103,6 +105,7 @@ type LocalizedText = string | { [lang: string]: string }
 - `xml_render`
 - `input_menu_toggle`
 - 聊天输入框事件
+- 聊天输入区插槽渲染事件
 - 聊天消息持久化事件
 - 工具生命周期事件
 - Prompt 输入 / 历史 / 系统提示词 / 工具提示词 / 最终发送事件
@@ -245,6 +248,24 @@ interface PromptTurn {
 - `input_changed`
 - `submit_requested`
 - `submitted`
+
+### `InputSlotEventPayload`
+
+聊天输入区插槽是宿主在聊天输入界面内提供的命名 UI 区域。当前支持三个位置：
+
+- `above_input`：输入区容器顶部，输入控件之前
+- `input_drawer`：输入控件所在容器内部，输入控件之前
+- `input_toolbar_right`：模型选择器右侧的输入工具栏区域
+
+事件名固定为 `render`，payload 字段包括：
+
+- `slot?`
+- `chatId?`
+- `runtime?`
+- `inputStyle?`：`classic` 或 `agent`
+- `isProcessing?`
+- `isInputFocused?`
+- `inputText?`
 
 ### `ChatMessageEventPayload`
 
@@ -404,6 +425,24 @@ interface PromptTurn {
 - `{ action: 'consume', message?: string, clearInput?: boolean }`
 - 或对应的 `Promise`
 
+### 输入区插槽返回：`InputSlotRenderReturn`
+
+插槽 Hook 返回值支持：
+
+- 非空字符串：以宿主默认文本样式渲染
+- `{ text: string }`
+- `{ content: string }`
+- `{ composeDsl: { screen, state?, memo?, moduleSpec? } }`
+- `null` 或 `void`：本次不渲染内容
+
+对象可以包含 `handled: false` 以明确表示不渲染。`composeDsl.screen` 必须是
+当前 ToolPkg 归档内的 Compose DSL screen，宿主会复用现有 Compose DSL renderer
+和独立的执行上下文。
+
+插槽 Hook 受“前置插件 Hook 超时”设置约束。宿主会为一次插槽分发内的多个
+插件共享一个截止时间；Hook 超时或抛出异常时只跳过该插件，原有输入区继续工作。
+输入文字变化不会单独触发插槽 Hook 解析，避免每次击键启动完整的插件执行链。
+
 ### 聊天消息持久化返回
 
 `message_persisted` 的返回值会被忽略。
@@ -474,6 +513,14 @@ interface PromptTurn {
 - `id`
 - `function`
 
+### `InputSlotPluginRegistration`
+
+字段：
+
+- `id`
+- `slot`：`above_input`、`input_drawer` 或 `input_toolbar_right`
+- `function`
+
 ### `ChatMessageHookRegistration`
 
 字段：
@@ -508,6 +555,7 @@ interface PromptTurn {
 - `registerXmlRenderPlugin(definition)`
 - `registerInputMenuTogglePlugin(definition)`
 - `registerChatInputHook(definition)`
+- `registerInputSlotPlugin(definition)`
 - `registerChatMessageHook(definition)`
 - `registerToolLifecycleHook(definition)`
 - `registerPromptInputHook(definition)`
@@ -883,6 +931,49 @@ ToolPkg.registerChatInputHook({
   }
 });
 ```
+
+### 注册聊天输入区 UI 插槽
+
+`registerInputSlotPlugin()` 注册一个输入区插槽 renderer。一个 ToolPkg 可以为
+不同 slot 注册多个 renderer；同一 slot 的多个 ToolPkg 内容会按宿主顺序依次渲染。
+
+```ts
+export function renderInputSlot(event: ToolPkg.InputSlotHookEvent) {
+  const payload = event.eventPayload;
+  if (payload.slot !== 'above_input') {
+    return null;
+  }
+
+  return {
+    handled: true,
+    composeDsl: {
+      screen: 'dist/ui/input_slot/index.ui.js',
+      state: {
+        chatId: payload.chatId,
+        inputStyle: payload.inputStyle,
+        isProcessing: payload.isProcessing
+      }
+    }
+  };
+}
+
+export function registerToolPkg() {
+  ToolPkg.registerInputSlotPlugin({
+    id: 'status_above_input',
+    slot: 'above_input',
+    function: renderInputSlot
+  });
+}
+```
+
+如果只需要宿主默认文本样式，可以直接返回字符串或 `{ text: '...' }`。插槽
+screen 运行在独立的 Compose DSL UI runtime 中，`state`、`memo` 和 `moduleSpec`
+会作为该 screen 的初始运行参数传入。插槽不需要声明
+`required_host_capabilities`。
+
+`inputText` 会随事件 payload 提供，但输入框每次击键不会单独触发插槽 Hook 重新
+解析。需要响应输入内容时，应结合 `isProcessing`、焦点或其他宿主状态设计更新
+时机，避免在输入过程中执行昂贵任务。
 
 ### 注册聊天消息持久化 Hook
 
