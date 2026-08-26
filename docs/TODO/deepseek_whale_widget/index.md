@@ -52,3 +52,4 @@ Operit 当前已经支持 ToolPkg 页面和消息 Hook，但没有通用的长�
 - `jq`、`file`、`git diff --check` 和 `.toolpkg` ZIP 校验已通过；环境没有 `node`，未执行 JavaScript 语法检查
 - 本轮将旧浮窗能力重做为通用 `toolpkg.floating_window.v3`，不保留旧字段兼容路径
 - 当前开发包版本为 `v0.3.0`，宿主仓库不再重复存放鲸鱼插件资源和 UI
+- 宿主提交 `a9fe57d88` 已通过远程 Release 构建；独立插件源码提交为 `9eaa308`
