@@ -27,6 +27,10 @@ status: in_progress
 - 镜像功能远程 `sync + build_release` 通过，宿主提交 `014d8d3b7`
 - 镜像 Release APK：`operit-release-fix_api-interface-014d8d3b.apk`
 - 镜像 Release APK SHA-256：`59ebe8f67e4c346504ddc01f90a531b8df41ebcd0a1347fcc8b32724c3049516`
+- 变基上游后远程 `sync + build_release` 通过，宿主提交 `7ce4247ff`
+- 变基 Release APK：`operit-release-fix_api-interface-7ce4247f.apk`
+- 变基 Release APK SHA-256：`fb0f329d1318a20101f14b39db66381a166d986f092bccff47f63269e4069914`
+- 变基备份分支：`backup/fix-api-interface-before-rebase`
 - 独立插件 `sh scripts/pack.sh` 与 ZIP 完整性校验通过
 - 测试 ToolPkg `0.4.0-test.2` 已重新打包并通过 ZIP 校验
 - 测试 ToolPkg SHA-256：`102245e64a83c6f29584f0e436473068e9e5f7eb9542c0e08c51450adfa16bb1`
