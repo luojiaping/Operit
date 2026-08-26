@@ -385,6 +385,7 @@ internal object ToolPkgMainRegistrationScriptParser {
                     "$TOOLPKG_REGISTRATION_FLOATING_WINDOW[$index].snapMode must be none or quarter"
                 )
             }
+            val contentLayout = parseFloatingWindowContentLayout(item, index)
             val follow = parseFloatingWindowFollow(item, index)
             val pressFeedback = parseFloatingWindowFeedback(item, "pressFeedback", index)
             val releaseFeedback = parseFloatingWindowFeedback(item, "releaseFeedback", index)
@@ -400,6 +401,7 @@ internal object ToolPkgMainRegistrationScriptParser {
                     draggable = item.optBoolean("draggable", true),
                     resizable = item.optBoolean("resizable", true),
                     snapMode = snapMode,
+                    contentLayout = contentLayout,
                     follow = follow,
                     pressFeedback = pressFeedback,
                     releaseFeedback = releaseFeedback,
@@ -434,6 +436,30 @@ internal object ToolPkgMainRegistrationScriptParser {
             }
             window.copy(follow = follow)
         }
+    }
+
+    private fun parseFloatingWindowContentLayout(
+        item: JSONObject,
+        index: Int
+    ): ToolPkgFloatingWindowContentLayout {
+        val field = "$TOOLPKG_REGISTRATION_FLOATING_WINDOW[$index].contentLayout"
+        val layout = item.optJSONObject("contentLayout")
+            ?: throw IllegalArgumentException("$field must be a JSON object")
+        val mode = layout.optString("mode").trim().lowercase()
+        require(mode == "fixed") { "$field.mode must be fixed" }
+        val widthDp = layout.optInt("widthDp", -1)
+        val heightDp = layout.optInt("heightDp", -1)
+        require(widthDp in 1..1200 && heightDp in 1..1600) {
+            "$field size is outside supported bounds"
+        }
+        val scaleMode = layout.optString("scaleMode").trim().lowercase()
+        require(scaleMode == "fit") { "$field.scaleMode must be fit" }
+        return ToolPkgFloatingWindowContentLayout(
+            mode = mode,
+            widthDp = widthDp,
+            heightDp = heightDp,
+            scaleMode = scaleMode
+        )
     }
 
     private fun parseFloatingWindowFollow(

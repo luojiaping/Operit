@@ -71,6 +71,7 @@ export interface ComposeGeneratedTextProps extends ComposeCommonProps {
   fontFamily?: string;
   fontSize?: number;
   fontWeight?: string;
+  lineHeight?: number;
   maxLines?: number;
   overflow?: ComposeTextOverflow;
   softWrap?: boolean;
@@ -721,6 +722,7 @@ export interface ComposeGeneratedBoxWithConstraintsProps extends ComposeCommonPr
 export interface ComposeGeneratedBasicTextProps extends ComposeCommonProps {
   fontFamily?: string;
   fontSize?: number;
+  lineHeight?: number;
   maxLines?: number;
   onTextLayout?: () => void | Promise<void>;
   overflow?: ComposeTextOverflow;

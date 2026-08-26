@@ -386,6 +386,12 @@ function registerToolPkg() {
     draggable: true,
     resizable: true,
     snapMode: "quarter",
+    contentLayout: {
+      mode: "fixed",
+      widthDp: 320,
+      heightDp: 420,
+      scaleMode: "fit"
+    },
     follow: {
       windowId: "anchor_window",
       placement: "above",
@@ -510,6 +516,7 @@ exports.onInputMenuToggle = onInputMenuToggle;
 | `ToolPkg.registerFloatingWindow` | `draggable` | 否 | 是否允许拖动 |
 | `ToolPkg.registerFloatingWindow` | `resizable` | 否 | 是否允许调整尺寸 |
 | `ToolPkg.registerFloatingWindow` | `snapMode` | 否 | `quarter` 边缘吸附或 `none` 自由定位，默认 `quarter` |
+| `ToolPkg.registerFloatingWindow` | `contentLayout` | 是 | 固定设计视口及单次 `fit` 缩放方式 |
 | `ToolPkg.registerFloatingWindow` | `follow` | 否 | 同一 ToolPkg 内的锚定窗口、相对方向和二维偏移 |
 | `ToolPkg.registerFloatingWindow` | `pressFeedback` | 否 | 按下时的音效资源 key 和动画 |
 | `ToolPkg.registerFloatingWindow` | `releaseFeedback` | 否 | 松开时的音效资源 key 和动画 |
@@ -1106,7 +1113,7 @@ exports.default = Screen;
 - `AiChat`：嵌入当前主聊天的消息列表和输入区，不包含工作区
 - `AdaptiveSidePanel`：宽屏可拖拽分栏、窄屏覆盖层的自适应侧栏
 
-`Text` 和 `BasicText` 支持 `textAlign: "start" | "center" | "end" | "left" | "right" | "justify"`。当文本需要在固定宽度内逐行对齐时，同时给节点设置 `fillMaxWidth: true`。Canvas 的 `text` 和 `drawText` 命令也支持同名属性。
+`Text` 和 `BasicText` 支持 `textAlign: "start" | "center" | "end" | "left" | "right" | "justify"` 与 `lineHeight`。当文本需要在固定宽度内逐行对齐时，同时给节点设置 `fillMaxWidth: true`。Canvas 的 `text` 和 `drawText` 命令也支持同名 `textAlign` 属性；描边宽度可传 `{ value, unit: "dp" }` 以随固定设计视口缩放。
 
 `AdaptiveSidePanel` 的第二个参数是主内容，`side` 是侧栏内容。两者都必须恰好传入一个节点；`open` 与 `onOpenChanged` 由插件状态管理。默认在 600dp 以上使用分栏，侧栏初始宽度为 360dp，最小宽度为 280dp，主内容至少保留 320dp。
 

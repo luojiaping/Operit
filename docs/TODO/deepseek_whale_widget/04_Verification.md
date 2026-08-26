@@ -17,13 +17,8 @@ status: in_progress
 - 独立插件 `manifest.json` 结构和 Whale PNG 资源已核对
 - `git diff --check` 通过
 - 独立插件 `src` 与 `dist` 逐文件同步
-- 插件 `manifest.json` 声明 `toolpkg.floating_window.v3` 和 `0.3.0`
-- v3 字段已覆盖注册 parser、runtime model、PackageManager DTO、host bridge、service、JS facade 和 TypeScript 类型
+- `v0.3.0` 误发布 Release 与 tag 已删除，测试期不保留该版本
+- 待核对插件 `manifest.json` 的 `toolpkg.floating_window.v4` 和 `0.4.0-test.1`
+- 待核对 v4 字段覆盖注册 parser、runtime model、PackageManager DTO、host bridge、service、JS facade 和 TypeScript 类型
 - `Text`、`BasicText`、Canvas `text`/`drawText` 已接入 `textAlign`
-- 远程 `sync + build_release` 通过，宿主提交 `a9fe57d88`，耗时 `415.02s`
-- Release APK：`operit-release-fix_api-interface-a9fe57d8.apk`
-- Release APK SHA-256：`e47e10ebeb70ba19bcccff1c4f72ed56dcff911bea0a00910abe548681820875`
-- 独立插件 `sh scripts/pack.sh` 与 ZIP 完整性校验通过
-- ToolPkg `v0.3.0` SHA-256：`22c8e89732936dd1a19d9eb304395809e95ec5d0478f8220b955aa620334259c`
-- ToolPkg [`v0.3.0` Release](https://github.com/luojiaping/operit-deepseek-whale-widget/releases/tag/v0.3.0) 已发布
-- 待执行设备上的动画、音频、跟随与对齐验证
+- 待执行新的远程 Release 编译、测试 ToolPkg 打包和设备上的动画、音频、跟随与对齐验证

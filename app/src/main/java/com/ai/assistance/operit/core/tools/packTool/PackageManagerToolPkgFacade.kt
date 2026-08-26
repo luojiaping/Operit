@@ -172,6 +172,12 @@ internal class PackageManagerToolPkgFacade(
                 draggable = window.draggable,
                 resizable = window.resizable,
                 snapMode = window.snapMode,
+                contentLayout = PackageManager.ToolPkgFloatingWindowContentLayout(
+                    mode = window.contentLayout.mode,
+                    widthDp = window.contentLayout.widthDp,
+                    heightDp = window.contentLayout.heightDp,
+                    scaleMode = window.contentLayout.scaleMode
+                ),
                 follow = window.follow?.let { follow ->
                     PackageManager.ToolPkgFloatingWindowFollow(
                         windowId = follow.windowId,

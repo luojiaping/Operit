@@ -1953,6 +1953,7 @@ def build_ts_generated_file(
             emitted.setdefault("fontSize", ("number", False))
             emitted.setdefault("fontFamily", ("string", False))
             emitted.setdefault("textAlign", ("ComposeTextAlign", False))
+            emitted.setdefault("lineHeight", ("number", False))
 
         if component == "BasicText":
             emitted.setdefault("onTextLayout", ("() => void | Promise<void>", False))
