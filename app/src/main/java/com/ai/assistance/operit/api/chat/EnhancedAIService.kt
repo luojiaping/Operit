@@ -950,6 +950,7 @@ class EnhancedAIService private constructor(private val context: Context) {
             registerExecutionContext(execContext)
             var hadFatalError = false
             var providerStreamCollectionStarted = false
+            var useNativeToolCallForCompletion = false
             try {
                 // 确保所有操作都在IO线程上执行
                 withContext(Dispatchers.IO) {
@@ -1014,6 +1015,7 @@ class EnhancedAIService private constructor(private val context: Context) {
 
                     // 获取对应功能类型的AIService实例
                     val serviceForFunction = modelSnapshot.service
+                    useNativeToolCallForCompletion = serviceForFunction.usesNativeToolCall
                     val tAfterGetService = messageTimingNow()
                     AppLogger.d(TAG, "sendMessage本地耗时: getAIServiceForFunction=${tAfterGetService - tAfterModelParams}ms")
 
@@ -1338,7 +1340,7 @@ class EnhancedAIService private constructor(private val context: Context) {
                                  memorySpaceIdOverride,
                                  stream,
                                  enableGroupOrchestrationHint,
-                                 useNativeToolCall = serviceForFunction.usesNativeToolCall,
+                                  useNativeToolCall = useNativeToolCallForCompletion,
                                  disableWarning = disableWarning
                              )
                         }
