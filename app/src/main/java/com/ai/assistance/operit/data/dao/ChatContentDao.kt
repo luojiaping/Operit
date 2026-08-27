@@ -32,6 +32,7 @@ private const val MESSAGE_CONTENT_ROW_QUERY =
         completedAt,
         displayMode,
         isFavorite,
+        toolCallMetadataJson,
         LENGTH(content) AS contentCharacterCount
     FROM messages
     """
@@ -54,6 +55,7 @@ private const val MESSAGE_VARIANT_CONTENT_ROW_QUERY =
         outputDurationMs,
         waitDurationMs,
         completedAt,
+        toolCallMetadataJson,
         LENGTH(content) AS contentCharacterCount
     FROM message_variants
     """
