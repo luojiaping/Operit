@@ -530,6 +530,8 @@
     <string name="theme_bg_media">Configuración de medios de fondo</string>
     <string name="enable_tool_call">Habilitar llamada a herramientas</string>
     <string name="enable_tool_call_desc">Cuando está desactivado, se utiliza el mecanismo de llamada a herramientas integrado. Cuando está activado, se utiliza la interfaz nativa de la API para llamadas a herramientas (requiere soporte del modelo)</string>
+    <string name="enable_tool_call_api">Habilitar API de llamadas a herramientas</string>
+    <string name="enable_tool_call_api_desc">Controla la API de llamadas a herramientas del proveedor; al desactivarla se usa la compatibilidad con el protocolo XML</string>
     <string name="enable_deepseek_reasoning">Habilitar modo de razonamiento DeepSeek</string>
     <string name="enable_deepseek_reasoning_desc">Cuando está habilitado, el contenido dentro de la etiqueta &lt;think&gt; se enviará como reasoning_content al modelo DeepSeek, para admitir la llamada a herramientas en modelos de razonamiento como DeepSeek-R1</string>
     <string name="theme_media_image">Imagen</string>

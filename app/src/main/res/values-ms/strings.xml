@@ -3452,6 +3452,8 @@ Kini anda boleh menggunakan mod AutoGLM di antara muka perbualan.</string>
     <string name="enable_claude_1h_prompt_cache_desc">Setelah diaktifkan, Claude dan penyedia serasi Claude akan menggunakan TTL cache prompt 1 jam</string>
     <string name="enable_tool_call">Model menyokong ToolCall</string>
     <string name="enable_tool_call_desc">Apabila ditutup, mekanisme panggilan alat dalam perisian akan digunakan, dan panggilan alat juga boleh diselesaikan. Setelah dibuka, antara muka khusus API akan digunakan untuk panggilan alat asli (memerlukan sokongan model)</string>
+    <string name="enable_tool_call_api">Dayakan API Tool Call</string>
+    <string name="enable_tool_call_api_desc">Mengawal API Tool Call penyedia; apabila dilumpuhkan, keserasian protokol XML digunakan</string>
 
     <string name="chat_style_bubble_user_bubble_liquid_glass">Latar Belakang Kaca Mati untuk Gelembung Mesej Pengguna</string>
     <string name="chat_style_bubble_user_bubble_liquid_glass_desc">Apabila dihidupkan, latar belakang gelembung mesej pengguna akan memaparkan kesan kaca mati gaya iOS</string>

@@ -3473,6 +3473,8 @@
     <string name="enable_claude_1h_prompt_cache_desc">활성화되면 Claude 및 Claude 호환 제공자는 1시간 프롬프트 캐시 TTL을 사용합니다.</string>
     <string name="enable_tool_call">ToolCall을 지원하는 모델</string>
     <string name="enable_tool_call_desc">비활성화되면 도구 호출을 지원하는 앱 내 도구 호출 메커니즘을 사용합니다. 활성화되면 API의 전용 기본 인터페이스를 사용합니다(모델 지원 필요)</string>
+    <string name="enable_tool_call_api">Tool Call API 사용</string>
+    <string name="enable_tool_call_api_desc">제공업체 Tool Call API를 제어합니다. 비활성화하면 XML 프로토콜 호환 모드를 사용합니다</string>
     <string name="enable_deepseek_reasoning">DeepSeek 추론 모드 활성화</string>
     <string name="enable_deepseek_reasoning_desc">활성화되면 &lt;think&gt; 태그 내의 콘텐츠가 reasoning_content로 DeepSeek 모델에 전송되어 DeepSeek-R1과 같은 추론 모델을 위한 도구 호출을 지원합니다.</string>
     <string name="search_sources">출처 검색</string>

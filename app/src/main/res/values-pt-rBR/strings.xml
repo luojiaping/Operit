@@ -3334,6 +3334,8 @@ Agora é possível usar o modo AutoGLM na interface de diálogo.</string>
     <string name="enable_claude_1h_prompt_cache_desc">Quando ativado, Claude e provedores compatíveis com Claude usarão TTL de cache de prompt de 1 hora</string>
     <string name="enable_tool_call">Modelo suporta ToolCall</string>
     <string name="enable_tool_call_desc">Quando fechado, o mecanismo de chamada de ferramenta dentro do software será usado e a chamada de ferramenta também poderá ser concluída. Uma vez habilitada, a interface dedicada da API será usada para fazer chamadas de ferramentas nativas (é necessário suporte ao modelo)</string>
+    <string name="enable_tool_call_api">Ativar API de Tool Call</string>
+    <string name="enable_tool_call_api_desc">Controla a API de Tool Call do provedor; quando desativada, usa a compatibilidade com o protocolo XML</string>
     <string name="enable_deepseek_reasoning">Habilitar modo de inferência DeepSeek</string>
     <string name="enable_deepseek_reasoning_desc">Quando ativado, o conteúdo da tag &lt;think&gt; será enviado ao modelo DeepSeek como reasoning_content para suportar chamadas de ferramentas de modelos de raciocínio como DeepSeek-R1.</string>
     <string name="search_sources">Fonte de pesquisa</string>

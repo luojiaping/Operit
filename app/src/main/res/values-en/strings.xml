@@ -4009,8 +4009,10 @@
     <string name="enable_google_search_desc">When enabled, Gemini will use Google Search to enhance responses (may incur additional charges)</string>
     <string name="enable_claude_1h_prompt_cache">Enable Claude 1-hour prompt cache</string>
     <string name="enable_claude_1h_prompt_cache_desc">When enabled, Claude and Claude-compatible providers use a 1-hour prompt cache TTL</string>
-    <string name="enable_tool_call">Model supports ToolCall</string>
-    <string name="enable_tool_call_desc">When disabled, uses the built-in tool invocation mechanism which also supports tool calls. When enabled, uses the API\'s dedicated native interface (requires model support)</string>
+    <string name="enable_tool_call">Use Native Tool Call</string>
+    <string name="enable_tool_call_desc">When enabled, supported APIs use native tool calls and preserve call details; when disabled, XML protocol compatibility is used</string>
+    <string name="enable_tool_call_api">Enable Tool Call API</string>
+    <string name="enable_tool_call_api_desc">Controls the provider Tool Call API; when disabled, XML protocol compatibility is used</string>
     <string name="enable_deepseek_reasoning">Enable DeepSeek Reasoning Mode</string>
     <string name="enable_deepseek_reasoning_desc">When enabled, content within &lt;think&gt; tags will be sent as reasoning_content to DeepSeek models, supporting tool invocation for reasoning models like DeepSeek-R1</string>
     <string name="search_sources">Search Sources</string>

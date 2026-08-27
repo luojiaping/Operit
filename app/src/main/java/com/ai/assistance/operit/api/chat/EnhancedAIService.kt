@@ -32,6 +32,8 @@ import com.ai.assistance.operit.core.tools.climode.ToolExposureMode
 import com.ai.assistance.operit.core.tools.packTool.PackageManager
 import com.ai.assistance.operit.data.model.FunctionType
 import com.ai.assistance.operit.data.model.InputProcessingState
+import com.ai.assistance.operit.data.model.NativeToolCall
+import com.ai.assistance.operit.data.model.NativeToolResult
 import com.ai.assistance.operit.data.model.PromptFunctionType
 import com.ai.assistance.operit.data.model.ToolInvocation
 import com.ai.assistance.operit.data.model.ToolResult
@@ -430,6 +432,8 @@ class EnhancedAIService private constructor(private val context: Context) {
         val isConversationActive: AtomicBoolean = AtomicBoolean(true),
         val conversationHistory: MutableList<PromptTurn>,
         val eventChannel: MutableSharedStream<TextStreamEvent>,
+        val nativeToolCalls: MutableList<NativeToolCall> = mutableListOf(),
+        var nativeToolRoundIndex: Int = -1,
         var modelExecutionSnapshot: ModelExecutionSnapshot? = null
     )
 
@@ -1096,6 +1100,10 @@ class EnhancedAIService private constructor(private val context: Context) {
                     
                     // 使用新的Stream API
                     AppLogger.d(TAG, "sendMessage请求前准备耗时: ${tAfterGetTools - startTime}ms, 流式输出: $stream")
+                    synchronized(execContext.nativeToolCalls) {
+                        execContext.nativeToolCalls.clear()
+                    }
+                    execContext.nativeToolRoundIndex += 1
                     val requestStartTime = messageTimingNow()
                     val responseStream =
                             serviceForFunction.sendMessage(
@@ -1134,7 +1142,20 @@ class EnhancedAIService private constructor(private val context: Context) {
                             revisableStream?.let { carrier ->
                                 launch {
                                     carrier.eventChannel.collect { event ->
-                                        execContext.eventChannel.emit(event)
+                                        val eventToForward =
+                                            if (event.eventType == TextStreamEventType.NATIVE_TOOL_CALL &&
+                                                event.nativeToolCall != null
+                                            ) {
+                                                event.copy(
+                                                    nativeToolCall =
+                                                        event.nativeToolCall.copy(
+                                                            roundIndex = execContext.nativeToolRoundIndex
+                                                        )
+                                                )
+                                            } else {
+                                                event
+                                            }
+                                        execContext.eventChannel.emit(eventToForward)
                                         when (event.eventType) {
                                             TextStreamEventType.SAVEPOINT -> {
                                                 revisionMutex.withLock {
@@ -1151,6 +1172,20 @@ class EnhancedAIService private constructor(private val context: Context) {
                                                 execContext.streamBuffer.append(snapshot)
                                                 execContext.roundManager.updateContent(snapshot)
                                             }
+
+                                            TextStreamEventType.NATIVE_TOOL_CALL -> {
+                                                eventToForward.nativeToolCall?.let { annotatedToolCall ->
+                                                    synchronized(execContext.nativeToolCalls) {
+                                                        if (execContext.nativeToolCalls.none {
+                                                            it.callId == annotatedToolCall.callId
+                                                        }) {
+                                                            execContext.nativeToolCalls.add(annotatedToolCall)
+                                                        }
+                                                    }
+                                                }
+                                            }
+
+                                            TextStreamEventType.NATIVE_TOOL_RESULT -> Unit
                                         }
                                     }
                                 }
@@ -1198,6 +1233,23 @@ class EnhancedAIService private constructor(private val context: Context) {
                                 emit(content)
                             }
                         } finally {
+                            revisableStream?.eventChannel?.replayCache?.forEach { event ->
+                                if (event.eventType == TextStreamEventType.NATIVE_TOOL_CALL &&
+                                    event.nativeToolCall != null
+                                ) {
+                                    val nativeToolCall =
+                                        event.nativeToolCall.copy(
+                                            roundIndex = execContext.nativeToolRoundIndex
+                                        )
+                                    synchronized(execContext.nativeToolCalls) {
+                                        if (execContext.nativeToolCalls.none {
+                                            it.callId == nativeToolCall.callId
+                                        }) {
+                                            execContext.nativeToolCalls.add(nativeToolCall)
+                                        }
+                                    }
+                                }
+                            }
                             revisionJob?.cancelAndJoin()
                         }
                     }
@@ -1283,11 +1335,12 @@ class EnhancedAIService private constructor(private val context: Context) {
                                 notifyReplyOverride,
                                 chatModelConfigIdOverride,
                                 chatModelIndexOverride,
-                                memorySpaceIdOverride,
-                                stream,
-                                enableGroupOrchestrationHint,
-                                disableWarning
-                            )
+                                 memorySpaceIdOverride,
+                                 stream,
+                                 enableGroupOrchestrationHint,
+                                 useNativeToolCall = serviceForFunction.usesNativeToolCall,
+                                 disableWarning = disableWarning
+                             )
                         }
                     } else if (!hadFatalError) {
                         AppLogger.d(
@@ -1708,10 +1761,11 @@ class EnhancedAIService private constructor(private val context: Context) {
             notifyReplyOverride: Boolean? = null,
             chatModelConfigIdOverride: String? = null,
             chatModelIndexOverride: Int? = null,
-            memorySpaceIdOverride: String? = null,
-            stream: Boolean = true,
-            enableGroupOrchestrationHint: Boolean = false,
-            disableWarning: Boolean = false
+             memorySpaceIdOverride: String? = null,
+             stream: Boolean = true,
+             enableGroupOrchestrationHint: Boolean = false,
+             useNativeToolCall: Boolean = false,
+             disableWarning: Boolean = false
     ) {
         try {
             val startTime = messageTimingNow()
@@ -1722,10 +1776,14 @@ class EnhancedAIService private constructor(private val context: Context) {
 
             // Get response content
             val content = context.streamBuffer.toString().trim()
+            val nativeToolCalls = synchronized(context.nativeToolCalls) {
+                context.nativeToolCalls.toList()
+            }
+            val hasNativeToolCalls = useNativeToolCall && nativeToolCalls.isNotEmpty()
 
             // If content is empty, it means an error likely occurred or the model returned nothing.
             // We must still finalize the conversation to reset the state correctly.
-            if (content.isEmpty()) {
+            if (content.isEmpty() && !hasNativeToolCalls) {
                 AppLogger.d(TAG, "Stream content is empty. Finalizing conversation state.")
                 finalizeAssistantResponse(
                     context = context,
@@ -1741,13 +1799,13 @@ class EnhancedAIService private constructor(private val context: Context) {
             }
 
             // If content is empty, finish immediately
-            if (content.isEmpty()) {
+            if (content.isEmpty() && !hasNativeToolCalls) {
                 return
             }
 
             // 禁止“纯思考输出”：移除 thinking 后正文为空时，发出专用告警并回传给 AI 继续生成
             val contentWithoutThinking = ChatUtils.removeThinkingContent(content)
-            if (contentWithoutThinking.isEmpty()) {
+            if (contentWithoutThinking.isEmpty() && !hasNativeToolCalls) {
                 if (disableWarning) {
                     AppLogger.w(TAG, "检测到纯思考输出，disableWarning=true，直接结束本轮而不注入警告")
                     finalizeAssistantResponse(
@@ -1812,8 +1870,9 @@ class EnhancedAIService private constructor(private val context: Context) {
             }
 
             // 使用增强的工具检测功能处理内容
-            val enhancedContent = enhanceToolDetection(content)
-            val truncatedToolRecovery = detectAndRepairTruncatedToolRound(content)
+            val enhancedContent = if (useNativeToolCall) content else enhanceToolDetection(content)
+            val truncatedToolRecovery =
+                if (useNativeToolCall) null else detectAndRepairTruncatedToolRound(content)
             val finalContent = truncatedToolRecovery?.repairedContent ?: enhancedContent
 
             // 截断修复仅追加缺失后缀，不撤回已经发出的内容
@@ -1832,11 +1891,21 @@ class EnhancedAIService private constructor(private val context: Context) {
 
             // 预先提取工具调用信息，避免重复解析
             val extractedToolInvocations =
-                    if (truncatedToolRecovery == null) {
+                    if (useNativeToolCall) {
+                        emptyList()
+                    } else if (truncatedToolRecovery == null) {
                         ToolExecutionManager.extractToolInvocations(finalContent)
                     } else {
                         emptyList()
                     }
+            val nativeToolInvocations =
+                if (useNativeToolCall) {
+                    nativeToolCalls.map(ToolExecutionManager::createNativeToolInvocation)
+                } else {
+                    emptyList()
+                }
+            val toolInvocations =
+                if (useNativeToolCall) nativeToolInvocations else extractedToolInvocations
 
             // Check again if conversation is active
             if (!context.isConversationActive.get()) {
@@ -1848,7 +1917,8 @@ class EnhancedAIService private constructor(private val context: Context) {
                 context.conversationHistory.add(
                     PromptTurn(
                         kind = PromptTurnKind.ASSISTANT,
-                        content = context.roundManager.getCurrentRoundContent()
+                        content = context.roundManager.getCurrentRoundContent(),
+                        nativeToolCalls = if (useNativeToolCall) nativeToolCalls else emptyList()
                     )
                 )
             } catch (e: Exception) {
@@ -1925,14 +1995,14 @@ class EnhancedAIService private constructor(private val context: Context) {
             }
 
             // Main flow: Detect and process tool invocations
-            if (extractedToolInvocations.isNotEmpty()) {
+            if (toolInvocations.isNotEmpty()) {
                 logMessageTiming(
                     stage = "enhanced.processStreamCompletion.detectToolInvocations",
                     startTimeMs = startTime,
-                    details = "count=${extractedToolInvocations.size}"
+                    details = "count=${toolInvocations.size}, native=$useNativeToolCall"
                 )
                 handleToolInvocation(
-                        extractedToolInvocations,
+                        toolInvocations,
                         context,
                         functionType,
                         promptFunctionType,
@@ -1955,6 +2025,7 @@ class EnhancedAIService private constructor(private val context: Context) {
                         memorySpaceIdOverride,
                         stream = stream,
                         enableGroupOrchestrationHint = enableGroupOrchestrationHint,
+                        useNativeToolCall = useNativeToolCall,
                         disableWarning = disableWarning
                 )
                 return
@@ -2068,10 +2139,11 @@ class EnhancedAIService private constructor(private val context: Context) {
         notifyReplyOverride: Boolean? = null,
         chatModelConfigIdOverride: String? = null,
         chatModelIndexOverride: Int? = null,
-        memorySpaceIdOverride: String? = null,
-        stream: Boolean = true,
-        enableGroupOrchestrationHint: Boolean = false,
-        toolResultOverrideMessage: String? = null,
+         memorySpaceIdOverride: String? = null,
+         stream: Boolean = true,
+         enableGroupOrchestrationHint: Boolean = false,
+         useNativeToolCall: Boolean = false,
+         toolResultOverrideMessage: String? = null,
         disableWarning: Boolean = false
     ) {
         val startTime = messageTimingNow()
@@ -2113,8 +2185,9 @@ class EnhancedAIService private constructor(private val context: Context) {
                     allToolResults, context, functionType, promptFunctionType, collector, enableThinking,
                     enableMemoryAutoUpdate, onNonFatalError, onTokenLimitExceeded, maxTokens, tokenUsageThreshold, isSubTask,
                     characterName, avatarUri, roleCardId, chatId, onToolInvocation, notifyReplyOverride,
-                    chatModelConfigIdOverride, chatModelIndexOverride, memorySpaceIdOverride, stream, enableGroupOrchestrationHint,
-                    disableWarning = disableWarning
+                     chatModelConfigIdOverride, chatModelIndexOverride, memorySpaceIdOverride, stream, enableGroupOrchestrationHint,
+                     useNativeToolCall = useNativeToolCall,
+                     disableWarning = disableWarning
                 )
             } else if (!toolResultOverrideMessage.isNullOrEmpty()) {
                 AppLogger.d(TAG, "0工具路由命中，使用覆盖消息继续请求AI。")
@@ -2140,9 +2213,10 @@ class EnhancedAIService private constructor(private val context: Context) {
                     chatModelConfigIdOverride = chatModelConfigIdOverride,
                     chatModelIndexOverride = chatModelIndexOverride,
                     memorySpaceIdOverride = memorySpaceIdOverride,
-                    stream = stream,
-                    enableGroupOrchestrationHint = enableGroupOrchestrationHint,
-                    toolResultMessageOverride = toolResultOverrideMessage,
+                     stream = stream,
+                     enableGroupOrchestrationHint = enableGroupOrchestrationHint,
+                     useNativeToolCall = useNativeToolCall,
+                     toolResultMessageOverride = toolResultOverrideMessage,
                     disableWarning = disableWarning
                 )
             }
@@ -2166,6 +2240,16 @@ class EnhancedAIService private constructor(private val context: Context) {
 
 
     /** Process tool execution result - simplified version without callbacks */
+    private fun nativeToolResultOutput(result: ToolResult): String {
+        if (result.success) {
+            return result.result.toString()
+        }
+
+        return listOf(result.error.orEmpty().trim(), result.result.toString().trim())
+            .filter { it.isNotEmpty() }
+            .joinToString("\n\n")
+    }
+
     private suspend fun processToolResults(
             results: List<ToolResult>,
             context: MessageExecutionContext,
@@ -2189,12 +2273,29 @@ class EnhancedAIService private constructor(private val context: Context) {
             chatModelIndexOverride: Int? = null,
             memorySpaceIdOverride: String? = null,
             stream: Boolean = true,
-            enableGroupOrchestrationHint: Boolean = false,
-            toolResultMessageOverride: String? = null,
+             enableGroupOrchestrationHint: Boolean = false,
+             useNativeToolCall: Boolean = false,
+             toolResultMessageOverride: String? = null,
             disableWarning: Boolean = false
     ) {
         val startTime = messageTimingNow()
         val toolNames = results.joinToString(", ") { it.toolName }
+        val nativeToolResults =
+            if (useNativeToolCall) {
+                results.mapNotNull { result ->
+                    result.toolCallId?.takeIf { it.isNotBlank() }?.let { callId ->
+                        NativeToolResult(
+                            callId = callId,
+                            toolName = result.toolName,
+                            output = nativeToolResultOutput(result),
+                            success = result.success,
+                            roundIndex = context.nativeToolRoundIndex
+                        )
+                    }
+                }
+            } else {
+                emptyList()
+            }
         val rawToolResultMessage =
             toolResultMessageOverride ?: ConversationMarkupManager.buildBoundedToolResultMessage(results)
         val toolResultMessage =
@@ -2237,9 +2338,20 @@ class EnhancedAIService private constructor(private val context: Context) {
             PromptTurn(
                 kind = PromptTurnKind.TOOL_RESULT,
                 content = toolResultMessage,
-                toolName = toolNames.ifBlank { null }
+                toolName = toolNames.ifBlank { null },
+                nativeToolResults = nativeToolResults
             )
         )
+
+        nativeToolResults.forEach { nativeToolResult ->
+            context.eventChannel.emit(
+                TextStreamEvent(
+                    eventType = TextStreamEventType.NATIVE_TOOL_RESULT,
+                    id = nativeToolResult.callId,
+                    nativeToolResult = nativeToolResult
+                )
+            )
+        }
 
         val normalizedChatHistory =
             conversationService.normalizeConversationHistoryForModel(context.conversationHistory)
@@ -2319,6 +2431,10 @@ class EnhancedAIService private constructor(private val context: Context) {
         // 使用新的Stream API处理工具执行结果
         withContext(Dispatchers.IO) {
             try {
+                synchronized(context.nativeToolCalls) {
+                    context.nativeToolCalls.clear()
+                }
+                context.nativeToolRoundIndex += 1
                 // 发送消息并获取响应流
                 val aiStartTime = messageTimingNow()
                 val responseStream =
@@ -2360,7 +2476,20 @@ class EnhancedAIService private constructor(private val context: Context) {
                         revisableStream?.let { carrier ->
                             launch {
                                 carrier.eventChannel.collect { event ->
-                                    context.eventChannel.emit(event)
+                                    val eventToForward =
+                                        if (event.eventType == TextStreamEventType.NATIVE_TOOL_CALL &&
+                                            event.nativeToolCall != null
+                                        ) {
+                                            event.copy(
+                                                nativeToolCall =
+                                                    event.nativeToolCall.copy(
+                                                        roundIndex = context.nativeToolRoundIndex
+                                                    )
+                                            )
+                                        } else {
+                                            event
+                                        }
+                                    context.eventChannel.emit(eventToForward)
                                     when (event.eventType) {
                                         TextStreamEventType.SAVEPOINT -> {
                                             revisionMutex.withLock {
@@ -2377,13 +2506,27 @@ class EnhancedAIService private constructor(private val context: Context) {
                                             context.streamBuffer.append(snapshot)
                                             context.roundManager.updateContent(snapshot)
                                         }
+
+                                        TextStreamEventType.NATIVE_TOOL_CALL -> {
+                                            eventToForward.nativeToolCall?.let { nativeToolCall ->
+                                                synchronized(context.nativeToolCalls) {
+                                                    if (context.nativeToolCalls.none {
+                                                        it.callId == nativeToolCall.callId
+                                                    }) {
+                                                        context.nativeToolCalls.add(nativeToolCall)
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        TextStreamEventType.NATIVE_TOOL_RESULT -> Unit
                                     }
                                 }
                             }
                         }
 
                     try {
-                        responseStream.collect { content ->
+                            responseStream.collect { content ->
                             if (isFirstChunk) {
                                 isFirstChunk = false
                                 logMessageTiming(
@@ -2413,10 +2556,27 @@ class EnhancedAIService private constructor(private val context: Context) {
 
                             // 通过收集器将内容发射出去，让UI可以接收到
                             collector.emit(content)
+                            }
+                        } finally {
+                            revisableStream?.eventChannel?.replayCache?.forEach { event ->
+                                if (event.eventType == TextStreamEventType.NATIVE_TOOL_CALL &&
+                                    event.nativeToolCall != null
+                                ) {
+                                    val nativeToolCall =
+                                        event.nativeToolCall.copy(
+                                            roundIndex = context.nativeToolRoundIndex
+                                        )
+                                    synchronized(context.nativeToolCalls) {
+                                        if (context.nativeToolCalls.none {
+                                            it.callId == nativeToolCall.callId
+                                        }) {
+                                            context.nativeToolCalls.add(nativeToolCall)
+                                        }
+                                    }
+                                }
+                            }
+                            revisionJob?.cancelAndJoin()
                         }
-                    } finally {
-                        revisionJob?.cancelAndJoin()
-                    }
                 }
 
                 // Update accumulated token counts and persist them
@@ -2463,11 +2623,12 @@ class EnhancedAIService private constructor(private val context: Context) {
                     notifyReplyOverride,
                     chatModelConfigIdOverride,
                     chatModelIndexOverride,
-                    memorySpaceIdOverride,
-                    stream,
-                    enableGroupOrchestrationHint,
-                    disableWarning
-                )
+                     memorySpaceIdOverride,
+                     stream,
+                     enableGroupOrchestrationHint,
+                     useNativeToolCall = useNativeToolCall,
+                     disableWarning = disableWarning
+                 )
             } catch (e: CancellationException) {
                 AppLogger.d(TAG, "处理工具执行结果被取消")
                 throw e

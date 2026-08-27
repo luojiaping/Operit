@@ -18,6 +18,8 @@ import com.ai.assistance.operit.core.tools.packTool.PackageManager
 import com.ai.assistance.operit.data.model.AITool
 import com.ai.assistance.operit.data.model.FunctionType
 import com.ai.assistance.operit.data.model.ModelParameter
+import com.ai.assistance.operit.data.model.NativeToolCall
+import com.ai.assistance.operit.data.model.NativeToolResult
 import com.ai.assistance.operit.data.model.ToolParameter
 import com.ai.assistance.operit.core.tools.UIPageResultData
 import com.ai.assistance.operit.core.tools.SimplifiedUINode
@@ -640,7 +642,15 @@ class ConversationService(
                     val xmlTags = splitXmlTag(content)
                     if (xmlTags.isNotEmpty()) {
                         // Process the message with tool results
-                        processChatMessageWithTools(content, xmlTags, preparedHistory, index, effectiveChatHistory.size)
+                        processChatMessageWithTools(
+                            content = content,
+                            xmlTags = xmlTags,
+                            conversationHistory = preparedHistory,
+                            messageIndex = index,
+                            totalMessages = effectiveChatHistory.size,
+                            nativeToolCalls = message.nativeToolCalls,
+                            nativeToolResults = message.nativeToolResults
+                        )
                     } else {
                         // Add the message as is
                         preparedHistory.add(message)
@@ -718,16 +728,28 @@ class ConversationService(
             xmlTags: List<List<String>>,
             conversationHistory: MutableList<PromptTurn>,
             messageIndex: Int,
-            totalMessages: Int
+            totalMessages: Int,
+            nativeToolCalls: List<NativeToolCall> = emptyList(),
+            nativeToolResults: List<NativeToolResult> = emptyList()
     ) {
         if (xmlTags.isEmpty()) {
             // 如果没有XML标签，直接添加为AI消息
             conversationHistory.add(
                 PromptTurn(
                     kind = PromptTurnKind.ASSISTANT,
-                    content = content
+                    content = content,
+                    nativeToolCalls = nativeToolCalls
                 )
             )
+            if (nativeToolResults.isNotEmpty()) {
+                conversationHistory.add(
+                    PromptTurn(
+                        kind = PromptTurnKind.TOOL_RESULT,
+                        content = "",
+                        nativeToolResults = nativeToolResults
+                    )
+                )
+            }
             return
         }
 
@@ -827,8 +849,91 @@ class ConversationService(
             )
         }
 
-        // 将合并后的消息添加到对话历史
-        conversationHistory.addAll(mergedSegments)
+        // 将结构化原生记录恢复到与显示内容对应的 assistant/tool_result 段，并保留多轮边界。
+        val callsByRound = nativeToolCalls.groupBy { it.roundIndex }.toSortedMap()
+        val resultsByRound = nativeToolResults.groupBy { it.roundIndex }.toSortedMap()
+        val callRounds = callsByRound.keys.toList()
+        val resultRounds = resultsByRound.keys.toList()
+        var nextCallRoundIndex = 0
+        var nextResultRoundIndex = 0
+        val restoredSegments = mutableListOf<PromptTurn>()
+
+        fun appendCallRoundIfNeeded(round: Int) {
+            while (nextCallRoundIndex < callRounds.size && callRounds[nextCallRoundIndex] <= round) {
+                val callRound = callRounds[nextCallRoundIndex]
+                restoredSegments.add(
+                    PromptTurn(
+                        kind = PromptTurnKind.TOOL_CALL,
+                        content = "",
+                        nativeToolCalls = callsByRound.getValue(callRound)
+                    )
+                )
+                nextCallRoundIndex++
+            }
+        }
+
+        mergedSegments.forEach { segment ->
+            when (segment.kind) {
+                PromptTurnKind.ASSISTANT,
+                PromptTurnKind.TOOL_CALL -> {
+                    if (nextCallRoundIndex < callRounds.size) {
+                        val callRound = callRounds[nextCallRoundIndex]
+                        restoredSegments.add(
+                            segment.copy(nativeToolCalls = callsByRound.getValue(callRound))
+                        )
+                        nextCallRoundIndex++
+                    } else if (segment.kind == PromptTurnKind.TOOL_CALL &&
+                        nativeToolCalls.isNotEmpty()
+                    ) {
+                        Unit
+                    } else {
+                        restoredSegments.add(segment)
+                    }
+                }
+
+                PromptTurnKind.TOOL_RESULT -> {
+                    if (nextResultRoundIndex < resultRounds.size) {
+                        val resultRound = resultRounds[nextResultRoundIndex]
+                        appendCallRoundIfNeeded(resultRound)
+                        restoredSegments.add(
+                            segment.copy(nativeToolResults = resultsByRound.getValue(resultRound))
+                        )
+                        nextResultRoundIndex++
+                    } else if (nativeToolResults.isNotEmpty()) {
+                        Unit
+                    } else {
+                        restoredSegments.add(segment)
+                    }
+                }
+
+                else -> restoredSegments.add(segment)
+            }
+        }
+
+        while (nextCallRoundIndex < callRounds.size) {
+            val callRound = callRounds[nextCallRoundIndex]
+            restoredSegments.add(
+                PromptTurn(
+                    kind = PromptTurnKind.TOOL_CALL,
+                    content = "",
+                    nativeToolCalls = callsByRound.getValue(callRound)
+                )
+            )
+            nextCallRoundIndex++
+        }
+        while (nextResultRoundIndex < resultRounds.size) {
+            val resultRound = resultRounds[nextResultRoundIndex]
+            restoredSegments.add(
+                PromptTurn(
+                    kind = PromptTurnKind.TOOL_RESULT,
+                    content = "",
+                    nativeToolResults = resultsByRound.getValue(resultRound)
+                )
+            )
+            nextResultRoundIndex++
+        }
+
+        conversationHistory.addAll(restoredSegments)
     }
 
     /** Data class for search-replace operations, used for JSON deserialization. */

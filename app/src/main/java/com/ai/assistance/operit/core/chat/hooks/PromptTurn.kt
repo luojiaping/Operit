@@ -1,5 +1,8 @@
 package com.ai.assistance.operit.core.chat.hooks
 
+import com.ai.assistance.operit.data.model.NativeToolCall
+import com.ai.assistance.operit.data.model.NativeToolResult
+
 enum class PromptTurnKind {
     SYSTEM,
     USER,
@@ -27,7 +30,9 @@ data class PromptTurn(
     val kind: PromptTurnKind,
     val content: String,
     val toolName: String? = null,
-    val metadata: Map<String, Any?> = emptyMap()
+    val metadata: Map<String, Any?> = emptyMap(),
+    val nativeToolCalls: List<NativeToolCall> = emptyList(),
+    val nativeToolResults: List<NativeToolResult> = emptyList()
 ) {
     val role: String
         get() =
@@ -88,10 +93,12 @@ fun List<PromptTurn>.mergeAdjacentTurns(
     for (turn in this) {
         val previous = merged.lastOrNull()
         if (previous != null && shouldMerge(previous, turn)) {
-            merged[merged.lastIndex] =
+                merged[merged.lastIndex] =
                 previous.copy(
                     content = previous.content + "\n" + turn.content,
-                    metadata = if (turn.metadata.isEmpty()) previous.metadata else previous.metadata + turn.metadata
+                    metadata = if (turn.metadata.isEmpty()) previous.metadata else previous.metadata + turn.metadata,
+                    nativeToolCalls = previous.nativeToolCalls + turn.nativeToolCalls,
+                    nativeToolResults = previous.nativeToolResults + turn.nativeToolResults
                 )
         } else {
             merged.add(turn)

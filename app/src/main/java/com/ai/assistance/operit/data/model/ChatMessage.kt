@@ -23,6 +23,7 @@ data class ChatMessage(
         val outputDurationMs: Long = 0L, // 本轮输出耗时
         val waitDurationMs: Long = 0L, // 本轮等待首包耗时
         val completedAt: Long = 0L, // 本轮消息完成时间（时间戳）
+        val toolCallMetadataJson: String = NativeToolCallMetadataCodec.EMPTY_JSON,
         val displayMode: ChatMessageDisplayMode = ChatMessageDisplayMode.NORMAL,
         val isFavorite: Boolean = false,
         @Transient
@@ -55,6 +56,11 @@ data class ChatMessage(
         displayMode = readDisplayModeFromParcel(parcel),
         isFavorite = readBooleanFromParcel(parcel),
         completedAt = if (parcel.dataAvail() > 0) parcel.readLong() else 0L,
+        toolCallMetadataJson = if (parcel.dataAvail() > 0) {
+            parcel.readString() ?: NativeToolCallMetadataCodec.EMPTY_JSON
+        } else {
+            NativeToolCallMetadataCodec.EMPTY_JSON
+        },
     )
 
     override fun writeToParcel(parcel: Parcel, flags: Int) {
@@ -75,6 +81,7 @@ data class ChatMessage(
         parcel.writeString(displayMode.name)
         parcel.writeInt(if (isFavorite) 1 else 0)
         parcel.writeLong(completedAt)
+        parcel.writeString(toolCallMetadataJson)
         // 不需要序列化contentStream，因为它是暂时性的
     }
 

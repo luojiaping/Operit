@@ -225,13 +225,31 @@ export namespace ToolPkg {
         | "ASSISTANT"
         | "TOOL_CALL"
         | "TOOL_RESULT"
-        | "SUMMARY";
+         | "SUMMARY";
+
+    export interface NativeToolCallRecord extends JsonObject {
+        callId: string;
+        toolName: string;
+        argumentsJson: string;
+        index: number;
+        roundIndex: number;
+    }
+
+    export interface NativeToolResultRecord extends JsonObject {
+        callId: string;
+        toolName: string;
+        output: string;
+        success: boolean;
+        roundIndex: number;
+    }
 
     export interface PromptTurn extends JsonObject {
         kind: PromptTurnKind;
         content: string;
         toolName?: string;
         metadata?: JsonObject;
+        nativeToolCalls?: NativeToolCallRecord[];
+        nativeToolResults?: NativeToolResultRecord[];
     }
 
     export type ActivePromptType =

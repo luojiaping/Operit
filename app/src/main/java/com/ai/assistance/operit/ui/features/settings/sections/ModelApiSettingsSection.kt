@@ -160,6 +160,10 @@ fun ModelApiSettingsSection(
     var hasInitializedProviderEndpointSync by remember(config.id) { mutableStateOf(false) }
     var previousProviderTypeId by remember(config.id) { mutableStateOf(config.apiProviderTypeId) }
     val selectedApiProvider = ApiProviderType.fromProviderTypeId(selectedProviderTypeId)
+    val supportsDirectNativeToolCall =
+        selectedApiProvider == ApiProviderType.OPENAI_RESPONSES ||
+            selectedApiProvider == ApiProviderType.OPENAI_RESPONSES_GENERIC ||
+            selectedApiProvider == ApiProviderType.DEEPSEEK
     val isCodexProvider = selectedApiProvider == ApiProviderType.OPENAI_CODEX
     val codexUsage = persistedCodexUsage
         ?.takeIf { it.accountId == codexAuthState?.accountId }
@@ -881,11 +885,23 @@ fun ModelApiSettingsSection(
                     )
             }
             
-            // Tool Call 开关
-            SettingsSwitchRow(
-                title = stringResource(R.string.enable_tool_call),
-                subtitle = stringResource(R.string.enable_tool_call_desc),
-                checked = enableToolCallInput,
+             // Tool Call 开关
+             SettingsSwitchRow(
+                 title = stringResource(
+                     if (supportsDirectNativeToolCall) {
+                         R.string.enable_tool_call
+                     } else {
+                         R.string.enable_tool_call_api
+                     }
+                 ),
+                 subtitle = stringResource(
+                     if (supportsDirectNativeToolCall) {
+                         R.string.enable_tool_call_desc
+                     } else {
+                         R.string.enable_tool_call_api_desc
+                     }
+                 ),
+                 checked = enableToolCallInput,
                 onCheckedChange = { enableToolCallInput = it }
             )
 

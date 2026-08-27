@@ -337,7 +337,25 @@ internal class ToolPkgJsAiProviderService(
             "kind" to turn.kind.name,
             "content" to turn.content,
             "toolName" to turn.toolName,
-            "metadata" to turn.metadata
+            "metadata" to turn.metadata,
+            "nativeToolCalls" to turn.nativeToolCalls.map { call ->
+                jsonObjectOf(
+                    "callId" to call.callId,
+                    "toolName" to call.toolName,
+                    "argumentsJson" to call.argumentsJson,
+                    "index" to call.index,
+                    "roundIndex" to call.roundIndex
+                )
+            },
+            "nativeToolResults" to turn.nativeToolResults.map { result ->
+                jsonObjectOf(
+                    "callId" to result.callId,
+                    "toolName" to result.toolName,
+                    "output" to result.output,
+                    "success" to result.success,
+                    "roundIndex" to result.roundIndex
+                )
+            }
         )
     }
 

@@ -21,6 +21,8 @@ import com.ai.assistance.operit.data.model.AITool
 import com.ai.assistance.operit.data.model.AttachmentInfo
 import com.ai.assistance.operit.data.model.ChatMessage
 import com.ai.assistance.operit.data.model.ChatMessageTimestampAllocator
+import com.ai.assistance.operit.data.model.NativeToolCallMetadata
+import com.ai.assistance.operit.data.model.NativeToolCallMetadataCodec
 import com.ai.assistance.operit.data.model.ToolParameter
 import com.ai.assistance.operit.data.model.PromptFunctionType
 import com.ai.assistance.operit.data.preferences.ApiPreferences
@@ -1375,6 +1377,17 @@ object AIMessageManager {
         targetRoleName: String,
         removeStatusTags: (String) -> String
     ): PromptTurn? {
+        val nativeToolMetadata =
+            NativeToolCallMetadataCodec.decode(message.toolCallMetadataJson).also { decoded ->
+                if (decoded == null && message.toolCallMetadataJson.isNotBlank() &&
+                    message.toolCallMetadataJson != NativeToolCallMetadataCodec.EMPTY_JSON
+                ) {
+                    AppLogger.w(
+                        TAG,
+                        "消息原生工具元数据解析失败: timestamp=${message.timestamp}"
+                    )
+                }
+            } ?: NativeToolCallMetadata()
         // 清理思考内容
         val cleanedContent = ChatUtils.removeThinkingContent(message.content).trim()
         val contentWithoutStatus = removeStatusTags(cleanedContent)
@@ -1383,7 +1396,9 @@ object AIMessageManager {
         if (!isRoleScopedMode) {
             return PromptTurn(
                 kind = PromptTurnKind.ASSISTANT,
-                content = message.content
+                content = message.content,
+                nativeToolCalls = nativeToolMetadata.toolCalls,
+                nativeToolResults = nativeToolMetadata.toolResults
             )
         }
 
@@ -1393,7 +1408,9 @@ object AIMessageManager {
             // 当前角色的消息：作为 assistant 返回
             PromptTurn(
                 kind = PromptTurnKind.ASSISTANT,
-                content = message.content
+                content = message.content,
+                nativeToolCalls = nativeToolMetadata.toolCalls,
+                nativeToolResults = nativeToolMetadata.toolResults
             )
         } else {
             // 其他角色的消息：转换为 user 消息，添加角色标签

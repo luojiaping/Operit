@@ -21,6 +21,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import com.ai.assistance.operit.data.model.AITool
+import com.ai.assistance.operit.data.model.NativeToolCall
 import com.ai.assistance.operit.data.model.ToolParameter
 import com.ai.assistance.operit.ui.common.displays.MessageContentParser
 import com.ai.assistance.operit.util.ChatMarkupRegex
@@ -193,7 +194,8 @@ object ToolExecutionManager {
             toolName = resolveDisplayToolName(invocation.tool),
             success = false,
             result = StringResultData(""),
-            error = context.getString(R.string.character_card_tool_access_denied_runtime)
+            error = context.getString(R.string.character_card_tool_access_denied_runtime),
+            toolCallId = invocation.nativeToolCall?.callId
         )
     }
 
@@ -239,7 +241,8 @@ object ToolExecutionManager {
             toolName = resultToolName,
             success = false,
             result = StringResultData(""),
-            error = errorMessage
+            error = errorMessage,
+            toolCallId = invocation.nativeToolCall?.callId
         )
     }
 
@@ -343,6 +346,42 @@ object ToolExecutionManager {
         return invocations
     }
 
+    /** Converts a provider-native call into the shared executor input without serializing it to XML. */
+    fun createNativeToolInvocation(nativeToolCall: NativeToolCall): ToolInvocation {
+        require(nativeToolCall.callId.isNotBlank()) { "原生工具调用缺少 call_id" }
+        require(nativeToolCall.toolName.isNotBlank()) { "原生工具调用缺少工具名" }
+        val parameters = mutableListOf<ToolParameter>()
+        val arguments =
+            try {
+                JSONObject(nativeToolCall.argumentsJson)
+            } catch (e: Exception) {
+                AppLogger.e(
+                    TAG,
+                    "原生工具调用 arguments 解析失败: tool=${nativeToolCall.toolName}, call_id=${nativeToolCall.callId}",
+                    e
+                )
+                throw e
+            }
+        val keys = arguments.keys()
+        while (keys.hasNext()) {
+            val key = keys.next()
+            val value = arguments.opt(key)
+            val valueString = when (value) {
+                null, JSONObject.NULL -> "null"
+                is String -> value
+                else -> value.toString()
+            }
+            parameters.add(ToolParameter(name = key, value = valueString))
+        }
+
+        return ToolInvocation(
+            tool = AITool(name = nativeToolCall.toolName, parameters = parameters),
+            rawText = "",
+            responseLocation = 0..0,
+            nativeToolCall = nativeToolCall
+        )
+    }
+
     /**
      * Unescapes XML special characters
      * @param input The XML escaped string
@@ -392,7 +431,8 @@ object ToolExecutionManager {
                         toolName = invocation.tool.name,
                         success = false,
                         result = StringResultData(""),
-                        error = "Invalid parameters: ${validationResult.errorMessage}"
+                        error = "Invalid parameters: ${validationResult.errorMessage}",
+                        toolCallId = invocation.nativeToolCall?.callId
                     )
                 )
             }
@@ -406,7 +446,8 @@ object ToolExecutionManager {
                     toolName = invocation.tool.name,
                     success = false,
                     result = StringResultData(""),
-                    error = "Tool execution error: ${e.message}"
+                    error = "Tool execution error: ${e.message}",
+                    toolCallId = invocation.nativeToolCall?.callId
                 )
             )
         }
@@ -461,7 +502,8 @@ object ToolExecutionManager {
                         toolName = resolvedTarget.displayName,
                         success = false,
                         result = StringResultData(""),
-                        error = "User cancelled the tool execution."
+                        error = "User cancelled the tool execution.",
+                        toolCallId = invocation.nativeToolCall?.callId
                     )
                 toolHandler.notifyToolPermissionChecked(
                     permissionTool,
@@ -579,7 +621,7 @@ object ToolExecutionManager {
                     if (hasPermission) {
                         permittedInvocations.add(invocation)
                     } else {
-                        errorResult?.let {
+                        errorResult?.copy(toolCallId = invocation.nativeToolCall?.callId)?.let {
                             permissionDeniedResults.add(it)
                             val toolResultStatusContent =
                                 ConversationMarkupManager.formatToolResultForMessage(it)
@@ -593,7 +635,7 @@ object ToolExecutionManager {
                         toolHandler.buildToolInterceptionResult(
                             resolveDisplayToolName(invocation.tool),
                             interception
-                        )
+                        ).copy(toolCallId = invocation.nativeToolCall?.callId)
                     hookDeniedResults.add(interceptedResult)
                     toolHandler.notifyToolExecutionResult(invocation.tool, interceptedResult)
                     toolHandler.notifyToolExecutionFinished(invocation.tool)
@@ -705,7 +747,8 @@ object ToolExecutionManager {
                             toolName = displayToolName,
                             success = false,
                             result = StringResultData(""),
-                            error = errorMessage
+                            error = errorMessage,
+                            toolCallId = invocation.nativeToolCall?.callId
                         )
                     toolHandler.notifyToolExecutionResult(invocation.tool, notAvailableResult)
                     return@withContext notAvailableResult
@@ -724,12 +767,13 @@ object ToolExecutionManager {
 
                 // 为此调用聚合最终结果
                 if (collectedResults.isEmpty()) {
-                    val emptyResult =
+                        val emptyResult =
                         ToolResult(
                             toolName = displayToolName,
                             success = false,
                             result = StringResultData(""),
-                            error = "The tool execution returned no results."
+                            error = "The tool execution returned no results.",
+                            toolCallId = invocation.nativeToolCall?.callId
                         )
                     toolHandler.notifyToolExecutionResult(invocation.tool, emptyResult)
                     return@withContext emptyResult
@@ -745,7 +789,8 @@ object ToolExecutionManager {
                         toolName = displayToolName,
                         success = lastResult.success,
                         result = StringResultData(combinedResultString),
-                        error = lastResult.error
+                        error = lastResult.error,
+                        toolCallId = invocation.nativeToolCall?.callId
                     )
                 toolHandler.notifyToolExecutionResult(invocation.tool, finalResult)
                 return@withContext finalResult

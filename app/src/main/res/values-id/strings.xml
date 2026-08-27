@@ -3578,6 +3578,8 @@ Sekarang Anda dapat menggunakan mode AutoGLM di antarmuka percakapan.</string>
     <string name="enable_claude_1h_prompt_cache_desc">Setelah diaktifkan, Claude dan penyedia kompatibel Claude akan memakai TTL cache prompt 1 jam</string>
     <string name="enable_tool_call">Model mendukung ToolCall</string>
     <string name="enable_tool_call_desc">Saat dinonaktifkan, akan menggunakan mekanisme pemanggilan alat dalam perangkat lunak, yang juga dapat menyelesaikan pemanggilan alat. Setelah diaktifkan, akan menggunakan antarmuka khusus API untuk pemanggilan alat asli (memerlukan dukungan model)</string>
+    <string name="enable_tool_call_api">Aktifkan API Tool Call</string>
+    <string name="enable_tool_call_api_desc">Mengontrol API Tool Call penyedia; saat dinonaktifkan, kompatibilitas protokol XML digunakan</string>
     <string name="enable_deepseek_reasoning">Aktifkan mode penalaran DeepSeek</string>
     <string name="enable_deepseek_reasoning_desc">Setelah diaktifkan, konten dalam tag &lt;think&gt; akan dikirim sebagai reasoning_content ke model DeepSeek, untuk mendukung pemanggilan alat model penalaran seperti DeepSeek-R1</string>
     <string name="search_sources">Sumber pencarian</string>

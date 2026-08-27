@@ -49,6 +49,7 @@ class CodexProvider(
     enableToolCall = enableToolCall,
     thinkingConfigurations = thinkingConfigurations,
     thinkingOptionId = thinkingOptionId,
+    nativeToolCallMode = false,
 ) {
     override fun applyAuthenticationHeaders(builder: Request.Builder, currentApiKey: String) {
         super.applyAuthenticationHeaders(builder, currentApiKey)

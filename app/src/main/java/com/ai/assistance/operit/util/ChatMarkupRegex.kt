@@ -91,6 +91,8 @@ object ChatMarkupRegex {
 
     val nameAttr = Regex("name\\s*=\\s*\"([^\"]+)\"", RegexOption.IGNORE_CASE)
 
+    val toolCallIdAttr = Regex("call_id\\s*=\\s*\"([^\"]+)\"", RegexOption.IGNORE_CASE)
+
     val statusAttr = Regex("status\\s*=\\s*\"([^\"]+)\"", RegexOption.IGNORE_CASE)
 
     val typeAttr = Regex("type\\s*=\\s*\"([^\"]+)\"", RegexOption.IGNORE_CASE)

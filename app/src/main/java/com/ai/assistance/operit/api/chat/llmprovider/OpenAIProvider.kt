@@ -10,6 +10,8 @@ import com.ai.assistance.operit.core.chat.hooks.PromptTurnKind
 import com.ai.assistance.operit.data.model.ApiProviderType
 import com.ai.assistance.operit.data.model.ModelOption
 import com.ai.assistance.operit.data.model.ModelParameter
+import com.ai.assistance.operit.data.model.NativeToolCall
+import com.ai.assistance.operit.data.model.NativeToolResult
 import com.ai.assistance.operit.data.model.ToolPrompt
 import com.ai.assistance.operit.api.chat.llmprovider.EndpointCompleter
 import com.ai.assistance.operit.util.AppLogger
@@ -51,39 +53,19 @@ import com.ai.assistance.operit.api.chat.llmprovider.MediaLinkParser
  *
  * ## enableToolCall 参数说明
  *
- * `enableToolCall` 用于启用/禁用 OpenAI Tool Call API 原生格式。
+ * `enableToolCall` controls whether the caller provides provider-native tool records.
+ * The direct native event path is enabled by subclasses that opt into
+ * `nativeToolCallMode`; other OpenAI-compatible providers retain their existing XML bridge.
  *
- * ### 工作原理
+ * When the native path is enabled:
  *
- * 当 `enableToolCall = true` 时，本Provider会执行双向格式转换：
+ * 1. The request carries the provider tool schema and typed tool history.
+ * 2. Streaming and non-streaming responses retain the provider call ID and raw arguments.
+ * 3. The execution layer receives a native event without converting the response into XML.
  *
- * 1. **发送请求前**：将内部XML格式的工具调用转换为OpenAI Tool Call格式
- *    - `<tool name="xxx"><param name="yyy">value</param></tool>`
- *    - → `{"tool_calls": [{"function": {"name": "xxx", "arguments": "{\"yyy\": \"value\"}"}}]}`
+ * When `enableToolCall = false`, the existing XML protocol compatibility path is used.
  *
- * 2. **接收响应后**：将API返回的Tool Call格式转换回XML格式
- *    - API返回的tool_calls对象 → XML格式
- *    - 保持上层代码对XML格式的兼容性
- *
- * ### 历史记录处理
- *
- * - **Assistant消息**：XML工具调用 → OpenAI `tool_calls` 字段
- * - **User消息**：XML `tool_result` → OpenAI `role: "tool"` 消息
- * - **tool_call_id追踪**：自动生成和匹配ID，确保工具调用与结果正确关联
- *
- * ### 适用场景
- *
- * - 使用支持原生Tool Call API的模型（GPT-4、Claude、Qwen等）
- * - 需要更结构化的工具调用处理
- * - 希望利用模型的自动工具选择功能
- *
- * ### 注意事项
- *
- * - 默认值为 `false`，需要显式启用
- * - 启用后会自动添加 `tools` 和 `tool_choice` 到请求体
- * - 流式响应中也支持增量工具调用数据的处理
- *
- * @param enableToolCall 是否启用Tool Call API格式转换（默认false）
+ * @param enableToolCall whether to expose provider tool calls (default false for direct provider construction)
  */
 open class OpenAIProvider(
     private val apiEndpoint: String,
@@ -100,6 +82,7 @@ open class OpenAIProvider(
     private val includeUsageInStream: Boolean = false,
     protected val thinkingConfigurations: String = "",
     protected val thinkingOptionId: String = "",
+    protected open val nativeToolCallMode: Boolean = false,
 ) : AIService {
     // private val client: OkHttpClient = HttpClientFactory.instance
 
@@ -127,6 +110,9 @@ open class OpenAIProvider(
     val tokenCacheManager = TokenCacheManager()
 
     protected open val useResponsesApi: Boolean = false
+
+    override val usesNativeToolCall: Boolean
+        get() = nativeToolCallMode && enableToolCall
 
     // 公开token计数
     override val inputTokenCount: Long
@@ -716,6 +702,48 @@ open class OpenAIProvider(
         }
     }
 
+    protected fun renderNativeToolRecordsForXml(
+        turn: PromptTurn,
+        content: String
+    ): String {
+        if (turn.nativeToolCalls.isEmpty() && turn.nativeToolResults.isEmpty()) {
+            return content
+        }
+
+        val rendered = StringBuilder(content)
+        if (turn.nativeToolCalls.isNotEmpty() && !ChatMarkupRegex.containsToolTag(content)) {
+            turn.nativeToolCalls.forEach { nativeToolCall ->
+                val tagName = ChatMarkupRegex.generateRandomToolTagName()
+                rendered.append("\n<$tagName name=\"${escapeXml(nativeToolCall.toolName)}\"")
+                rendered.append(" call_id=\"${escapeXml(nativeToolCall.callId)}\">")
+                val arguments = JSONObject(nativeToolCall.argumentsJson)
+                val keys = arguments.keys()
+                while (keys.hasNext()) {
+                    val key = keys.next()
+                    rendered.append("\n<param name=\"${escapeXml(key)}\">")
+                    rendered.append(escapeXml(arguments.opt(key).toString()))
+                    rendered.append("</param>")
+                }
+                rendered.append("\n</$tagName>\n")
+            }
+        }
+
+        if (turn.nativeToolResults.isNotEmpty() && !ChatMarkupRegex.containsToolResultTag(content)) {
+            turn.nativeToolResults.forEach { nativeToolResult ->
+                val tagName = ChatMarkupRegex.generateRandomToolResultTagName()
+                val status = if (nativeToolResult.success) "success" else "error"
+                rendered.append(
+                    "\n<$tagName name=\"${escapeXml(nativeToolResult.toolName)}\" " +
+                        "status=\"$status\" call_id=\"${escapeXml(nativeToolResult.callId)}\">"
+                )
+                rendered.append("<content>${escapeXml(nativeToolResult.output)}</content>")
+                rendered.append("</$tagName>\n")
+            }
+        }
+
+        return rendered.toString()
+    }
+
     protected open fun comparableContentForTurn(
         turn: PromptTurn,
         preserveThinkInHistory: Boolean
@@ -950,6 +978,25 @@ open class OpenAIProvider(
             }
         }
 
+        fun queueNativeToolCalls(textContent: String, toolCalls: List<NativeToolCall>) {
+            appendQueuedAssistantToolText(textContent)
+            toolCalls.forEach { nativeToolCall ->
+                val toolCall = JSONObject().apply {
+                    put("id", nativeToolCall.callId)
+                    put("type", "function")
+                    put(
+                        "function",
+                        JSONObject().apply {
+                            put("name", nativeToolCall.toolName)
+                            put("arguments", nativeToolCall.argumentsJson)
+                        }
+                    )
+                }
+                queuedToolCalls.put(toolCall)
+                queuedToolCallIds.add(nativeToolCall.callId)
+            }
+        }
+
         fun emitQueuedToolCallsIfNeeded() {
             if (queuedToolCalls.length() == 0) return
 
@@ -993,6 +1040,29 @@ open class OpenAIProvider(
             openToolCallIds.clear()
         }
 
+        fun emitNativeToolResults(results: List<NativeToolResult>) {
+            emitQueuedToolCallsIfNeeded()
+            for (result in results) {
+                val openCallIndex = openToolCallIds.indexOf(result.callId)
+                if (openCallIndex < 0) {
+                    AppLogger.w(
+                        "AIService",
+                        "原生工具结果没有匹配的 open tool call: call_id=${result.callId}"
+                    )
+                    continue
+                }
+
+                messagesArray.put(
+                    JSONObject().apply {
+                        put("role", "tool")
+                        put("tool_call_id", result.callId)
+                        put("content", result.output)
+                    }
+                )
+                openToolCallIds.removeAt(openCallIndex)
+            }
+        }
+
         // 添加聊天历史
         if (effectiveHistory.isNotEmpty()) {
             for (turn in effectiveHistory) {
@@ -1022,15 +1092,25 @@ open class OpenAIProvider(
                         }
 
                         PromptTurnKind.ASSISTANT -> {
-                            val (textContent, parsedToolCalls) = parseXmlToolCalls(content)
-                            val toolCalls =
-                                if (parsedToolCalls != null) {
-                                    wrapPackageToolCallsWithProxy(parsedToolCalls)
+                            val (textContent, toolCalls) =
+                                if (turn.nativeToolCalls.isNotEmpty()) {
+                                    content to null
                                 } else {
-                                    null
+                                    val (parsedText, parsedToolCalls) = parseXmlToolCalls(content)
+                                    parsedText to
+                                        if (parsedToolCalls != null) {
+                                            wrapPackageToolCallsWithProxy(parsedToolCalls)
+                                        } else {
+                                            null
+                                        }
                                 }
 
-                            if (toolCalls != null && toolCalls.length() > 0) {
+                            if (turn.nativeToolCalls.isNotEmpty()) {
+                                if (openToolCallIds.isNotEmpty()) {
+                                    flushOpenToolCallsAsCancelled("assistant_native_tool_call_before_result")
+                                }
+                                queueNativeToolCalls(textContent, turn.nativeToolCalls)
+                            } else if (toolCalls != null && toolCalls.length() > 0) {
                                 if (openToolCallIds.isNotEmpty()) {
                                     flushOpenToolCallsAsCancelled("assistant_tool_call_before_result")
                                 }
@@ -1053,15 +1133,25 @@ open class OpenAIProvider(
                         }
 
                         PromptTurnKind.TOOL_CALL -> {
-                            val (textContent, parsedToolCalls) = parseXmlToolCalls(content)
-                            val toolCalls =
-                                if (parsedToolCalls != null) {
-                                    wrapPackageToolCallsWithProxy(parsedToolCalls)
+                            val (textContent, toolCalls) =
+                                if (turn.nativeToolCalls.isNotEmpty()) {
+                                    content to null
                                 } else {
-                                    null
+                                    val (parsedText, parsedToolCalls) = parseXmlToolCalls(content)
+                                    parsedText to
+                                        if (parsedToolCalls != null) {
+                                            wrapPackageToolCallsWithProxy(parsedToolCalls)
+                                        } else {
+                                            null
+                                        }
                                 }
 
-                            if (toolCalls != null && toolCalls.length() > 0) {
+                            if (turn.nativeToolCalls.isNotEmpty()) {
+                                if (openToolCallIds.isNotEmpty()) {
+                                    flushOpenToolCallsAsCancelled("typed_native_tool_call_before_result")
+                                }
+                                queueNativeToolCalls(textContent, turn.nativeToolCalls)
+                            } else if (toolCalls != null && toolCalls.length() > 0) {
                                 if (openToolCallIds.isNotEmpty()) {
                                     flushOpenToolCallsAsCancelled("typed_tool_call_before_result")
                                 }
@@ -1080,54 +1170,66 @@ open class OpenAIProvider(
 
                         PromptTurnKind.TOOL_RESULT -> {
                             emitQueuedToolCallsIfNeeded()
-                            val (textContent, toolResults) = parseXmlToolResults(content)
-                            val resultsList = toolResults ?: emptyList()
+                            if (turn.nativeToolResults.isNotEmpty()) {
+                                emitNativeToolResults(turn.nativeToolResults)
+                            } else {
+                                val (textContent, toolResults) = parseXmlToolResults(content)
+                                val resultsList = toolResults ?: emptyList()
 
-                            if (resultsList.isNotEmpty() && openToolCallIds.isNotEmpty()) {
-                                val validCount = minOf(resultsList.size, openToolCallIds.size)
-                                repeat(validCount) { index ->
-                                    val (_, resultContent) = resultsList[index]
-                                    messagesArray.put(
-                                        JSONObject().apply {
-                                            put("role", "tool")
-                                            put("tool_call_id", openToolCallIds[index])
-                                            put("content", resultContent)
+                                if (resultsList.isNotEmpty() && openToolCallIds.isNotEmpty()) {
+                                    var matchedCount = 0
+                                    for ((resultCallId, resultContent) in resultsList) {
+                                        if (openToolCallIds.isEmpty()) break
+                                        val openCallIndex =
+                                            if (resultCallId == null) 0 else openToolCallIds.indexOf(resultCallId)
+                                        if (openCallIndex < 0) {
+                                            AppLogger.w(
+                                                "AIService",
+                                                "tool_result call_id does not match an open tool call: $resultCallId"
+                                            )
+                                            continue
                                         }
-                                    )
-                                }
-                                repeat(validCount) {
-                                    openToolCallIds.removeAt(0)
-                                }
+                                        val matchedCallId = openToolCallIds.removeAt(openCallIndex)
+                                        messagesArray.put(
+                                            JSONObject().apply {
+                                                put("role", "tool")
+                                                put("tool_call_id", matchedCallId)
+                                                put("content", resultContent)
+                                            }
+                                        )
+                                        matchedCount++
+                                    }
 
-                                if (resultsList.size > validCount) {
-                                    AppLogger.w(
-                                        "AIService",
-                                        "发现多余的tool_result: ${resultsList.size} results vs ${validCount} pending tool_calls"
-                                    )
-                                }
+                                    if (resultsList.size > matchedCount) {
+                                        AppLogger.w(
+                                            "AIService",
+                                            "发现未匹配的tool_result: ${resultsList.size} results vs $matchedCount matched tool_calls"
+                                        )
+                                    }
 
-                                if (textContent.isNotEmpty()) {
+                                    if (textContent.isNotEmpty()) {
+                                        messagesArray.put(
+                                            JSONObject().apply {
+                                                put("role", "user")
+                                                put("content", buildContentField(context, textContent))
+                                            }
+                                        )
+                                    }
+                                } else {
+                                    flushOpenToolCallsAsCancelled("tool_result_without_structured_match")
+                                    val fallbackContent =
+                                        when {
+                                            textContent.isNotEmpty() -> textContent
+                                            content.isNotBlank() -> content
+                                            else -> "[Empty]"
+                                        }
                                     messagesArray.put(
                                         JSONObject().apply {
                                             put("role", "user")
-                                            put("content", buildContentField(context, textContent))
+                                            put("content", buildContentField(context, fallbackContent))
                                         }
                                     )
                                 }
-                            } else {
-                                flushOpenToolCallsAsCancelled("tool_result_without_structured_match")
-                                val fallbackContent =
-                                    when {
-                                        textContent.isNotEmpty() -> textContent
-                                        content.isNotBlank() -> content
-                                        else -> "[Empty]"
-                                    }
-                                messagesArray.put(
-                                    JSONObject().apply {
-                                        put("role", "user")
-                                        put("content", buildContentField(context, fallbackContent))
-                                    }
-                                )
                             }
                         }
                     }
@@ -1139,11 +1241,12 @@ open class OpenAIProvider(
                     historyMessage.put("role", role)
 
                     // 检查assistant角色的空消息
-                    val effectiveContent = if (role == "assistant" && content.isBlank()) {
+                    val compatibilityContent = renderNativeToolRecordsForXml(turn, content)
+                    val effectiveContent = if (role == "assistant" && compatibilityContent.isBlank()) {
                         AppLogger.d("AIService", "发现空的assistant消息，填充为[空消息]")
                         "[Empty]"
                     } else {
-                        content
+                        compatibilityContent
                     }
                     historyMessage.put("content", buildContentField(context, effectiveContent, role = role))
                     messagesArray.put(historyMessage)
@@ -1294,6 +1397,40 @@ open class OpenAIProvider(
         return xml.toString()
     }
 
+    internal fun parseNativeToolCall(toolCall: JSONObject, index: Int): NativeToolCall {
+        val function = toolCall.optJSONObject("function")
+            ?: throw IllegalArgumentException("原生工具调用缺少 function: index=$index")
+        val name = function.optString("name", "").trim()
+        if (name.isEmpty()) {
+            throw IllegalArgumentException("原生工具调用缺少工具名: index=$index")
+        }
+
+        val arguments = function.optString("arguments", "{}").ifBlank { "{}" }
+        val callId = toolCall.optString("id", "").trim()
+        if (callId.isEmpty()) {
+            val message = "原生工具调用缺少 provider call id: index=$index, name=$name"
+            AppLogger.e("OpenAIProvider", message)
+            throw IllegalStateException(message)
+        }
+        return NativeToolCall(
+            callId = callId,
+            toolName = name,
+            argumentsJson = arguments,
+            index = index
+        )
+    }
+
+    private suspend fun emitNativeToolCalls(
+        toolCalls: JSONArray,
+        emitter: StreamEmitter
+    ) {
+        for (i in 0 until toolCalls.length()) {
+            val toolCall = toolCalls.optJSONObject(i)
+                ?: throw IllegalArgumentException("原生工具调用条目不是对象: index=$i")
+            emitter.emitNativeToolCall(parseNativeToolCall(toolCall, i))
+        }
+    }
+
     /**
      * XML转义/反转义工具
      */
@@ -1387,6 +1524,7 @@ open class OpenAIProvider(
         private val onTokensUpdated: suspend (Long, Long, Long) -> Unit
     ) {
         private val savepointLengths = mutableMapOf<String, Int>()
+        private val pendingNativeToolCalls = linkedMapOf<Int, NativeToolCall>()
 
         suspend fun emitContent(content: String) {
             if (content.isNotNullOrEmpty()) {
@@ -1434,6 +1572,28 @@ open class OpenAIProvider(
             }
             eventChannel.emit(TextStreamEvent(TextStreamEventType.ROLLBACK, id))
             return true
+        }
+
+        suspend fun emitNativeToolCall(toolCall: NativeToolCall) {
+            pendingNativeToolCalls[toolCall.index] = toolCall
+        }
+
+        suspend fun commitNativeToolCalls() {
+            val calls = pendingNativeToolCalls.toSortedMap().values.toList()
+            pendingNativeToolCalls.clear()
+            calls.forEach { toolCall ->
+                eventChannel.emit(
+                    TextStreamEvent(
+                        eventType = TextStreamEventType.NATIVE_TOOL_CALL,
+                        id = toolCall.callId,
+                        nativeToolCall = toolCall
+                    )
+                )
+            }
+        }
+
+        fun clearPendingNativeToolCalls() {
+            pendingNativeToolCalls.clear()
         }
 
         /**
@@ -1603,7 +1763,13 @@ open class OpenAIProvider(
             // 使用工具名和参数的哈希生成确定性ID
             val toolNamePart = sanitizeToolCallId(toolName)
             val hashPart = stableIdHashPart("${toolName}:${params}")
-            val callId = sanitizeToolCallId("call_${toolNamePart}_${hashPart}_$callIndex")
+            val sourceCallId =
+                ChatMarkupRegex.toolCallIdAttr.find(match.value)
+                    ?.groupValues
+                    ?.getOrNull(1)
+                    ?.let(XmlEscaper::unescape)
+                    ?.takeIf { it.isNotBlank() }
+            val callId = sourceCallId ?: sanitizeToolCallId("call_${toolNamePart}_${hashPart}_$callIndex")
             toolCalls.put(JSONObject().apply {
                 put("id", callId)
                 put("type", "function")
@@ -1626,7 +1792,7 @@ open class OpenAIProvider(
      * 解析XML格式的tool_result，转换为OpenAI Tool消息格式
      * @return List<Pair<tool_call_id, result_content>>
      */
-    fun parseXmlToolResults(content: String): Pair<String, List<Pair<String, String>>?> {
+    fun parseXmlToolResults(content: String): Pair<String, List<Pair<String?, String>>?> {
         // 匹配带属性的tool_result标签，例如: <tool_result name="..." status="...">...</tool_result>
         val matches = ChatMarkupRegex.toolResultAnyPattern.findAll(content)
 
@@ -1634,11 +1800,16 @@ open class OpenAIProvider(
             return Pair(content, null)
         }
 
-        val results = mutableListOf<Pair<String, String>>()
+        val results = mutableListOf<Pair<String?, String>>()
         var textContent = content
-        var resultIndex = 0
 
         matches.forEach { match ->
+            val callId =
+                ChatMarkupRegex.toolCallIdAttr.find(match.value)
+                    ?.groupValues
+                    ?.getOrNull(1)
+                    ?.let(XmlEscaper::unescape)
+                    ?.takeIf { it.isNotBlank() }
             // 提取<content>标签内的内容，如果有的话
             val fullContent = match.groupValues[2].trim()
             val contentMatch = ChatMarkupRegex.contentTag.find(fullContent)
@@ -1648,12 +1819,10 @@ open class OpenAIProvider(
                 fullContent
             }
 
-            // 生成一个tool_call_id（这里需要与之前的call对应，但因为历史记录可能不完整，我们使用索引）
-            results.add(Pair("call_result_${resultIndex}", resultContent))
+            results.add(Pair(callId, resultContent))
 
             // 从文本内容中移除tool_result标签（包括前后的空白符）
             textContent = textContent.replace(match.value, "").trim()
-            resultIndex++
         }
 
         // trim 确保移除所有空白字符
@@ -1764,23 +1933,24 @@ open class OpenAIProvider(
         val name = deltaFunction.optString("name", "")
         if (name.isNotEmpty()) {
             accFunction.put("name", name)
-            // 流式输出开始标签
             if (state.toolCallState.nameEmitted[index] != true) {
-                val toolTagName = state.toolCallState.getTagName(index)
-                val toolStartTag = if (state.toolCallState.emitted[index] != true) {
-                    state.toolCallState.emitted[index] = true
-                    "\n<$toolTagName name=\"$name\">"
-                } else {
-                    ""
-                }
-                if (toolStartTag.isNotEmpty()) {
-                    emitter.emitTag(toolStartTag)
+                if (!nativeToolCallMode) {
+                    val toolTagName = state.toolCallState.getTagName(index)
+                    val toolStartTag = if (state.toolCallState.emitted[index] != true) {
+                        state.toolCallState.emitted[index] = true
+                        "\n<$toolTagName name=\"$name\">"
+                    } else {
+                        ""
+                    }
+                    if (toolStartTag.isNotEmpty()) {
+                        emitter.emitTag(toolStartTag)
+                    }
                 }
                 state.toolCallState.nameEmitted[index] = true
 
                 // 如果参数先到，工具名后到，在此处一次性补喂已累计参数
                 val canonicalArgs = accFunction.optString("arguments", "")
-                if (canonicalArgs.isNotEmpty()) {
+                if (!nativeToolCallMode && canonicalArgs.isNotEmpty()) {
                     feedParserFromCanonical(index, canonicalArgs, state, emitter)
                 }
             }
@@ -1794,7 +1964,7 @@ open class OpenAIProvider(
             val changed = mergedArgs != currentArgs
             if (changed) {
                 accFunction.put("arguments", mergedArgs)
-                if (state.toolCallState.nameEmitted[index] == true) {
+                if (!nativeToolCallMode && state.toolCallState.nameEmitted[index] == true) {
                     feedParserFromCanonical(index, mergedArgs, state, emitter)
                 }
             }
@@ -1865,7 +2035,10 @@ open class OpenAIProvider(
             if (index < 0) continue
 
             // 检测工具切换
-            if (state.lastProcessedToolIndex != null && state.lastProcessedToolIndex != index) {
+            if (!nativeToolCallMode &&
+                state.lastProcessedToolIndex != null &&
+                state.lastProcessedToolIndex != index
+            ) {
                 handleToolSwitch(state.lastProcessedToolIndex!!, state, emitter)
             }
             state.lastProcessedToolIndex = index
@@ -1881,6 +2054,15 @@ open class OpenAIProvider(
         emitter: StreamEmitter
     ) {
         if (state.toolCallState.closed[index] == true || state.toolCallState.nameEmitted[index] != true) {
+            return
+        }
+
+        if (nativeToolCallMode) {
+            val accumulated = state.accumulatedToolCalls[index]
+            if (accumulated != null) {
+                emitter.emitNativeToolCall(parseNativeToolCall(accumulated, index))
+            }
+            state.toolCallState.closed[index] = true
             return
         }
 
@@ -2093,7 +2275,9 @@ open class OpenAIProvider(
 
                 val deltaCall = JSONObject().apply {
                     put("index", outputIndex)
-                    val callId = item.optString("call_id", item.optString("id", ""))
+                    val callId = item.optString("call_id", "").ifBlank {
+                        item.optString("id", "")
+                    }
                     if (callId.isNotEmpty()) {
                         put("id", callId)
                     }
@@ -2104,6 +2288,24 @@ open class OpenAIProvider(
                 // 对于 output_item 事件，仅更新工具元信息（name/id）。
                 // 参数统一由 response.function_call_arguments.delta 通道累积，避免快照+增量混拼导致 JSON 破坏。
                 processToolCallChunk(outputIndex, deltaCall, state, emitter)
+                if (nativeToolCallMode && eventType == "response.output_item.done") {
+                    val accumulatedArguments = getAccumulatedToolArguments(state, outputIndex)
+                    val completeArguments = item.optString("arguments", "")
+                    if (accumulatedArguments.isEmpty() && completeArguments.isNotEmpty()) {
+                        processToolCallChunk(
+                            outputIndex,
+                            JSONObject().apply {
+                                put("index", outputIndex)
+                                put(
+                                    "function",
+                                    JSONObject().put("arguments", completeArguments)
+                                )
+                            },
+                            state,
+                            emitter
+                        )
+                    }
+                }
                 state.lastProcessedToolIndex = outputIndex
                 // 某些供应商会先发送 output_item.done，随后才发送 function_call_arguments.delta。
                 // 因此不在 output_item.done 阶段关闭工具调用，改由
@@ -2141,6 +2343,25 @@ open class OpenAIProvider(
                 if (!enableToolCall) return
                 val outputIndex = jsonResponse.optInt("output_index", -1)
                 if (outputIndex >= 0) {
+                    if (nativeToolCallMode &&
+                        getAccumulatedToolArguments(state, outputIndex).isEmpty()
+                    ) {
+                        val completeArguments = jsonResponse.optString("arguments", "")
+                        if (completeArguments.isNotEmpty()) {
+                            processToolCallChunk(
+                                outputIndex,
+                                JSONObject().apply {
+                                    put("index", outputIndex)
+                                    put(
+                                        "function",
+                                        JSONObject().put("arguments", completeArguments)
+                                    )
+                                },
+                                state,
+                                emitter
+                            )
+                        }
+                    }
                     closeToolCallIfOpen(outputIndex, state, emitter)
                     state.lastProcessedToolIndex = outputIndex
                 }
@@ -2636,13 +2857,17 @@ open class OpenAIProvider(
                                     }
 
                                     if (parsed.toolCalls.length() > 0 && enableToolCall) {
-                                        val xmlToolCalls = convertToolCallsToXml(parsed.toolCalls)
-                                        if (xmlToolCalls.isNotEmpty()) {
-                                            emitter.emitContent(xmlToolCalls)
-                                            AppLogger.d(
-                                                "AIService",
-                                                "Tool Call转XML (Responses非流式): $xmlToolCalls"
-                                            )
+                                        if (nativeToolCallMode) {
+                                            emitNativeToolCalls(parsed.toolCalls, emitter)
+                                        } else {
+                                            val xmlToolCalls = convertToolCallsToXml(parsed.toolCalls)
+                                            if (xmlToolCalls.isNotEmpty()) {
+                                                emitter.emitContent(xmlToolCalls)
+                                                AppLogger.d(
+                                                    "AIService",
+                                                    "Tool Call转XML (Responses非流式): $xmlToolCalls"
+                                                )
+                                            }
                                         }
                                     }
                                 } else if (!handledImages) {
@@ -2656,13 +2881,17 @@ open class OpenAIProvider(
                                             // 检查是否有tool_calls（Tool Call API）
                                             val toolCalls = messageObj.optJSONArray("tool_calls")
                                             if (toolCalls != null && toolCalls.length() > 0 && enableToolCall) {
-                                                val xmlToolCalls = convertToolCallsToXml(toolCalls)
-                                                if (xmlToolCalls.isNotEmpty()) {
-                                                    emitter.emitContent(xmlToolCalls)
-                                                    AppLogger.d(
-                                                        "AIService",
-                                                        "Tool Call转XML (非流式): $xmlToolCalls"
-                                                    )
+                                                if (nativeToolCallMode) {
+                                                    emitNativeToolCalls(toolCalls, emitter)
+                                                } else {
+                                                    val xmlToolCalls = convertToolCallsToXml(toolCalls)
+                                                    if (xmlToolCalls.isNotEmpty()) {
+                                                        emitter.emitContent(xmlToolCalls)
+                                                        AppLogger.d(
+                                                            "AIService",
+                                                            "Tool Call转XML (非流式): $xmlToolCalls"
+                                                        )
+                                                    }
                                                 }
                                             }
 
@@ -2711,6 +2940,7 @@ open class OpenAIProvider(
                 // 成功处理后返回
                 checkCancellation(context)
                 onUsageFinalized?.invoke(attemptNumber)
+                emitter.commitNativeToolCalls()
                 AppLogger.d(
                     "AIService",
                     "【发送消息】请求成功完成，输入token: ${tokenCacheManager.totalInputTokenCount}(缓存:${tokenCacheManager.cachedInputTokenCount})，输出token: ${tokenCacheManager.outputTokenCount}"
@@ -2718,6 +2948,7 @@ open class OpenAIProvider(
                 return@stream
             } catch (e: Exception) {
                 lastException = e
+                emitter.clearPendingNativeToolCalls()
                 retryCount = handleRetryableError(
                     context = context,
                     exception = e,

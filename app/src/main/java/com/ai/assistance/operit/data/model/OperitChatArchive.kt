@@ -109,6 +109,7 @@ data class OperitArchivedMessageVariant(
     val outputDurationMs: Long = 0L,
     val waitDurationMs: Long = 0L,
     val completedAt: Long = 0L,
+    val toolCallMetadataJson: String = NativeToolCallMetadataCodec.EMPTY_JSON,
 ) {
     fun toEntity(chatId: String, messageTimestamp: Long): MessageVariantEntity {
         return MessageVariantEntity(
@@ -126,6 +127,7 @@ data class OperitArchivedMessageVariant(
             outputDurationMs = outputDurationMs,
             waitDurationMs = waitDurationMs,
             completedAt = completedAt,
+            toolCallMetadataJson = toolCallMetadataJson,
         )
     }
 
@@ -144,6 +146,7 @@ data class OperitArchivedMessageVariant(
                 outputDurationMs = entity.outputDurationMs,
                 waitDurationMs = entity.waitDurationMs,
                 completedAt = entity.completedAt,
+                toolCallMetadataJson = entity.toolCallMetadataJson,
             )
         }
     }

@@ -21,6 +21,8 @@ import com.ai.assistance.operit.core.tools.packTool.TOOLPKG_EVENT_PROMPT_HISTORY
 import com.ai.assistance.operit.core.tools.packTool.TOOLPKG_EVENT_PROMPT_INPUT
 import com.ai.assistance.operit.core.tools.packTool.TOOLPKG_EVENT_SYSTEM_PROMPT_COMPOSE
 import com.ai.assistance.operit.core.tools.packTool.TOOLPKG_EVENT_TOOL_PROMPT_COMPOSE
+import com.ai.assistance.operit.data.model.NativeToolCall
+import com.ai.assistance.operit.data.model.NativeToolResult
 import com.ai.assistance.operit.util.AppLogger
 import java.util.concurrent.atomic.AtomicBoolean
 import org.json.JSONArray
@@ -388,7 +390,25 @@ internal object ToolPkgPromptHookBridge {
             "kind" to message.kind.name,
             "content" to message.content,
             "toolName" to message.toolName,
-            "metadata" to message.metadata
+            "metadata" to message.metadata,
+            "nativeToolCalls" to message.nativeToolCalls.map { call ->
+                mapOf(
+                    "callId" to call.callId,
+                    "toolName" to call.toolName,
+                    "argumentsJson" to call.argumentsJson,
+                    "index" to call.index,
+                    "roundIndex" to call.roundIndex
+                )
+            },
+            "nativeToolResults" to message.nativeToolResults.map { result ->
+                mapOf(
+                    "callId" to result.callId,
+                    "toolName" to result.toolName,
+                    "output" to result.output,
+                    "success" to result.success,
+                    "roundIndex" to result.roundIndex
+                )
+            }
         )
     }
 
@@ -524,10 +544,57 @@ internal object ToolPkgPromptHookBridge {
                     kind = kind,
                     content = content,
                     toolName = item.optString("toolName").takeIf { it.isNotBlank() },
-                    metadata = item.optJSONObject("metadata")?.let(::jsonObjectToMap).orEmpty()
+                    metadata = item.optJSONObject("metadata")?.let(::jsonObjectToMap).orEmpty(),
+                    nativeToolCalls = parseNativeToolCalls(item.optJSONArray("nativeToolCalls")),
+                    nativeToolResults = parseNativeToolResults(item.optJSONArray("nativeToolResults"))
                 )
             )
         }
         return result
+    }
+
+    private fun parseNativeToolCalls(jsonArray: JSONArray?): List<NativeToolCall> {
+        if (jsonArray == null) return emptyList()
+        return buildList {
+            for (index in 0 until jsonArray.length()) {
+                val item = jsonArray.optJSONObject(index) ?: continue
+                val callId = item.optString("callId").trim()
+                val toolName = item.optString("toolName").trim()
+                val argumentsJson = item.optString("argumentsJson")
+                if (callId.isNotEmpty() && toolName.isNotEmpty() && argumentsJson.isNotEmpty()) {
+                    add(
+                        NativeToolCall(
+                            callId = callId,
+                            toolName = toolName,
+                            argumentsJson = argumentsJson,
+                            index = item.optInt("index", index),
+                            roundIndex = item.optInt("roundIndex", 0)
+                        )
+                    )
+                }
+            }
+        }
+    }
+
+    private fun parseNativeToolResults(jsonArray: JSONArray?): List<NativeToolResult> {
+        if (jsonArray == null) return emptyList()
+        return buildList {
+            for (index in 0 until jsonArray.length()) {
+                val item = jsonArray.optJSONObject(index) ?: continue
+                val callId = item.optString("callId").trim()
+                val toolName = item.optString("toolName").trim()
+                if (callId.isNotEmpty() && toolName.isNotEmpty()) {
+                    add(
+                        NativeToolResult(
+                            callId = callId,
+                            toolName = toolName,
+                            output = item.optString("output"),
+                            success = item.optBoolean("success", false),
+                            roundIndex = item.optInt("roundIndex", 0)
+                        )
+                    )
+                }
+            }
+        }
     }
 }

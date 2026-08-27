@@ -1,15 +1,21 @@
 package com.ai.assistance.operit.util.stream
 
+import com.ai.assistance.operit.data.model.NativeToolCall
+import com.ai.assistance.operit.data.model.NativeToolResult
 import kotlinx.coroutines.CoroutineScope
 
 data class TextStreamEvent(
     val eventType: TextStreamEventType,
-    val id: String
+    val id: String,
+    val nativeToolCall: NativeToolCall? = null,
+    val nativeToolResult: NativeToolResult? = null
 )
 
 enum class TextStreamEventType {
     SAVEPOINT,
-    ROLLBACK
+    ROLLBACK,
+    NATIVE_TOOL_CALL,
+    NATIVE_TOOL_RESULT
 }
 
 interface TextStreamEventCarrier {

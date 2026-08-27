@@ -109,7 +109,7 @@ writeEnvironmentVariable(key: string, value?: string): Promise<StringResultData>
 - 上下文参数：`context_length`、`max_context_length`、`enable_max_context_mode`
 - 摘要相关：`summary_token_threshold`、`enable_summary`、`enable_summary_by_message_count`、`summary_message_count_threshold`
 - 多模态开关：`enable_direct_image_processing`、`enable_direct_audio_processing`、`enable_direct_video_processing`
-- 扩展能力：`enable_google_search`、`enable_tool_call`
+- 扩展能力：`enable_google_search`、`enable_tool_call`。`enable_tool_call` 已发布，开启时 OpenAI Responses API 和 DeepSeek Chat Completions 使用原生 Tool Call，关闭时使用 XML 协议兼容模式；其他 provider 保持各自现有行为。
 - 本地模型/并发控制：`mnn_forward_type`、`mnn_thread_count`、`llama_thread_count`、`llama_context_size`、`request_limit_per_minute`、`max_concurrent_requests`
 
 同一组字段都带有对应的 `..._enabled` 布尔控制项时，应按类型定义一起传递。

@@ -1,5 +1,6 @@
 package com.ai.assistance.operit.api.chat.llmprovider
 
+import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -61,5 +62,81 @@ class OpenAIResponsesPayloadAdapterTest {
                 JSONObject("""{"other": "x"}""")
             )
         )
+    }
+
+    @Test
+    fun `responses function call keeps native id and arguments`() {
+        val parsed =
+            OpenAIResponsesPayloadAdapter.parseNonStreamingResponse(
+                JSONObject(
+                    """
+                    {
+                      "output": [
+                        {
+                          "type": "function_call",
+                          "call_id": "call_native_1",
+                          "name": "read_file",
+                          "arguments": "{\"path\":\"/tmp/a\",\"line\":3}"
+                        }
+                      ]
+                    }
+                    """.trimIndent()
+                )
+            )
+
+        val toolCall = parsed.toolCalls.getJSONObject(0)
+        assertEquals("call_native_1", toolCall.getString("id"))
+        assertEquals("read_file", toolCall.getJSONObject("function").getString("name"))
+        assertEquals(
+            "{\"path\":\"/tmp/a\",\"line\":3}",
+            toolCall.getJSONObject("function").getString("arguments")
+        )
+    }
+
+    @Test
+    fun `responses history keeps function calls adjacent to matching outputs`() {
+        val callId = "call_native_2"
+        val request =
+            JSONObject().apply {
+                put(
+                    "messages",
+                    JSONArray()
+                        .put(
+                            JSONObject().apply {
+                                put("role", "assistant")
+                                put("content", "I will inspect the file.")
+                                put(
+                                    "tool_calls",
+                                    JSONArray().put(
+                                        JSONObject().apply {
+                                            put("id", callId)
+                                            put("type", "function")
+                                            put(
+                                                "function",
+                                                JSONObject()
+                                                    .put("name", "read_file")
+                                                    .put("arguments", "{\"path\":\"/tmp/a\"}")
+                                            )
+                                        }
+                                    )
+                                )
+                            }
+                        )
+                        .put(
+                            JSONObject()
+                                .put("role", "tool")
+                                .put("tool_call_id", callId)
+                                .put("content", "file content")
+                        )
+                )
+            }
+
+        val input = OpenAIResponsesPayloadAdapter.toResponsesRequest(request).getJSONArray("input")
+
+        assertEquals("message", input.getJSONObject(0).getString("type"))
+        assertEquals("function_call", input.getJSONObject(1).getString("type"))
+        assertEquals(callId, input.getJSONObject(1).getString("call_id"))
+        assertEquals("function_call_output", input.getJSONObject(2).getString("type"))
+        assertEquals(callId, input.getJSONObject(2).getString("call_id"))
     }
 }

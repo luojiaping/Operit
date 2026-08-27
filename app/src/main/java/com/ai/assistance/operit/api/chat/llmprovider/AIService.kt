@@ -22,6 +22,10 @@ interface AIService {
     /** 获取供应商:模型标识符，格式如"DEEPSEEK:deepseek-chat" */
     val providerModel: String
 
+    /** 当前服务是否直接向上层提供原生工具调用记录。 */
+    val usesNativeToolCall: Boolean
+        get() = false
+
     /** 重置token计数器 */
     fun resetTokenCounts()
 

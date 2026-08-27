@@ -1121,6 +1121,55 @@ class MessageProcessingDelegate(
                     modelName = modelName,
                     sentAt = requestSentAt
                 )
+
+                val nativeToolMetadataLock = Any()
+                fun recordNativeToolCall(nativeToolCall: NativeToolCall) {
+                    synchronized(nativeToolMetadataLock) {
+                        val current =
+                            NativeToolCallMetadataCodec.decode(aiMessage.toolCallMetadataJson)
+                                ?: NativeToolCallMetadata()
+                        val updatedCalls =
+                            (current.toolCalls + nativeToolCall).distinctBy {
+                                it.roundIndex to it.callId
+                            }
+                        aiMessage = aiMessage.copy(
+                            toolCallMetadataJson =
+                                NativeToolCallMetadataCodec.encode(
+                                    toolCalls = updatedCalls,
+                                    toolResults = current.toolResults
+                                )
+                        )
+                        chatRuntime.activeStreamingTurn?.let { activeTurn ->
+                            if (activeTurn.message.timestamp == aiMessage.timestamp) {
+                                chatRuntime.activeStreamingTurn = activeTurn.copy(message = aiMessage)
+                            }
+                        }
+                    }
+                }
+
+                fun recordNativeToolResult(nativeToolResult: NativeToolResult) {
+                    synchronized(nativeToolMetadataLock) {
+                        val current =
+                            NativeToolCallMetadataCodec.decode(aiMessage.toolCallMetadataJson)
+                                ?: NativeToolCallMetadata()
+                        val updatedResults =
+                            (current.toolResults + nativeToolResult).distinctBy {
+                                it.roundIndex to it.callId
+                            }
+                        aiMessage = aiMessage.copy(
+                            toolCallMetadataJson =
+                                NativeToolCallMetadataCodec.encode(
+                                    toolCalls = current.toolCalls,
+                                    toolResults = updatedResults
+                                )
+                        )
+                        chatRuntime.activeStreamingTurn?.let { activeTurn ->
+                            if (activeTurn.message.timestamp == aiMessage.timestamp) {
+                                chatRuntime.activeStreamingTurn = activeTurn.copy(message = aiMessage)
+                            }
+                        }
+                    }
+                }
                 if (effectivePersistTurn && chatId != null) {
                     chatRuntime.activeStreamingTurn =
                         ActiveStreamingTurn(
@@ -1182,11 +1231,11 @@ class MessageProcessingDelegate(
                                     inputTokens = sourceMessage.inputTokens,
                                     outputTokens = sourceMessage.outputTokens,
                                     cachedInputTokens = sourceMessage.cachedInputTokens,
-                                    sentAt = sourceMessage.sentAt,
-                                    outputDurationMs = sourceMessage.outputDurationMs,
-                                    waitDurationMs = sourceMessage.waitDurationMs,
-                                    completedAt = sourceMessage.completedAt,
-                                )
+                                     sentAt = sourceMessage.sentAt,
+                                     outputDurationMs = sourceMessage.outputDurationMs,
+                                     waitDurationMs = sourceMessage.waitDurationMs,
+                                     completedAt = sourceMessage.completedAt,
+                                 )
                             waifuEmittedMessages[index] = updatedMessage
                             addMessageToChat(chatId, updatedMessage)
                         }
@@ -1329,6 +1378,14 @@ class MessageProcessingDelegate(
                                                         tryEmitScrollToBottomThrottled(chatId)
                                                     }
                                                 }
+
+                                                TextStreamEventType.NATIVE_TOOL_CALL -> {
+                                                    event.nativeToolCall?.let(::recordNativeToolCall)
+                                                }
+
+                                                TextStreamEventType.NATIVE_TOOL_RESULT -> {
+                                                    event.nativeToolResult?.let(::recordNativeToolResult)
+                                                }
                                             }
                                         }
                                     }
@@ -1365,6 +1422,19 @@ class MessageProcessingDelegate(
                                 }
                             } finally {
                                 withContext(NonCancellable) {
+                                    revisableStream?.eventChannel?.replayCache?.forEach { event ->
+                                        when (event.eventType) {
+                                            TextStreamEventType.NATIVE_TOOL_CALL -> {
+                                                event.nativeToolCall?.let(::recordNativeToolCall)
+                                            }
+
+                                            TextStreamEventType.NATIVE_TOOL_RESULT -> {
+                                                event.nativeToolResult?.let(::recordNativeToolResult)
+                                            }
+
+                                            else -> Unit
+                                        }
+                                    }
                                     revisionJob?.cancelAndJoin()
                                     // Cancellation must publish the final revision before statistics are persisted.
                                     aiMessage.content =
@@ -1706,7 +1776,7 @@ class MessageProcessingDelegate(
             val sharedResponseStream = responseStream
             chatRuntime.responseStream = sharedResponseStream
 
-            val aiMessage =
+            var aiMessage =
                 ChatMessage(
                     sender = "ai",
                     contentStream = sharedResponseStream,
@@ -1716,6 +1786,38 @@ class MessageProcessingDelegate(
                     modelName = modelName,
                     sentAt = requestSentAt,
                 )
+            val nativeToolMetadataLock = Any()
+            fun recordNativeToolCall(nativeToolCall: NativeToolCall) {
+                synchronized(nativeToolMetadataLock) {
+                    val current =
+                        NativeToolCallMetadataCodec.decode(aiMessage.toolCallMetadataJson)
+                            ?: NativeToolCallMetadata()
+                    aiMessage = aiMessage.copy(
+                        toolCallMetadataJson =
+                            NativeToolCallMetadataCodec.encode(
+                                toolCalls = (current.toolCalls + nativeToolCall)
+                                    .distinctBy { it.roundIndex to it.callId },
+                                toolResults = current.toolResults
+                            )
+                    )
+                }
+            }
+
+            fun recordNativeToolResult(nativeToolResult: NativeToolResult) {
+                synchronized(nativeToolMetadataLock) {
+                    val current =
+                        NativeToolCallMetadataCodec.decode(aiMessage.toolCallMetadataJson)
+                            ?: NativeToolCallMetadata()
+                    aiMessage = aiMessage.copy(
+                        toolCallMetadataJson =
+                            NativeToolCallMetadataCodec.encode(
+                                toolCalls = current.toolCalls,
+                                toolResults = (current.toolResults + nativeToolResult)
+                                    .distinctBy { it.roundIndex to it.callId }
+                            )
+                    )
+                }
+            }
             onVariantPreviewStarted(aiMessage)
 
             coroutineScope {
@@ -1741,6 +1843,14 @@ class MessageProcessingDelegate(
                                             } ?: return@collect
                                         aiMessage.content = snapshot
                                     }
+
+                                    TextStreamEventType.NATIVE_TOOL_CALL -> {
+                                        event.nativeToolCall?.let(::recordNativeToolCall)
+                                    }
+
+                                    TextStreamEventType.NATIVE_TOOL_RESULT -> {
+                                        event.nativeToolResult?.let(::recordNativeToolResult)
+                                    }
                                 }
                             }
                         }
@@ -1755,6 +1865,19 @@ class MessageProcessingDelegate(
                     }
                 }
 
+                revisableStream?.eventChannel?.replayCache?.forEach { event ->
+                    when (event.eventType) {
+                        TextStreamEventType.NATIVE_TOOL_CALL -> {
+                            event.nativeToolCall?.let(::recordNativeToolCall)
+                        }
+
+                        TextStreamEventType.NATIVE_TOOL_RESULT -> {
+                            event.nativeToolResult?.let(::recordNativeToolResult)
+                        }
+
+                        else -> Unit
+                    }
+                }
                 revisionJob?.cancelAndJoin()
                 aiMessage.content =
                     revisionMutex.withLock {

@@ -38,6 +38,7 @@ data class MessageEntity(
         val completedAt: Long = 0L,
         val displayMode: String = ChatMessageDisplayMode.NORMAL.name,
         val isFavorite: Boolean = false,
+        val toolCallMetadataJson: String = NativeToolCallMetadataCodec.EMPTY_JSON,
 ) {
     /** 转换为ChatMessage对象（供UI层使用） */
     fun toChatMessage(): ChatMessage {
@@ -55,8 +56,9 @@ data class MessageEntity(
             sentAt = sentAt,
             outputDurationMs = outputDurationMs,
             waitDurationMs = waitDurationMs,
-            completedAt = completedAt,
-            displayMode =
+             completedAt = completedAt,
+             toolCallMetadataJson = toolCallMetadataJson,
+             displayMode =
                 runCatching { ChatMessageDisplayMode.valueOf(displayMode) }
                     .getOrDefault(ChatMessageDisplayMode.NORMAL),
             isFavorite = isFavorite,
@@ -91,6 +93,7 @@ data class MessageEntity(
                     completedAt = message.completedAt,
                     displayMode = message.displayMode.name,
                     isFavorite = message.isFavorite,
+                    toolCallMetadataJson = message.toolCallMetadataJson,
             )
         }
     }

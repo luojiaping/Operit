@@ -327,10 +327,10 @@ object AIServiceFactory {
                     supportsVision = supportsVision,
                     supportsAudio = supportsAudio,
                     supportsVideo = supportsVideo,
-                    enableToolCall = enableToolCall,
-                    thinkingConfigurations = config.thinkingConfigurations,
-                    thinkingOptionId = config.thinkingOptionId,
-                )
+                     enableToolCall = enableToolCall,
+                     thinkingConfigurations = config.thinkingConfigurations,
+                     thinkingOptionId = config.thinkingOptionId,
+                 )
 
             ApiProviderType.OPENAI ->
                 OpenAIProvider(
@@ -361,10 +361,10 @@ object AIServiceFactory {
                     supportsVision = supportsVision,
                     supportsAudio = supportsAudio,
                     supportsVideo = supportsVideo,
-                    enableToolCall = enableToolCall,
-                    thinkingConfigurations = config.thinkingConfigurations,
-                    thinkingOptionId = config.thinkingOptionId,
-                )
+                     enableToolCall = enableToolCall,
+                     thinkingConfigurations = config.thinkingConfigurations,
+                     thinkingOptionId = config.thinkingOptionId,
+                 )
 
             ApiProviderType.OPENAI_RESPONSES,
             ApiProviderType.OPENAI_RESPONSES_GENERIC ->
@@ -377,11 +377,12 @@ object AIServiceFactory {
                     responsesProviderType = providerType,
                     supportsVision = supportsVision,
                     supportsAudio = supportsAudio,
-                    supportsVideo = supportsVideo,
-                    enableToolCall = enableToolCall,
-                    thinkingConfigurations = config.thinkingConfigurations,
-                    thinkingOptionId = config.thinkingOptionId,
-                )
+                     supportsVideo = supportsVideo,
+                     enableToolCall = enableToolCall,
+                     thinkingConfigurations = config.thinkingConfigurations,
+                     thinkingOptionId = config.thinkingOptionId,
+                     nativeToolCallMode = true,
+                 )
 
             ApiProviderType.OPENAI_CODEX ->
                 CodexProvider(

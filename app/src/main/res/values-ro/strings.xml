@@ -3847,6 +3847,8 @@ Acum poate fi utilizat în interfața de dialog AutoGLM A devenit un model.</str
     <string name="enable_claude_1h_prompt_cache_desc">După activare,Claude și Claude Cache-ul de sugestii compatibil cu furnizorul TTL Se va utiliza 1 oră</string>
     <string name="enable_tool_call">Suport pentru modeleToolCall</string>
     <string name="enable_tool_call_desc">Când este dezactivată, apelarea instrumentelor se va efectua prin mecanismul integrat în software; totuși, apelarea instrumentelor poate fi realizată și în acest mod. După activare, se va utilizaAPIprin intermediul unei interfețe dedicate pentru apelarea instrumentelor native (necesită suport din partea modelului)</string>
+    <string name="enable_tool_call_api">Activează API Tool Call</string>
+    <string name="enable_tool_call_api_desc">Controlează API-ul Tool Call al furnizorului; când este dezactivat, se folosește compatibilitatea cu protocolul XML</string>
     <string name="enable_deepseek_reasoning">Activare DeepSeek Modul de deducție</string>
     <string name="enable_deepseek_reasoning_desc">După activare,&lt;think&gt;Conținutul din etichetă va fi considerat ca fiindreasoning_contentTrimite cătreDeepSeekModel, utilizat pentru a sprijiniDeepSeek-R1Apeluri către instrumente ale modelelor de deducție etc.</string>
     <string name="search_sources">Sursă de căutare</string>

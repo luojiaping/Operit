@@ -6,6 +6,8 @@ import com.ai.assistance.operit.core.chat.hooks.PromptTurnKind
 import com.ai.assistance.operit.util.AppLogger
 import com.ai.assistance.operit.data.model.ApiProviderType
 import com.ai.assistance.operit.data.model.ModelParameter
+import com.ai.assistance.operit.data.model.NativeToolCall
+import com.ai.assistance.operit.data.model.NativeToolResult
 import com.ai.assistance.operit.data.model.ToolPrompt
 import com.ai.assistance.operit.util.ChatUtils
 import com.ai.assistance.operit.util.stream.Stream
@@ -42,10 +44,11 @@ class DeepseekProvider(
         supportsVision = supportsVision,
         supportsAudio = supportsAudio,
         supportsVideo = supportsVideo,
-        enableToolCall = enableToolCall,
-        thinkingConfigurations = thinkingConfigurations,
-        thinkingOptionId = thinkingOptionId
-    ) {
+         enableToolCall = enableToolCall,
+         thinkingConfigurations = thinkingConfigurations,
+         thinkingOptionId = thinkingOptionId,
+         nativeToolCallMode = true
+     ) {
 
     /**
      * 重写创建请求体的方法，以支持DeepSeek的`reasoning_content`参数。
@@ -212,6 +215,31 @@ class DeepseekProvider(
             }
         }
 
+        fun queueNativeToolCalls(
+            textContent: String,
+            toolCalls: List<NativeToolCall>,
+            reasoningContent: String = ""
+        ) {
+            appendQueuedAssistantToolText(textContent)
+            appendQueuedAssistantReasoning(reasoningContent)
+            toolCalls.forEach { nativeToolCall ->
+                queuedToolCalls.put(
+                    JSONObject().apply {
+                        put("id", nativeToolCall.callId)
+                        put("type", "function")
+                        put(
+                            "function",
+                            JSONObject().apply {
+                                put("name", nativeToolCall.toolName)
+                                put("arguments", nativeToolCall.argumentsJson)
+                            }
+                        )
+                    }
+                )
+                queuedToolCallIds.add(nativeToolCall.callId)
+            }
+        }
+
         fun emitQueuedToolCallsIfNeeded() {
             if (queuedToolCalls.length() == 0) return
 
@@ -255,6 +283,29 @@ class DeepseekProvider(
             openToolCallIds.clear()
         }
 
+        fun emitNativeToolResults(results: List<NativeToolResult>) {
+            emitQueuedToolCallsIfNeeded()
+            for (result in results) {
+                val openCallIndex = openToolCallIds.indexOf(result.callId)
+                if (openCallIndex < 0) {
+                    AppLogger.w(
+                        "DeepseekProvider",
+                        "原生工具结果没有匹配的 open tool call: call_id=${result.callId}"
+                    )
+                    continue
+                }
+
+                messagesArray.put(
+                    JSONObject().apply {
+                        put("role", "tool")
+                        put("tool_call_id", result.callId)
+                        put("content", result.output)
+                    }
+                )
+                openToolCallIds.removeAt(openCallIndex)
+            }
+        }
+
         if (effectiveHistory.isNotEmpty()) {
             for (turn in effectiveHistory) {
                 val originalContent = comparableContentForTurn(turn, preserveThinkInHistory = true)
@@ -283,15 +334,25 @@ class DeepseekProvider(
 
                         PromptTurnKind.ASSISTANT -> {
                             val (content, reasoningContent) = ChatUtils.extractThinkingContent(originalContent)
-                            val (textContent, parsedToolCalls) = parseXmlToolCalls(content)
-                            val toolCalls =
-                                if (parsedToolCalls != null) {
-                                    wrapPackageToolCallsWithProxy(parsedToolCalls)
+                            val (textContent, toolCalls) =
+                                if (turn.nativeToolCalls.isNotEmpty()) {
+                                    content to null
                                 } else {
-                                    null
+                                    val (parsedText, parsedToolCalls) = parseXmlToolCalls(content)
+                                    parsedText to
+                                        if (parsedToolCalls != null) {
+                                            wrapPackageToolCallsWithProxy(parsedToolCalls)
+                                        } else {
+                                            null
+                                        }
                                 }
 
-                            if (toolCalls != null && toolCalls.length() > 0) {
+                            if (turn.nativeToolCalls.isNotEmpty()) {
+                                if (openToolCallIds.isNotEmpty()) {
+                                    flushOpenToolCallsAsCancelled("assistant_native_tool_call_before_result")
+                                }
+                                queueNativeToolCalls(textContent, turn.nativeToolCalls, reasoningContent)
+                            } else if (toolCalls != null && toolCalls.length() > 0) {
                                 if (openToolCallIds.isNotEmpty()) {
                                     flushOpenToolCallsAsCancelled("assistant_tool_call_before_result")
                                 }
@@ -309,15 +370,25 @@ class DeepseekProvider(
                         }
 
                         PromptTurnKind.TOOL_CALL -> {
-                            val (textContent, parsedToolCalls) = parseXmlToolCalls(originalContent)
-                            val toolCalls =
-                                if (parsedToolCalls != null) {
-                                    wrapPackageToolCallsWithProxy(parsedToolCalls)
+                            val (textContent, toolCalls) =
+                                if (turn.nativeToolCalls.isNotEmpty()) {
+                                    originalContent to null
                                 } else {
-                                    null
+                                    val (parsedText, parsedToolCalls) = parseXmlToolCalls(originalContent)
+                                    parsedText to
+                                        if (parsedToolCalls != null) {
+                                            wrapPackageToolCallsWithProxy(parsedToolCalls)
+                                        } else {
+                                            null
+                                        }
                                 }
 
-                            if (toolCalls != null && toolCalls.length() > 0) {
+                            if (turn.nativeToolCalls.isNotEmpty()) {
+                                if (openToolCallIds.isNotEmpty()) {
+                                    flushOpenToolCallsAsCancelled("typed_native_tool_call_before_result")
+                                }
+                                queueNativeToolCalls(textContent, turn.nativeToolCalls)
+                            } else if (toolCalls != null && toolCalls.length() > 0) {
                                 if (openToolCallIds.isNotEmpty()) {
                                     flushOpenToolCallsAsCancelled("typed_tool_call_before_result")
                                 }
@@ -336,64 +407,77 @@ class DeepseekProvider(
 
                         PromptTurnKind.TOOL_RESULT -> {
                             emitQueuedToolCallsIfNeeded()
-                            val (textContent, toolResults) = parseXmlToolResults(originalContent)
-                            val resultsList = toolResults ?: emptyList()
+                            if (turn.nativeToolResults.isNotEmpty()) {
+                                emitNativeToolResults(turn.nativeToolResults)
+                            } else {
+                                val (textContent, toolResults) = parseXmlToolResults(originalContent)
+                                val resultsList = toolResults ?: emptyList()
 
-                            if (resultsList.isNotEmpty() && openToolCallIds.isNotEmpty()) {
-                                val validCount = minOf(resultsList.size, openToolCallIds.size)
-                                repeat(validCount) { index ->
-                                    val (_, resultContent) = resultsList[index]
-                                    messagesArray.put(
-                                        JSONObject().apply {
-                                            put("role", "tool")
-                                            put("tool_call_id", openToolCallIds[index])
-                                            put("content", resultContent)
+                                if (resultsList.isNotEmpty() && openToolCallIds.isNotEmpty()) {
+                                    var matchedCount = 0
+                                    for ((resultCallId, resultContent) in resultsList) {
+                                        if (openToolCallIds.isEmpty()) break
+                                        val openCallIndex =
+                                            if (resultCallId == null) 0 else openToolCallIds.indexOf(resultCallId)
+                                        if (openCallIndex < 0) {
+                                            AppLogger.w(
+                                                "DeepseekProvider",
+                                                "tool_result call_id does not match an open tool call: $resultCallId"
+                                            )
+                                            continue
                                         }
-                                    )
-                                }
-                                repeat(validCount) {
-                                    openToolCallIds.removeAt(0)
-                                }
+                                        val matchedCallId = openToolCallIds.removeAt(openCallIndex)
+                                        messagesArray.put(
+                                            JSONObject().apply {
+                                                put("role", "tool")
+                                                put("tool_call_id", matchedCallId)
+                                                put("content", resultContent)
+                                            }
+                                        )
+                                        matchedCount++
+                                    }
 
-                                if (resultsList.size > validCount) {
-                                    AppLogger.w(
-                                        "DeepseekProvider",
-                                        "发现多余的tool_result: ${resultsList.size} results vs ${validCount} pending tool_calls"
-                                    )
-                                }
+                                    if (resultsList.size > matchedCount) {
+                                        AppLogger.w(
+                                            "DeepseekProvider",
+                                            "发现未匹配的tool_result: ${resultsList.size} results vs $matchedCount matched tool_calls"
+                                        )
+                                    }
 
-                                if (textContent.isNotEmpty()) {
+                                    if (textContent.isNotEmpty()) {
+                                        messagesArray.put(
+                                            JSONObject().apply {
+                                                put("role", "user")
+                                                put("content", buildContentField(context, textContent))
+                                            }
+                                        )
+                                    }
+                                } else {
+                                    flushOpenToolCallsAsCancelled("tool_result_without_structured_match")
+                                    val fallbackContent =
+                                        when {
+                                            textContent.isNotEmpty() -> textContent
+                                            originalContent.isNotBlank() -> originalContent
+                                            else -> "[Empty]"
+                                        }
                                     messagesArray.put(
                                         JSONObject().apply {
                                             put("role", "user")
-                                            put("content", buildContentField(context, textContent))
+                                            put("content", buildContentField(context, fallbackContent))
                                         }
                                     )
                                 }
-                            } else {
-                                flushOpenToolCallsAsCancelled("tool_result_without_structured_match")
-                                val fallbackContent =
-                                    when {
-                                        textContent.isNotEmpty() -> textContent
-                                        originalContent.isNotBlank() -> originalContent
-                                        else -> "[Empty]"
-                                    }
-                                messagesArray.put(
-                                    JSONObject().apply {
-                                        put("role", "user")
-                                        put("content", buildContentField(context, fallbackContent))
-                                    }
-                                )
                             }
                         }
                     }
                 } else {
+                    val compatibilityContent = renderNativeToolRecordsForXml(turn, originalContent)
                     when (turn.kind) {
                         PromptTurnKind.SYSTEM -> {
                             messagesArray.put(
                                 JSONObject().apply {
                                     put("role", "system")
-                                    put("content", buildContentField(context, originalContent, role = "system"))
+                                    put("content", buildContentField(context, compatibilityContent, role = "system"))
                                 }
                             )
                         }
@@ -404,13 +488,13 @@ class DeepseekProvider(
                             messagesArray.put(
                                 JSONObject().apply {
                                     put("role", "user")
-                                    put("content", buildContentField(context, originalContent))
+                                    put("content", buildContentField(context, compatibilityContent))
                                 }
                             )
                         }
 
                         PromptTurnKind.ASSISTANT -> {
-                            val (content, reasoningContent) = ChatUtils.extractThinkingContent(originalContent)
+                            val (content, reasoningContent) = ChatUtils.extractThinkingContent(compatibilityContent)
                             messagesArray.put(
                                 JSONObject().apply {
                                     put("role", "assistant")
@@ -425,7 +509,7 @@ class DeepseekProvider(
                                 JSONObject().apply {
                                     put("role", "assistant")
                                     put("reasoning_content", "")
-                                    put("content", buildContentField(context, originalContent.ifBlank { "[Empty]" }, role = "assistant"))
+                                    put("content", buildContentField(context, compatibilityContent.ifBlank { "[Empty]" }, role = "assistant"))
                                 }
                             )
                         }

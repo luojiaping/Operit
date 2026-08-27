@@ -15,13 +15,34 @@ data class AITool(
         val description: String = ""
 )
 
+/** A provider-native tool call kept lossless across the execution round. */
+@Serializable
+data class NativeToolCall(
+        val callId: String,
+        val toolName: String,
+        val argumentsJson: String,
+        val index: Int = 0,
+        val roundIndex: Int = 0
+)
+
+/** A provider-native tool result kept lossless for the next request. */
+@Serializable
+data class NativeToolResult(
+        val callId: String,
+        val toolName: String,
+        val output: String,
+        val success: Boolean,
+        val roundIndex: Int = 0
+)
+
 /** Represents an invocation of a tool in the AI's response */
 @Serializable
 data class ToolInvocation(
         val tool: AITool,
         val rawText: String,
         @Contextual
-        val responseLocation: IntRange // Where in the response this tool invocation was found
+        val responseLocation: IntRange, // Where in the response this tool invocation was found
+        val nativeToolCall: NativeToolCall? = null
 )
 
 /** Represents the result of a tool execution */
@@ -30,7 +51,8 @@ data class ToolResult(
         val toolName: String,
         val success: Boolean,
         val result: ToolResultData,
-        val error: String? = null
+        val error: String? = null,
+        val toolCallId: String? = null
 )
 
 /** Represents the validation result for tool parameters */

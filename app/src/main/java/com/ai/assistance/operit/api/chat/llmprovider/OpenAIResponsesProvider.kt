@@ -28,7 +28,8 @@ open class OpenAIResponsesProvider(
     supportsFiles: Boolean = false,
     enableToolCall: Boolean = false,
     thinkingConfigurations: String = "",
-    thinkingOptionId: String = ""
+    thinkingOptionId: String = "",
+    nativeToolCallMode: Boolean = true
 ) : OpenAIProvider(
     apiEndpoint = responsesApiEndpoint,
     apiKeyProvider = apiKeyProvider,
@@ -42,7 +43,8 @@ open class OpenAIResponsesProvider(
     supportsFiles = supportsFiles,
     enableToolCall = enableToolCall,
     thinkingConfigurations = thinkingConfigurations,
-    thinkingOptionId = thinkingOptionId
+    thinkingOptionId = thinkingOptionId,
+    nativeToolCallMode = nativeToolCallMode
 ) {
     override val useResponsesApi: Boolean = true
 
@@ -431,6 +433,24 @@ object OpenAIResponsesPayloadAdapter {
 
             if (role == "assistant") {
                 appendReasoningItemsFromAssistantMessage(message, input)
+                val convertedContent = convertMessageContentForResponses(message.opt("content"))
+                val hasContent =
+                    when (convertedContent) {
+                        is String -> convertedContent.isNotBlank()
+                        is JSONArray -> convertedContent.length() > 0
+                        else -> false
+                    }
+
+                if (hasContent) {
+                    input.put(
+                        JSONObject().apply {
+                            put("type", "message")
+                            put("role", "assistant")
+                            put("content", convertedContent)
+                        }
+                    )
+                }
+
                 val toolCalls = message.optJSONArray("tool_calls")
                 if (toolCalls != null && toolCalls.length() > 0) {
                     for (j in 0 until toolCalls.length()) {
@@ -453,6 +473,7 @@ object OpenAIResponsesPayloadAdapter {
                         input.put(callItem)
                     }
                 }
+                continue
             }
 
             val convertedContent = convertMessageContentForResponses(message.opt("content"))
@@ -668,7 +689,9 @@ object OpenAIResponsesPayloadAdapter {
         if (name.isEmpty()) return null
 
         val arguments = item.optString("arguments", "{}").ifBlank { "{}" }
-        val callId = item.optString("call_id", item.optString("id", ""))
+        val callId = item.optString("call_id", "").ifBlank {
+            item.optString("id", "")
+        }
 
         return JSONObject().apply {
             if (callId.isNotEmpty()) {

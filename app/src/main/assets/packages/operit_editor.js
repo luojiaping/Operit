@@ -1346,8 +1346,8 @@
         {
           name: "enable_tool_call"
           description: {
-            zh: "可选，是否开启Tool Call"
-            en: "Optional tool-call switch"
+             zh: "可选，是否使用原生 Tool Call；关闭时使用 XML 协议兼容模式"
+             en: "Optional native Tool Call switch; disabled uses XML protocol compatibility"
           }
           type: boolean
           required: false
@@ -1733,8 +1733,8 @@
         {
           name: "enable_tool_call"
           description: {
-            zh: "可选，是否开启Tool Call"
-            en: "Optional tool-call switch"
+             zh: "可选，是否使用原生 Tool Call；关闭时使用 XML 协议兼容模式"
+             en: "Optional native Tool Call switch; disabled uses XML protocol compatibility"
           }
           type: boolean
           required: false

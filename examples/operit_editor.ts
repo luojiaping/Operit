@@ -1346,8 +1346,8 @@
         {
           name: "enable_tool_call"
           description: {
-            zh: "可选，是否开启Tool Call"
-            en: "Optional tool-call switch"
+             zh: "可选，是否使用原生 Tool Call；关闭时使用 XML 协议兼容模式"
+             en: "Optional native Tool Call switch; disabled uses XML protocol compatibility"
           }
           type: boolean
           required: false
@@ -1733,8 +1733,8 @@
         {
           name: "enable_tool_call"
           description: {
-            zh: "可选，是否开启Tool Call"
-            en: "Optional tool-call switch"
+             zh: "可选，是否使用原生 Tool Call；关闭时使用 XML 协议兼容模式"
+             en: "Optional native Tool Call switch; disabled uses XML protocol compatibility"
           }
           type: boolean
           required: false
@@ -4458,7 +4458,6 @@ exports.clear_active_character_card = operitEditorPackage.clear_active_character
 exports.import_character_card_from_tavern_json = operitEditorPackage.import_character_card_from_tavern_json;
 exports.export_character_card_to_tavern_json = operitEditorPackage.export_character_card_to_tavern_json;
 exports.ping_mcp = operitEditorPackage.ping_mcp;
-
 
 
 

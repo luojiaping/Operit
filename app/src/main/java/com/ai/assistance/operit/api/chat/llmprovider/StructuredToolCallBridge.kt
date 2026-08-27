@@ -2,6 +2,8 @@ package com.ai.assistance.operit.api.chat.llmprovider
 
 import com.ai.assistance.operit.core.chat.hooks.PromptTurn
 import com.ai.assistance.operit.core.chat.hooks.PromptTurnKind
+import com.ai.assistance.operit.data.model.NativeToolCall
+import com.ai.assistance.operit.data.model.NativeToolResult
 import com.ai.assistance.operit.data.model.ToolParameterSchema
 import com.ai.assistance.operit.data.model.ToolPrompt
 import com.ai.assistance.operit.util.ChatMarkupRegex
@@ -88,6 +90,8 @@ internal object StructuredToolCallBridge {
         var currentBlockType: ProviderHistoryBlockType? = null
         var currentContent = StringBuilder()
         var currentMetadata: Map<String, Any?> = emptyMap()
+        var currentNativeToolCalls = emptyList<NativeToolCall>()
+        var currentNativeToolResults = emptyList<NativeToolResult>()
 
         fun flushCurrentBlock() {
             val blockType = currentBlockType ?: return
@@ -101,12 +105,16 @@ internal object StructuredToolCallBridge {
                                 if (useToolCall) PromptTurnKind.TOOL_RESULT else PromptTurnKind.USER
                         },
                     content = currentContent.toString().trim(),
-                    metadata = currentMetadata
+                    metadata = currentMetadata,
+                    nativeToolCalls = currentNativeToolCalls,
+                    nativeToolResults = currentNativeToolResults
                 )
             )
             currentBlockType = null
             currentContent = StringBuilder()
             currentMetadata = emptyMap()
+            currentNativeToolCalls = emptyList()
+            currentNativeToolResults = emptyList()
         }
 
         fun appendToBlock(blockType: ProviderHistoryBlockType, turn: PromptTurn) {
@@ -123,6 +131,12 @@ internal object StructuredToolCallBridge {
             }
             if (turn.metadata.isNotEmpty()) {
                 currentMetadata = currentMetadata + turn.metadata
+            }
+            if (turn.nativeToolCalls.isNotEmpty()) {
+                currentNativeToolCalls = currentNativeToolCalls + turn.nativeToolCalls
+            }
+            if (turn.nativeToolResults.isNotEmpty()) {
+                currentNativeToolResults = currentNativeToolResults + turn.nativeToolResults
             }
         }
 
@@ -192,6 +206,26 @@ internal object StructuredToolCallBridge {
             }
         }
 
+        fun queueNativeToolCalls(textContent: String, toolCalls: List<NativeToolCall>) {
+            appendQueuedAssistantToolText(textContent)
+            toolCalls.forEach { nativeToolCall ->
+                queuedToolCalls.put(
+                    JSONObject().apply {
+                        put("id", nativeToolCall.callId)
+                        put("type", "function")
+                        put(
+                            "function",
+                            JSONObject().apply {
+                                put("name", nativeToolCall.toolName)
+                                put("arguments", nativeToolCall.argumentsJson)
+                            }
+                        )
+                    }
+                )
+                queuedToolCallIds.add(nativeToolCall.callId)
+            }
+        }
+
         fun emitQueuedToolCallsIfNeeded() {
             if (queuedToolCalls.length() == 0) return
 
@@ -232,6 +266,24 @@ internal object StructuredToolCallBridge {
             openToolCallIds.clear()
         }
 
+        fun emitNativeToolResults(results: List<NativeToolResult>) {
+            emitQueuedToolCallsIfNeeded()
+            results.forEach { result ->
+                val openCallIndex = openToolCallIds.indexOf(result.callId)
+                if (openCallIndex < 0) {
+                    return@forEach
+                }
+                messagesArray.put(
+                    JSONObject().apply {
+                        put("role", "tool")
+                        put("tool_call_id", result.callId)
+                        put("content", result.output)
+                    }
+                )
+                openToolCallIds.removeAt(openCallIndex)
+            }
+        }
+
         for (turn in mergedHistory) {
             val content =
                 if (!preserveThinkInHistory && turn.kind == PromptTurnKind.ASSISTANT) {
@@ -263,15 +315,23 @@ internal object StructuredToolCallBridge {
                 }
 
                 PromptTurnKind.ASSISTANT -> {
-                    val (textContent, parsedToolCalls) = parseXmlToolCalls(content)
-                    val toolCalls =
-                        if (parsedToolCalls != null) {
-                            wrapPackageToolCallsWithProxy(parsedToolCalls)
+                    val (textContent, toolCalls) =
+                        if (turn.nativeToolCalls.isNotEmpty()) {
+                            content to null
                         } else {
-                            null
+                            val (parsedText, parsedToolCalls) = parseXmlToolCalls(content)
+                            parsedText to
+                                if (parsedToolCalls != null) {
+                                    wrapPackageToolCallsWithProxy(parsedToolCalls)
+                                } else {
+                                    null
+                                }
                         }
 
-                    if (toolCalls != null && toolCalls.length() > 0) {
+                    if (turn.nativeToolCalls.isNotEmpty()) {
+                        flushOpenToolCallsAsCancelled()
+                        queueNativeToolCalls(textContent, turn.nativeToolCalls)
+                    } else if (toolCalls != null && toolCalls.length() > 0) {
                         flushOpenToolCallsAsCancelled()
                         queueToolCalls(textContent, toolCalls)
                     } else {
@@ -286,15 +346,23 @@ internal object StructuredToolCallBridge {
                 }
 
                 PromptTurnKind.TOOL_CALL -> {
-                    val (textContent, parsedToolCalls) = parseXmlToolCalls(content)
-                    val toolCalls =
-                        if (parsedToolCalls != null) {
-                            wrapPackageToolCallsWithProxy(parsedToolCalls)
+                    val (textContent, toolCalls) =
+                        if (turn.nativeToolCalls.isNotEmpty()) {
+                            content to null
                         } else {
-                            null
+                            val (parsedText, parsedToolCalls) = parseXmlToolCalls(content)
+                            parsedText to
+                                if (parsedToolCalls != null) {
+                                    wrapPackageToolCallsWithProxy(parsedToolCalls)
+                                } else {
+                                    null
+                                }
                         }
 
-                    if (toolCalls != null && toolCalls.length() > 0) {
+                    if (turn.nativeToolCalls.isNotEmpty()) {
+                        flushOpenToolCallsAsCancelled()
+                        queueNativeToolCalls(textContent, turn.nativeToolCalls)
+                    } else if (toolCalls != null && toolCalls.length() > 0) {
                         flushOpenToolCallsAsCancelled()
                         queueToolCalls(textContent, toolCalls)
                     } else {
@@ -310,48 +378,52 @@ internal object StructuredToolCallBridge {
 
                 PromptTurnKind.TOOL_RESULT -> {
                     emitQueuedToolCallsIfNeeded()
-                    val (textContent, toolResults) = parseXmlToolResults(content)
-                    val resultsList = toolResults ?: emptyList()
-
-                    if (resultsList.isNotEmpty() && openToolCallIds.isNotEmpty()) {
-                        val validCount = minOf(resultsList.size, openToolCallIds.size)
-                        repeat(validCount) { index ->
-                            val result = resultsList[index]
-                            val toolMessage = JSONObject().apply {
-                                put("role", "tool")
-                                put("tool_call_id", openToolCallIds[index])
-                                if (!result.name.isNullOrBlank()) {
-                                    put("name", result.name)
-                                }
-                                put("content", nonEmptyContent(result.content))
-                            }
-                            messagesArray.put(toolMessage)
-                        }
-                        repeat(validCount) {
-                            openToolCallIds.removeAt(0)
-                        }
-                        if (textContent.isNotBlank()) {
-                            messagesArray.put(
-                                JSONObject().apply {
-                                    put("role", "user")
-                                    put("content", textContent)
-                                }
-                            )
-                        }
+                    if (turn.nativeToolResults.isNotEmpty()) {
+                        emitNativeToolResults(turn.nativeToolResults)
                     } else {
-                        flushOpenToolCallsAsCancelled()
-                        messagesArray.put(
-                            JSONObject().apply {
-                                put("role", "user")
-                                put(
-                                    "content",
-                                    when {
-                                        textContent.isNotBlank() -> textContent
-                                        else -> nonEmptyContent(content)
+                        val (textContent, toolResults) = parseXmlToolResults(content)
+                        val resultsList = toolResults ?: emptyList()
+
+                        if (resultsList.isNotEmpty() && openToolCallIds.isNotEmpty()) {
+                            val validCount = minOf(resultsList.size, openToolCallIds.size)
+                            repeat(validCount) { index ->
+                                val result = resultsList[index]
+                                val toolMessage = JSONObject().apply {
+                                    put("role", "tool")
+                                    put("tool_call_id", openToolCallIds[index])
+                                    if (!result.name.isNullOrBlank()) {
+                                        put("name", result.name)
+                                    }
+                                    put("content", nonEmptyContent(result.content))
+                                }
+                                messagesArray.put(toolMessage)
+                            }
+                            repeat(validCount) {
+                                openToolCallIds.removeAt(0)
+                            }
+                            if (textContent.isNotBlank()) {
+                                messagesArray.put(
+                                    JSONObject().apply {
+                                        put("role", "user")
+                                        put("content", textContent)
                                     }
                                 )
                             }
-                        )
+                        } else {
+                            flushOpenToolCallsAsCancelled()
+                            messagesArray.put(
+                                JSONObject().apply {
+                                    put("role", "user")
+                                    put(
+                                        "content",
+                                        when {
+                                            textContent.isNotBlank() -> textContent
+                                            else -> nonEmptyContent(content)
+                                        }
+                                    )
+                                }
+                            )
+                        }
                     }
                 }
             }
