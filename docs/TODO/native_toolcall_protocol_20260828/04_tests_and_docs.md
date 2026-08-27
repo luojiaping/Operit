@@ -6,6 +6,7 @@
 - DeepSeek Chat Completions 流式和非流式调用解析
 - 原始 ID、arguments、多个调用及结果顺序
 - 原生调用事件到工具执行结果的 ID 传递
+- 原生调用展示名称、参数、分组数量和历史消息恢复
 - 原生模式与 XML 模式的请求体回归
 - 配置 JSON、Room 消息元数据和已发布 ToolPkg 字段兼容
 

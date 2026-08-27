@@ -30,4 +30,4 @@ fork_repository: https://github.com/AAswordman/Operit.git
 
 ## 结果 [DONE]
 
-本次改动已完成代码、持久化、兼容文档和针对性测试文件；按要求未触发构建或测试。
+本次改动已完成代码、持久化、原生调用展示、兼容文档和针对性测试文件；后续构建由 builder API 执行。

@@ -24,6 +24,7 @@ import com.ai.assistance.operit.ui.features.chat.components.part.CustomXmlRender
 import com.ai.assistance.operit.ui.features.chat.components.part.ThinkToolsXmlNodeGrouper
 import com.ai.assistance.operit.ui.features.chat.components.LinkPreviewDialog
 import com.ai.assistance.operit.util.markdown.toCharStream
+import com.ai.assistance.operit.util.nativeToolCallDisplayContent
 import com.ai.assistance.operit.util.stream.Stream
 import com.ai.assistance.operit.data.preferences.DisplayPreferencesManager
 import com.ai.assistance.operit.data.preferences.ToolCollapseMode
@@ -71,6 +72,9 @@ fun AiMessageComposable(
     
     // 创建并保存StreamMarkdownRenderer的状态，使用message.timestamp作为key确保同一条消息共享状态
     val rendererState = remember(message.timestamp) { StreamMarkdownRendererState() }
+    val staticDisplayContent = remember(message.content, message.toolCallMetadataJson) {
+        message.nativeToolCallDisplayContent()
+    }
 
     // 创建自定义XML渲染器
     val xmlRenderer = remember(
@@ -197,7 +201,7 @@ fun AiMessageComposable(
                 // 对于已完成的静态消息，使用新的字符串渲染器以提高性能
                 // 共享相同的state，避免重新计算nodes等状态
                 StreamMarkdownRenderer(
-                    content = message.content,
+                    content = staticDisplayContent,
                     textColor = textColor,
                     backgroundColor = backgroundColor,
                     onLinkClick = rememberedOnLinkClick,

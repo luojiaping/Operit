@@ -123,6 +123,8 @@ Codex、Claude、Gemini 和其他 provider 本轮保持各自已有行为。
 3. 两种模式都经过相同的权限、Hook、并行/串行执行链。
 4. 原生模式的结果使用调用 ID写入 `NativeToolResult`，下一轮按 provider 原生格式发送。
 
+原生调用在执行前会额外生成一份仅供聊天 UI 展示的 `<tool>` 标记，用于复用既有工具行和分组样式；这份展示标记不会进入原生 provider 历史。
+
 ---
 
 ## 5. 与系统提示词（System Prompt）的关系

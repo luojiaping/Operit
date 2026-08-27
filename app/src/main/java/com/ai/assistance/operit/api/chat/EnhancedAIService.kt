@@ -90,6 +90,7 @@ import com.ai.assistance.operit.core.config.SystemToolPrompts
 import com.ai.assistance.operit.data.model.ToolPrompt
 import com.ai.assistance.operit.data.model.ToolParameterSchema
 import com.ai.assistance.operit.util.ChatUtils
+import com.ai.assistance.operit.util.toDisplayMarkup
 import com.ai.assistance.operit.util.LocaleUtils
 
 /**
@@ -1998,6 +1999,12 @@ class EnhancedAIService private constructor(private val context: Context) {
 
             // Main flow: Detect and process tool invocations
             if (toolInvocations.isNotEmpty()) {
+                if (useNativeToolCall && nativeToolCalls.isNotEmpty()) {
+                    val displayMarkup = nativeToolCalls.toDisplayMarkup()
+                    if (displayMarkup.isNotEmpty()) {
+                        collector.emit(displayMarkup)
+                    }
+                }
                 logMessageTiming(
                     stage = "enhanced.processStreamCompletion.detectToolInvocations",
                     startTimeMs = startTime,
