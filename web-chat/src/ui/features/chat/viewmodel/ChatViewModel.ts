@@ -3,7 +3,7 @@ import { MOCK_TOKEN, isMockMode, resolveChatTransport } from '../util/chatTransp
 import {
   clearStoredToken,
   readStoredToken,
-  writeStoredToken
+  readTokenFromLocationHash
 } from '../util/ConfigurationStateHolder';
 import type {
   ChatStyle,
@@ -428,7 +428,6 @@ function finalizeStreamingAssistantMessage(
 
 export interface ChatViewModelState {
   token: string;
-  tokenDraft: string;
   boot: WebBootstrapResponse | null;
   theme: WebThemeSnapshot | null;
   characterSelector: WebCharacterSelectorResponse | null;
@@ -462,7 +461,6 @@ export interface ChatViewModelState {
   activeInputStyle: InputStyle;
   activeCharacterName: string;
   activeCharacterAvatarUrl?: string | null;
-  showConnectionOverlay: boolean;
   activeStreamingCount: number;
   contextStats: ContextStatsSnapshot;
   autoScrollToBottom: boolean;
@@ -474,8 +472,6 @@ export interface ChatViewModelState {
 }
 
 export interface ChatViewModelActions {
-  setTokenDraft: (value: string) => void;
-  submitToken: () => void;
   reloadCurrentConversation: () => Promise<void>;
   createConversation: (options?: { group?: string | null }) => Promise<void>;
   renameConversation: (chat: WebChatSummary, title: string) => Promise<void>;
@@ -556,11 +552,9 @@ export type ChatViewModel = ChatViewModelState & ChatViewModelActions;
 
 export function useChatViewModel(): ChatViewModel {
   const api = useMemo(() => resolveChatTransport(), []);
+  // Token 优先级：mock 模式固定值 → 地址 hash（#token=，读取后即清除）→ 本地存储
   const [token, setToken] = useState<string>(() =>
-    isMockMode() ? MOCK_TOKEN : readStoredToken()
-  );
-  const [tokenDraft, setTokenDraft] = useState<string>(() =>
-    isMockMode() ? MOCK_TOKEN : readStoredToken()
+    isMockMode() ? MOCK_TOKEN : readTokenFromLocationHash() || readStoredToken()
   );
   const [boot, setBoot] = useState<WebBootstrapResponse | null>(null);
   const [theme, setTheme] = useState<WebThemeSnapshot | null>(null);
@@ -661,7 +655,6 @@ export function useChatViewModel(): ChatViewModel {
 
   function handleApiFailure(loadError: unknown) {
     if (handleUnauthorizedError(loadError, () => setToken(''))) {
-      setTokenDraft('');
       clearStoredToken();
     }
     setError(normalizeError(loadError));
@@ -1062,22 +1055,10 @@ export function useChatViewModel(): ChatViewModel {
         await loadConversation(token, targetChatId, 'merge-latest');
         if (historyLoaded) {
           await ensureChatsLoaded(token, true);
-        }
-      }
-    }
-  }
-
-  function submitToken() {
-    const normalizedToken = tokenDraft.trim();
-    if (!normalizedToken) {
-      setError('请输入 Bearer Token');
-      return;
-    }
-
-    writeStoredToken(normalizedToken);
-    setToken(normalizedToken);
-    setError(null);
-  }
+         }
+       }
+     }
+   }
 
   // 预览站的会话重载入口：主题被外部覆盖（previewControls.patchTheme）后
   // 由 SimulatorShell 调用，重新拉取当前会话的主题与消息
@@ -1673,7 +1654,6 @@ export function useChatViewModel(): ChatViewModel {
 
   return {
     token,
-    tokenDraft,
     boot,
     theme,
     characterSelector,
@@ -1707,7 +1687,6 @@ export function useChatViewModel(): ChatViewModel {
     activeInputStyle,
     activeCharacterName,
     activeCharacterAvatarUrl,
-    showConnectionOverlay: !token,
     activeStreamingCount,
     contextStats,
     autoScrollToBottom,
@@ -1716,8 +1695,6 @@ export function useChatViewModel(): ChatViewModel {
     autoSwitchChatOnCharacterSelect,
     inputSettings,
     memorySelector,
-    setTokenDraft,
-    submitToken,
     reloadCurrentConversation,
     createConversation,
     renameConversation,

@@ -317,8 +317,7 @@ pre {
 .chat-message-locator-row,
 .classic-input-fullscreen,
 .history-dialog footer button,
-.fullscreen-input-dialog footer button,
-.configuration-screen-inline-card button {
+.fullscreen-input-dialog footer button {
   background: transparent;
   color: var(--chat-text-main);
 }

@@ -1,7 +1,5 @@
 import { useMemo } from 'react';
-import type { CSSProperties } from 'react';
 import { ChatScreenContent } from '../components/ChatScreenContent';
-import { ConfigurationScreen } from './ConfigurationScreen';
 import { buildChatFontFaceCss, buildChatThemeStyle } from '../util/chatTheme';
 import { useChatViewModel } from '../viewmodel/ChatViewModel';
 import type { ChatViewModel } from '../viewmodel/ChatViewModel';
@@ -38,15 +36,6 @@ export function AIChatScreenView({ viewModel }: { viewModel: ChatViewModel }) {
   const background = viewModel.theme?.background;
   const isVideoBackground =
     background?.type === 'video' && Boolean(background.asset_url);
-  const suggestedUrl = useMemo(() => {
-    if (typeof window === 'undefined') {
-      return 'http://127.0.0.1:8094/';
-    }
-
-    const { protocol, hostname, port } = window.location;
-    const resolvedPort = port || '8094';
-    return `${protocol}//${hostname}:${resolvedPort}/`;
-  }, []);
 
   return (
     <div
@@ -82,19 +71,15 @@ export function AIChatScreenView({ viewModel }: { viewModel: ChatViewModel }) {
 
       <ChatScreenContent viewModel={viewModel} />
 
-      {viewModel.showConnectionOverlay ? (
-        <ConfigurationScreen
-          error={viewModel.error}
-          onCopyUrl={() => {
-            if (typeof navigator !== 'undefined' && navigator.clipboard) {
-              void navigator.clipboard.writeText(suggestedUrl);
-            }
-          }}
-          onSubmit={viewModel.submitToken}
-          onTokenDraftChange={viewModel.setTokenDraft}
-          suggestedUrl={suggestedUrl}
-          tokenDraft={viewModel.tokenDraft}
-        />
+      {!viewModel.token ? (
+        <div className="chat-auth-banner" role="alert">
+          <strong>未连接</strong>
+          <span>
+            在手机 Operit 的设置页打开「局域网页面」，复制带 Token 的访问地址
+            （https://…:8094/#token=…）直接打开即可，无需手动输入。
+          </span>
+          {viewModel.error ? <em>{viewModel.error}</em> : null}
+        </div>
       ) : null}
     </div>
   );
