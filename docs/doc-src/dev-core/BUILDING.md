@@ -204,7 +204,14 @@ npm --prefix web-chat install
 ```bash
 npm run build:webchat
 ```
-该命令会先执行 `web-chat` 的 React/Vite 构建，再把生成的静态文件同步到 `app/src/main/assets/web-chat`。如果你修改了 `web-chat/src` 下的代码，重新编译 APK 前也需要重新执行一次这一步。
+该命令会先执行 `web-chat` 的 React/Vite 构建（含真机入口与预览站 `preview.html` 双入口，预览站产物不会进入 APK assets），再把生成的静态文件同步到 `app/src/main/assets/web-chat`。如果你修改了 `web-chat/src` 下的代码，重新编译 APK 前也需要重新执行一次这一步。
+
+预览站（Preview Studio）可单独在本机 docker 运行，见
+[Web Preview Studio](./web-preview-studio.md)：
+
+```bash
+cd web-chat && docker compose up -d --build   # http://127.0.0.1:8447/preview.html
+```
 
 7. **打包 ToolPkg 并同步示例包到应用 assets (关键步骤！):**
 ```bash

@@ -40,7 +40,7 @@ snapshot 转 CSS 变量体系，但它只能在连接真机 HTTP 后端时使用
 4. [DONE: 输入插槽注入与 Compose DSL 渲染器](./04_slot_dsl_renderer.md)
 5. [DONE: 代码预览模式](./05_code_preview.md)
 6. [DONE: 低代码模板与 .toolpkg 导出](./06_template_export.md)
-7. [IN_PROGRESS: CI、测试与文档收尾](./07_ci_tests_docs.md)
+7. [DONE: CI、测试与文档收尾](./07_ci_tests_docs.md)
 
 ## 验收
 
@@ -55,5 +55,8 @@ snapshot 转 CSS 变量体系，但它只能在连接真机 HTTP 后端时使用
   访问 http://127.0.0.1:8447/preview.html
 - 已验证：mock 主题三场景渲染、消息统计条、SSE 流式、三插槽注入、
   DSL 渲染、粘贴代码应用、模板生成预览、.toolpkg 上传解析闭环、
-  下载包可被标准 unzip 解析且与 examples/input_slot_demo 同构
+  下载包可被标准 unzip 解析且与 examples/input_slot_demo 同构、
+  vitest 25 项全部通过
+- CI：pr-check.yml 的 Check WebChat 增加 npm test
+- 文档：docs/doc-src/dev-core/web-preview-studio.md、BUILDING.md 预览站章节
 - 待真机验证：模板生成与上传演示的 .toolpkg 导入 app 后在输入区渲染

@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
     "preview": "vite preview",
     "sync:android-assets": "node ./scripts/sync-to-android-assets.mjs"
   },
@@ -22,6 +23,7 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^4.3.3",
     "typescript": "^5.6.3",
-    "vite": "^6.4.3"
+    "vite": "^6.4.3",
+    "vitest": "^4.1.11"
   }
 }
