@@ -137,8 +137,10 @@ export interface WebThemePalette {
   surface_container_high_color: string;
   primary_color: string;
   secondary_color: string;
-  primary_container_color: string;
-  on_primary_container_color: string;
+  // 真机快照恒下发；主题工作室合成快照时可省略，
+  // 由前端按 app 同款规则从主色派生（见 chatTheme.ts）
+  primary_container_color?: string;
+  on_primary_container_color?: string;
   on_surface_color: string;
   on_surface_variant_color: string;
   outline_color: string;

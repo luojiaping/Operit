@@ -59,4 +59,7 @@ snapshot 转 CSS 变量体系，但它只能在连接真机 HTTP 后端时使用
   vitest 25 项全部通过
 - CI：pr-check.yml 的 Check WebChat 增加 npm test
 - 文档：docs/doc-src/dev-core/web-preview-studio.md、BUILDING.md 预览站章节
+- 重构：预览站改为主题工作室布局——左侧主题面板（明暗/主辅色/背景图片上传与
+  模糊/气泡/风格/字号），右侧 devices.css 的 Google Pixel 6 Pro 手机壳内实时
+  渲染（壳随舞台自适应缩放）；插件创作收为「插件工坊」次级模式
 - 待真机验证：模板生成与上传演示的 .toolpkg 导入 app 后在输入区渲染

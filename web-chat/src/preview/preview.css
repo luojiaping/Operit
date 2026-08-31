@@ -5,40 +5,41 @@
   height: 100dvh;
   min-height: 100vh;
   overflow: hidden;
-  background: #101319;
+  background:
+    radial-gradient(1200px 600px at 20% -10%, rgba(59, 98, 217, 0.18), transparent 60%),
+    radial-gradient(900px 500px at 95% 110%, rgba(46, 158, 143, 0.12), transparent 60%),
+    #0e1117;
 }
 
-.preview-toolbar {
+.studio-topbar {
   display: flex;
-  flex: 1 0 auto;
   flex-wrap: wrap;
   align-items: center;
   gap: 14px;
-  padding: 10px 16px;
+  padding: 10px 18px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  background: #161a22;
+  background: rgba(15, 18, 26, 0.72);
   color: #e8ecf4;
   font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
   font-size: 13px;
 }
 
-.preview-toolbar-title {
+.studio-title {
   margin-right: 6px;
   font-weight: 700;
   letter-spacing: 0.02em;
 }
 
-.preview-toolbar-group {
+.studio-mode-tabs {
   display: inline-flex;
-  align-items: center;
   gap: 4px;
   padding: 3px;
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.06);
 }
 
-.preview-chip {
-  padding: 5px 12px;
+.studio-mode-tabs button {
+  padding: 6px 16px;
   border: 0;
   border-radius: 8px;
   background: transparent;
@@ -48,34 +49,199 @@
   cursor: pointer;
 }
 
-.preview-chip:hover {
-  color: #ffffff;
-}
-
-.preview-chip.is-active {
+.studio-mode-tabs button.is-active {
   background: #3b62d9;
   color: #ffffff;
 }
 
-.preview-toolbar-hint {
+.studio-hint {
   margin-left: auto;
   color: rgba(232, 236, 244, 0.45);
   font-size: 12px;
 }
 
-.preview-stage {
-  display: flex;
-  flex: 1 1 auto;
-  justify-content: center;
-  padding: 18px 16px;
-  overflow: hidden;
-}
-
-.preview-workbench {
+.studio-body {
   display: flex;
   flex: 1 1 auto;
   min-height: 0;
 }
+
+.studio-side {
+  display: flex;
+  flex: 0 0 340px;
+  flex-direction: column;
+  min-height: 0;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  background: #131722;
+  overflow-y: auto;
+}
+
+/* --- 主题工作室面板 --- */
+
+.studio-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px 14px 20px;
+  color: #e8ecf4;
+  font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+.studio-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.studio-group h4 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: rgba(232, 236, 244, 0.55);
+  text-transform: uppercase;
+}
+
+.studio-segment {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.studio-segment button {
+  flex: 1 1 auto;
+  padding: 6px 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: rgba(232, 236, 244, 0.72);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.studio-segment button.is-active {
+  background: #3b62d9;
+  color: #ffffff;
+}
+
+.studio-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 34px;
+  font-size: 12px;
+  color: rgba(232, 236, 244, 0.85);
+}
+
+.studio-field.is-slider {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.studio-field.is-slider span {
+  display: flex;
+  justify-content: space-between;
+}
+
+.studio-field code {
+  color: rgba(232, 236, 244, 0.55);
+  font-size: 11px;
+}
+
+.studio-color-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.studio-color-row input[type="color"] {
+  width: 34px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.studio-field.is-toggle input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: #3b62d9;
+  cursor: pointer;
+}
+
+.studio-field input[type="range"] {
+  width: 100%;
+  accent-color: #3b62d9;
+  cursor: pointer;
+}
+
+.studio-file-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.studio-file-button {
+  padding: 7px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  background: transparent;
+  color: rgba(232, 236, 244, 0.85);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.studio-file-button:hover {
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.studio-file-hint {
+  color: rgba(232, 236, 244, 0.4);
+  font-size: 11px;
+}
+
+.studio-background-thumb {
+  width: 100%;
+  max-height: 90px;
+  object-fit: cover;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+}
+
+.studio-reset {
+  padding: 10px 0;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 12px;
+  background: transparent;
+  color: rgba(232, 236, 244, 0.85);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.studio-reset:hover {
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.studio-note {
+  margin: 0;
+  color: rgba(232, 236, 244, 0.38);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+/* --- 插件工坊面板（沿用既有样式类） --- */
 
 .preview-panel {
   display: flex;
@@ -83,9 +249,13 @@
   flex-direction: column;
   gap: 12px;
   padding: 14px;
-  border-right: 1px solid rgba(255, 255, 255, 0.08);
-  background: #131722;
   overflow-y: auto;
+}
+
+.studio-side .preview-panel {
+  flex: 0 0 auto;
+  border-right: 0;
+  background: transparent;
 }
 
 .preview-panel-tabs {
@@ -218,22 +388,4 @@
   color: rgba(232, 236, 244, 0.38);
   font-size: 11px;
   line-height: 1.6;
-}
-
-.preview-device {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  min-height: 0;
-  max-width: 100%;
-  overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 18px;
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
-  background: var(--chat-root-background, #0f1520);
-}
-
-/* 设备框内取消 980px 内容限宽，按设备宽度渲染（B26） */
-.preview-device {
-  --chat-frame-max-width: 100%;
 }

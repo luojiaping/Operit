@@ -66,6 +66,14 @@ export const previewControls = {
     }
     state.themesByChat.set(chatId, { ...theme, ...patch });
   },
+  // 主题工作室用整体替换：面板合成完整快照（含删除派生字段让前端接管派生）后调用
+  setTheme(next: WebThemeSnapshot) {
+    const chatId = state.currentChatId ?? 'chat-main';
+    if (!state.themesByChat.has(chatId)) {
+      throw new Error(`mock: cannot set theme, chat not found: ${chatId}`);
+    }
+    state.themesByChat.set(chatId, JSON.parse(JSON.stringify(next)) as WebThemeSnapshot);
+  },
   resetTheme() {
     for (const [chatId, theme] of Object.entries(MOCK_THEMES)) {
       state.themesByChat.set(chatId, JSON.parse(JSON.stringify(theme)) as WebThemeSnapshot);

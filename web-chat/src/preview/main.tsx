@@ -1,14 +1,14 @@
-import { StrictMode, useState } from 'react';
+import { StrictMode, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { AIChatScreenView } from '../ui/features/chat/screens/AIChatScreen';
 import { useChatViewModel } from '../ui/features/chat/viewmodel/ChatViewModel';
-import { previewControls } from '../ui/features/chat/util/mock/mockTransport';
 import { isMockMode } from '../ui/features/chat/util/chatTransport';
-import type { ChatViewModel } from '../ui/features/chat/viewmodel/ChatViewModel';
 import { PreviewSlotProvider } from '../ui/features/chat/composedsl/InputSlotHost';
 import type { InputSlotContentMap } from '../ui/features/chat/composedsl/composeDslTypes';
+import { ThemeStudioPanel } from './ThemeStudioPanel';
 import { CodePreviewPanel } from './CodePreviewPanel';
 import './preview.css';
+import './deviceFrame.css';
 
 // 初始演示内容 = examples/input_slot_demo 三个插槽的等价物，
 // above_input 用 DSL screen、input_drawer 返回文本、toolbar_right 返回文本
@@ -34,14 +34,7 @@ const INITIAL_SLOT_CONTENTS: InputSlotContentMap = {
   input_toolbar_right: { kind: 'text', text: 'Slot' }
 };
 
-const DEVICE_WIDTHS = [
-  { id: 's', label: '360', value: 360 },
-  { id: 'm', label: '412', value: 412 },
-  { id: 'l', label: '768', value: 768 },
-  { id: 'full', label: 'Full', value: null }
-] as const;
-
-type DeviceWidthId = (typeof DEVICE_WIDTHS)[number]['id'];
+type StudioMode = 'theme' | 'plugin';
 
 // 预览站强制 mock 模式：直接访问 /preview.html 无参数时自动补 ?mock=1
 function ensureMockParam() {
@@ -53,166 +46,97 @@ function ensureMockParam() {
   window.location.replace(url.toString());
 }
 
-function ToolbarChip({
-  active,
-  onClick,
-  title,
-  children
-}: {
-  active: boolean;
-  onClick: () => void;
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      className={`preview-chip ${active ? 'is-active' : ''}`}
-      onClick={onClick}
-      title={title}
-      type="button"
-    >
-      {children}
-    </button>
-  );
-}
+// 手机壳（Google Pixel 6 Pro，devices.css）包裹的模拟器。
+// 壳实体尺寸固定（404x862），按舞台实际尺寸自适应缩放，任何视口都不溢出
+function DeviceMockup({ children }: { children: React.ReactNode }) {
+  const stageRef = useRef<HTMLElement | null>(null);
+  const [scale, setScale] = useState(1);
 
-function SimulatorToolbar({
-  deviceWidthId,
-  onDeviceWidthChange,
-  viewModel
-}: {
-  deviceWidthId: DeviceWidthId;
-  onDeviceWidthChange: (id: DeviceWidthId) => void;
-  viewModel: ChatViewModel;
-}) {
-  const chatStyle = viewModel.theme?.chat_style === 'cursor' ? 'cursor' : 'bubble';
-  const inputStyle = viewModel.theme?.input.style === 'classic' ? 'classic' : 'agent';
-
-  async function patchThemeAndReload(patch: Parameters<typeof previewControls.patchTheme>[0]) {
-    previewControls.patchTheme(patch);
-    await viewModel.reloadCurrentConversation();
-  }
+  useEffect(() => {
+    const element = stageRef.current;
+    if (!element) {
+      return;
+    }
+    const update = () => {
+      const rect = element.getBoundingClientRect();
+      const next = Math.min(
+        1,
+        (rect.height - 28) / 866,
+        (rect.width - 20) / 408
+      );
+      setScale(Math.max(0.35, next));
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
 
   return (
-    <div className="preview-toolbar">
-      <span className="preview-toolbar-title">Operit Preview Studio</span>
-
-      <div className="preview-toolbar-group">
-        {DEVICE_WIDTHS.map((width) => (
-          <ToolbarChip
-            key={width.id}
-            active={deviceWidthId === width.id}
-            onClick={() => onDeviceWidthChange(width.id)}
-            title={`设备宽度 ${width.label}`}
-          >
-            {width.label}
-          </ToolbarChip>
-        ))}
+    <main className="device-stage" ref={stageRef}>
+      <div className="device-stage-scale" style={{ '--device-scale': scale } as React.CSSProperties}>
+        <div className="device device-google-pixel-6-pro">
+          <div className="device-frame">
+            <div className="device-screen">
+              <div className="device-app">{children}</div>
+            </div>
+          </div>
+          <div className="device-stripe"></div>
+          <div className="device-header"></div>
+          <div className="device-sensors"></div>
+          <div className="device-btns"></div>
+          <div className="device-power"></div>
+        </div>
       </div>
-
-      <div className="preview-toolbar-group">
-        <ToolbarChip
-          active={chatStyle === 'bubble'}
-          onClick={() => {
-            if (chatStyle !== 'bubble') {
-              void patchThemeAndReload({ chat_style: 'bubble' });
-            }
-          }}
-          title="气泡消息风格"
-        >
-          气泡
-        </ToolbarChip>
-        <ToolbarChip
-          active={chatStyle === 'cursor'}
-          onClick={() => {
-            if (chatStyle !== 'cursor') {
-              void patchThemeAndReload({ chat_style: 'cursor' });
-            }
-          }}
-          title="光标消息风格"
-        >
-          光标
-        </ToolbarChip>
-      </div>
-
-      <div className="preview-toolbar-group">
-        <ToolbarChip
-          active={inputStyle === 'agent'}
-          onClick={() => {
-            if (inputStyle !== 'agent') {
-              void patchThemeAndReload({
-                input: { ...viewModel.theme!.input, style: 'agent' }
-              });
-            }
-          }}
-          title="Agent 输入风格"
-        >
-          Agent
-        </ToolbarChip>
-        <ToolbarChip
-          active={inputStyle === 'classic'}
-          onClick={() => {
-            if (inputStyle !== 'classic') {
-              void patchThemeAndReload({
-                input: { ...viewModel.theme!.input, style: 'classic' }
-              });
-            }
-          }}
-          title="Classic 输入风格"
-        >
-          Classic
-        </ToolbarChip>
-      </div>
-
-      <div className="preview-toolbar-group">
-        <ToolbarChip
-          active={false}
-          onClick={() => {
-            previewControls.resetTheme();
-            void viewModel.reloadCurrentConversation();
-          }}
-          title="重置主题覆盖"
-        >
-          重置主题
-        </ToolbarChip>
-      </div>
-
-      <span className="preview-toolbar-hint">
-        mock 数据驱动 · 消息可交互 · 主题为模拟近似
-      </span>
-    </div>
+    </main>
   );
 }
 
 function PreviewApp() {
   const viewModel = useChatViewModel();
-  const [deviceWidthId, setDeviceWidthId] = useState<DeviceWidthId>('m');
+  const [studioMode, setStudioMode] = useState<StudioMode>('theme');
   const [slotContents, setSlotContents] = useState<InputSlotContentMap>(INITIAL_SLOT_CONTENTS);
-  const deviceWidth = DEVICE_WIDTHS.find((width) => width.id === deviceWidthId)?.value ?? null;
 
   return (
     <div className="preview-studio">
-      <SimulatorToolbar
-        deviceWidthId={deviceWidthId}
-        onDeviceWidthChange={setDeviceWidthId}
-        viewModel={viewModel}
-      />
-      <div className="preview-workbench">
-        <CodePreviewPanel
-          onContentsChange={setSlotContents}
-          onResetDemo={() => setSlotContents(INITIAL_SLOT_CONTENTS)}
-          viewModel={viewModel}
-        />
-        <div className="preview-stage">
-          <div
-            className="preview-device"
-            style={deviceWidth !== null ? { width: `${deviceWidth}px` } : undefined}
+      <header className="studio-topbar">
+        <span className="studio-title">Operit Theme Studio</span>
+        <div className="studio-mode-tabs">
+          <button
+            className={studioMode === 'theme' ? 'is-active' : ''}
+            onClick={() => setStudioMode('theme')}
+            type="button"
           >
-            <PreviewSlotProvider contents={slotContents}>
-              <AIChatScreenView viewModel={viewModel} />
-            </PreviewSlotProvider>
-          </div>
+            主题预览
+          </button>
+          <button
+            className={studioMode === 'plugin' ? 'is-active' : ''}
+            onClick={() => setStudioMode('plugin')}
+            type="button"
+          >
+            插件工坊
+          </button>
         </div>
+        <span className="studio-hint">mock 数据驱动 · 一切渲染都在浏览器本地</span>
+      </header>
+      <div className="studio-body">
+        <aside className="studio-side">
+          {studioMode === 'theme' ? (
+            <ThemeStudioPanel viewModel={viewModel} />
+          ) : (
+            <CodePreviewPanel
+              onContentsChange={setSlotContents}
+              onResetDemo={() => setSlotContents(INITIAL_SLOT_CONTENTS)}
+              viewModel={viewModel}
+            />
+          )}
+        </aside>
+        <DeviceMockup>
+          {/* 主题模式展示纯净界面，插件模式挂载插槽内容 */}
+          <PreviewSlotProvider contents={studioMode === 'plugin' ? slotContents : {}}>
+            <AIChatScreenView viewModel={viewModel} />
+          </PreviewSlotProvider>
+        </DeviceMockup>
       </div>
     </div>
   );

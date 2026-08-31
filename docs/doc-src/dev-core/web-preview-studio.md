@@ -4,11 +4,19 @@ For_Agent: 本文档描述 Preview Studio 的结构、能力边界与部署方�
 
 # Web Preview Studio
 
-Preview Studio 是 Operit 聊天界面的浏览器预览与插件创作工具，从 web-chat 抽出的模拟器外壳驱动。
+Preview Studio 是 Operit 聊天界面的浏览器预览与创作工具，由两部分组成：
+
+- 主题预览（默认）：左侧主题工作室面板调参（明暗、主辅色、背景图片与模糊、
+  气泡、界面风格、字号），右侧 Google Pixel 6 Pro 手机壳（样式取自
+  devices.css，MIT）内实时渲染 mock 会话；颜色派生与 app 的
+  ThemeColorSchemeResolver 同一套规则，改主色即所见即所得
+- 插件工坊：输入区插槽插件的预览与创作（低代码模板 / 粘贴代码 /
+  上传 .toolpkg），渲染结果挂在手机壳内模拟器的三个插槽上
+
 它服务于两个场景：
 
-- 降低输入区插槽插件（`registerInputSlotPlugin`）的定制门槛：低代码模板或粘贴代码即可实时预览并导出 `.toolpkg`
-- 在无真机环境下预览主题渲染差异（mock 主题快照携带 web 侧扩展字段）
+- 降低输入区插槽插件（`registerInputSlotPlugin`）的定制门槛
+- 在无真机环境下预览主题效果（背景图、模糊、液态玻璃、明暗派生全链路）
 
 ## 入口与部署
 
@@ -32,12 +40,14 @@ docker compose up -d --build
 ```
 web-chat/src/
 	preview/                     预览站专属（不进 APK assets）
-		main.tsx                 预览入口与工具栏
-		CodePreviewPanel.tsx     演示/粘贴/模板/上传四模式面板
+		main.tsx                 预览入口：主题/插件双模式 + 手机壳舞台
+		ThemeStudioPanel.tsx     主题工作室面板（调参合成快照驱动派生管线）
+		CodePreviewPanel.tsx     插件工坊面板（演示/粘贴/模板/上传四模式）
 		slotRunner.ts            main.js 注册执行与返回值解析
 		templates.ts             低代码模板与 .toolpkg 源码生成
 		toolpkgLoader.ts         ZIP 读取（store 与 deflate）
 		zipWriter.ts             store ZIP 写入（导出 .toolpkg）
+		deviceFrame.css          手机壳样式（源自 devices.css，仅 Pixel 6 Pro 段）
 	ui/features/chat/
 		composedsl/              Compose DSL 浏览器渲染器与插槽宿主
 			composeDslRuntime.ts ctx 契约（UI 注册表、useState、MaterialTheme）
