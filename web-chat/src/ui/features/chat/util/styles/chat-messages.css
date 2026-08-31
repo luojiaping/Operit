@@ -1132,6 +1132,8 @@
   padding-bottom: 12px;
   padding-left: var(--chat-assistant-padding-left);
   padding-right: var(--chat-assistant-padding-right);
+  /* A10：气泡级独立字体，对齐 app applyFontFamilyToTypography */
+  font-family: var(--chat-assistant-font-family);
 }
 
 .bubble-user-message .chat-message-content {
@@ -1139,6 +1141,8 @@
   padding-bottom: 12px;
   padding-left: var(--chat-user-padding-left);
   padding-right: var(--chat-user-padding-right);
+  /* A10：气泡级独立字体，对齐 app applyFontFamilyToTypography */
+  font-family: var(--chat-user-font-family);
 }
 
 .bubble-user-message {
@@ -1168,4 +1172,47 @@
   min-width: 0;
   word-break: normal;
   overflow-wrap: break-word;
+}
+
+/* A20：消息底部统计条，对齐 app MessageFooterBar（labelSmall、onSurfaceVariant 0.68、start16 top4） */
+.message-footer-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 0 0 16px;
+  color: color-mix(in srgb, var(--chat-text-soft) 68%, transparent);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.message-footer-bar .message-footer-stat {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.message-footer-variants {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.message-footer-variant-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--chat-text-soft);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.message-footer-variant-button.is-disabled {
+  color: color-mix(in srgb, var(--chat-text-soft) 35%, transparent);
+  cursor: default;
 }

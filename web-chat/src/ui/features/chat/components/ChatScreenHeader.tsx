@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react';
 import { useMemo, useState } from 'react';
 import { ChatHeader } from './ChatHeader';
 
@@ -11,9 +12,19 @@ function UsageRing({
   const radius = 15;
   const circumference = 2 * Math.PI * radius;
   const dashOffset = circumference - (percent / 100) * circumference;
+  // B18：环内数字颜色跟随进度色，对齐 app ChatScreenHeader
+  const progressColor =
+    tone === 'danger'
+      ? 'var(--chat-context-danger)'
+      : tone === 'warn'
+        ? 'var(--chat-context-warn)'
+        : 'var(--chat-primary)';
 
   return (
-    <div className="chat-usage-ring">
+    <div
+      className="chat-usage-ring"
+      style={{ '--chat-usage-ring-progress': progressColor } as CSSProperties}
+    >
       <svg viewBox="0 0 38 38">
         <circle className="chat-usage-ring-track" cx="19" cy="19" r={radius} />
         <circle

@@ -73,8 +73,24 @@ export function ClassicChatInputSection({
   const showQueueAction = isLoading && messageInput.trim().length > 0;
   const showCancelAction = isLoading && !showQueueAction;
   const showProcessingStatus = showInputProcessingStatus && inputProcessingStage !== 'idle';
+  // B1：阶段进度与颜色对齐 app ClassicChatInputSection——
+  // Connecting tertiary 0.6、上传 secondary、接收（streaming）secondary 1f
   const processingProgress =
-    inputProcessingStage === 'streaming' ? 0.76 : inputProcessingStage === 'uploading' ? 0.52 : 0.38;
+    inputProcessingStage === 'streaming'
+      ? 1
+      : inputProcessingStage === 'uploading'
+        ? 0.52
+        : inputProcessingStage === 'connecting'
+          ? 0.6
+          : 0.38;
+  const processingColor =
+    inputProcessingStage === 'streaming'
+      ? 'var(--chat-progress-tool)'
+      : inputProcessingStage === 'uploading'
+        ? 'var(--chat-progress-tool)'
+        : inputProcessingStage === 'connecting'
+          ? 'var(--chat-progress-connecting)'
+          : 'var(--chat-progress-processing)';
 
   useEffect(() => {
     const textarea = textareaRef.current;
@@ -114,7 +130,7 @@ export function ClassicChatInputSection({
 
       {showProcessingStatus ? (
         <div className="input-processing-status is-classic">
-          <SimpleLinearProgressIndicator progress={processingProgress} />
+          <SimpleLinearProgressIndicator color={processingColor} progress={processingProgress} />
           <div className="input-processing-status-message">{processingLabel(inputProcessingStage)}</div>
         </div>
       ) : null}

@@ -60,7 +60,7 @@ export function ChatHeader({
         </button>
       ) : (
         <button
-          className={`chat-header-icon-button ${showChatHistorySelector ? 'is-active' : ''}`}
+          className={`chat-header-icon-button chat-header-history ${showChatHistorySelector ? 'is-active' : ''}`}
           onClick={onToggleChatHistorySelector}
           type="button"
         >
@@ -69,7 +69,7 @@ export function ChatHeader({
       )}
 
       <button
-        className={`chat-header-icon-button ${isFloatingMode ? 'is-active' : ''}`}
+        className={`chat-header-icon-button chat-header-pip ${isFloatingMode ? 'is-active' : ''}`}
         onClick={onLaunchFloatingWindow}
         type="button"
       >

@@ -1,4 +1,5 @@
 import { MessageAttachmentTag } from '../../attachments';
+import { MessageFooterBar } from '../../MessageFooterBar';
 import { GlassSurface } from '../../part/GlassSurface';
 import { effectiveUserDisplayContent, effectiveUserDisplayName } from '../../../util/chatUtils';
 import type {
@@ -101,6 +102,7 @@ export function UserMessageComposable({
           <div className="plain-text-block">{effectiveUserDisplayContent(message)}</div>
         </div>
       </GlassSurface>
+      <MessageFooterBar message={message} theme={theme} />
     </article>
   );
 }

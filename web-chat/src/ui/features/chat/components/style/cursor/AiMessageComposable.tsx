@@ -1,4 +1,5 @@
 import { MessageAttachmentTag } from '../../attachments';
+import { MessageFooterBar } from '../../MessageFooterBar';
 import { CustomXmlRenderer } from '../../part/CustomXmlRenderer';
 import { assistantCompactMeta } from '../../../util/chatUtils';
 import type { WebChatMessage, WebThemeSnapshot } from '../../../util/chatTypes';
@@ -46,6 +47,7 @@ export function AiMessageComposable({
           ))}
         </div>
       ) : null}
+      <MessageFooterBar message={message} theme={theme} />
     </article>
   );
 }

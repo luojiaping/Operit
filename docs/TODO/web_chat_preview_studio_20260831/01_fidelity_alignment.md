@@ -20,7 +20,6 @@ web-chat/src/ui/features/chat，app 表示 app/src/main/java/com/ai/assistance/o
 | A4 | 气泡九宫格 20 个参数缺失，app 为 BubbleImageStyleConfig 九宫格绘制 | WebBubbleImageTheme 加 crop、repeat、scale 字段；CSS 用 border-image 九宫格实现 |
 | A5 | render_mode 语义错配，web 判断 repeat 而 app 取值 tiled_nine_slice 与 nine_patch；web 还叠加固定暗色渐变 | 对齐取值枚举；去掉暗色渐变 |
 | A10 | 气泡级独立字体缺失，app 每个气泡可单独设置字体 | 类型加气泡级字体字段；chatTheme 输出气泡级 font-family 变量 |
-| A17 | 代码块写死 VSCode 暗色，--chat-code-block-bg 零消费 | 代码块背景接语义色变量，从 palette 派生亮暗两套 |
 | B26 | chat-screen-frame 限宽 980px，app 全屏宽 | 限宽改为外壳可配置，模拟器按设备宽度渲染 |
 
 ### P1 明显可见
@@ -29,7 +28,7 @@ web-chat/src/ui/features/chat，app 表示 app/src/main/java/com/ai/assistance/o
 | --- | --- | --- |
 | A7 | 输入栏玻璃启用条件缺 transparent 前置 | 对齐 app 条件 chatInputTransparent && liquid && !water |
 | A8 | input transparent 渲染为半透明毛玻璃，app 是真 alpha 0 | is-transparent 改真透明 |
-| A11 | fontScale 只作用于消息正文，app 缩放整个 Typography | --chat-font-scale 作用域扩展到 header、输入栏、弹窗 |
+| A11 | fontScale 只作用于消息正文，app 缩放整个 Typography | 后续项：需要字号系统从显式 px 迁移到可缩放变量，单独批次处理，本批不做 |
 | A13 | header 历史与 pip 图标颜色不可配，app 支持自定义 | 类型加可选字段，缺省 --chat-header-icon-muted |
 | A15 | palette 缺 tertiary、error、errorContainer、secondaryContainer、onSecondary、surfaceContainer 系列；token 环颜色写死 | 类型补语义色可选字段；token 用量环、发送队列、取消按钮按 app 阈值接 palette |
 | A16 | on_primary 与 on_secondary 由 web 自算，阈值 0.58 且忽略 onColorMode，app 阈值 0.5 且支持强制黑白 | 快照提供时直接使用；缺失时对齐 app 阈值与 onColorMode |
@@ -45,6 +44,8 @@ web-chat/src/ui/features/chat，app 表示 app/src/main/java/com/ai/assistance/o
 ### 不修项
 
 - A3 共 12 项 app bar、drawer、状态栏专属配置：web 无对应 surface，预览器标注不适用
+- A17 代码块写死 VS Code 暗色：核对 app 侧 EnhancedCodeBlock.kt 后确认其代码块背景
+  同样无条件写死 #1E1E1E 与 #252526，web 现状与 app 一致，调查报告此条为误判
 - B23、B24 液态玻璃与水玻璃机理差异：参数体系无法一一映射，接受近似并文档标注
 - 13 项细微差异：见调查存档，默认不处理
 

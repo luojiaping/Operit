@@ -84,9 +84,10 @@
 }
 
 .chat-composer-host.is-transparent .classic-chat-input-section {
-  background: var(--chat-composer-bg-transparent);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
+  /* A8：对齐 app 的真透明 surface alpha 0，不做半透明毛玻璃 */
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 .chat-composer-host.is-water-glass .classic-chat-input-section {
@@ -259,8 +260,9 @@
   padding: 8px 12px 8px;
   border: 0;
   border-radius: 20px 20px 0 0;
-  background: var(--chat-composer-bg);
-  box-shadow: 0 -10px 22px var(--chat-shadow);
+  /* B5/B6：底色与顶部质感公式由 chatTheme 按 app 侧规则生成 */
+  background: var(--chat-agent-card-bg);
+  box-shadow: var(--chat-agent-card-shadow);
 }
 
 .agent-input-field {
@@ -278,9 +280,11 @@
 }
 
 .chat-composer-host.is-transparent .agent-input-card {
-  background: var(--chat-composer-bg-transparent);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
+  /* A8：对齐 app 的真透明 surface alpha 0，不做半透明毛玻璃 */
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
 }
 
 .chat-composer-host.is-water-glass .agent-input-card {

@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react';
 import type { WebChatMessage, WebMessageAttachment, WebThemeSnapshot } from './chatTypes';
+import { buildBubbleImageBorderStyle } from './chatTheme';
 
 export function formatTime(timestamp: number) {
   return new Intl.DateTimeFormat('zh-CN', {
@@ -113,10 +114,13 @@ export function bubbleImageStyle(
     return undefined;
   }
 
+  // A4/A5：九宫格走 border-image（tiled_nine_slice 平铺 / nine_patch 拉伸），
+  // 不再整图 cover 拉伸，也不叠加旧版固定暗色渐变
   return {
-    backgroundImage: `linear-gradient(180deg, rgba(10, 12, 20, 0.06), rgba(10, 12, 20, 0.12)), url(${imageTheme.asset_url})`,
-    backgroundSize: imageTheme.render_mode === 'repeat' ? 'auto' : 'cover',
-    backgroundRepeat: imageTheme.render_mode === 'repeat' ? 'repeat' : 'no-repeat',
-    backgroundPosition: 'center'
+    ...buildBubbleImageBorderStyle(imageTheme),
+    borderStyle: 'solid',
+    // border-image 的边区宽度由 borderWidth 承载；
+    // 取 12px 与默认气泡内边距一致，保证角和边可见
+    borderWidth: '12px'
   };
 }

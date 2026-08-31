@@ -1,4 +1,6 @@
 import { MessageAttachmentTag } from '../../attachments';
+import { MessageFooterBar } from '../../MessageFooterBar';
+import { PersonIcon } from '../../../util/chatIcons';
 import { BubbleImageBackgroundSurface } from './BubbleImageBackgroundSurface';
 import {
   bubbleImageStyle,
@@ -24,8 +26,13 @@ function UserBubbleAvatar({
   }
 
   return (
-    <div className="bubble-avatar bubble-avatar-large bubble-avatar-fallback">
-      {name.slice(0, 1) || 'U'}
+    <div
+      aria-label={name || 'User'}
+      className="bubble-avatar bubble-avatar-large bubble-avatar-fallback is-user"
+      role="img"
+    >
+      {/* B11：对齐 app 的矢量图标 fallback，tint primary，不再用首字母 */}
+      <PersonIcon size={22} />
     </div>
   );
 }
@@ -205,6 +212,7 @@ export function BubbleUserMessageComposable({
             <div className="plain-text-block">{content}</div>
           </div>
         </BubbleImageBackgroundSurface>
+        <MessageFooterBar message={message} theme={theme} />
       </article>
     );
   }
@@ -250,6 +258,7 @@ export function BubbleUserMessageComposable({
           />
         ) : null}
       </div>
+      <MessageFooterBar message={message} theme={theme} />
     </article>
   );
 }

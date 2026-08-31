@@ -286,7 +286,7 @@
 }
 
 .xml-canvas-tool-result-arrow.is-error {
-  color: color-mix(in srgb, #ff6f7b 76%, transparent);
+  color: color-mix(in srgb, var(--chat-error) 76%, transparent);
 }
 
 .xml-canvas-tool-result-status.is-success {
@@ -294,7 +294,7 @@
 }
 
 .xml-canvas-tool-result-status.is-error {
-  color: #ff6f7b;
+  color: var(--chat-error);
 }
 
 .xml-canvas-tool-result-text {
@@ -311,7 +311,7 @@
 }
 
 .xml-canvas-tool-result-text.is-error {
-  color: color-mix(in srgb, #ff6f7b 84%, var(--chat-text-main));
+  color: color-mix(in srgb, var(--chat-error) 84%, var(--chat-text-main));
 }
 
 .xml-canvas-tool-result-copy {
@@ -432,16 +432,17 @@
   transform: scale(0.5);
 }
 
+/* 状态点色对齐 app 写死值：success #4CAF50、warning #FF9F0A、error 走 scheme.error */
 .structured-inline-status.is-success {
-  background: color-mix(in srgb, #28a745 74%, transparent);
+  background: color-mix(in srgb, #4caf50 74%, transparent);
 }
 
 .structured-inline-status.is-error {
-  background: color-mix(in srgb, #dc3545 74%, transparent);
+  background: color-mix(in srgb, var(--chat-error) 74%, transparent);
 }
 
 .structured-inline-status.is-warning {
-  background: color-mix(in srgb, #ff9800 78%, transparent);
+  background: color-mix(in srgb, #ff9f0a 78%, transparent);
 }
 
 .structured-warning-row {
@@ -461,13 +462,13 @@
   width: 2px;
   height: 16px;
   border-radius: 999px;
-  background: color-mix(in srgb, #ff6f7b 72%, transparent);
+  background: color-mix(in srgb, var(--chat-error) 72%, transparent);
   flex: 0 0 auto;
 }
 
 .structured-warning-text {
   min-width: 0;
-  color: color-mix(in srgb, #ff6f7b 90%, var(--chat-text-main));
+  color: color-mix(in srgb, var(--chat-error) 90%, var(--chat-text-main));
   font-size: 12px;
   line-height: 1.45;
 }
@@ -491,9 +492,10 @@
 }
 
 .structured-status-card.is-wait_for_user_need {
-  color: color-mix(in srgb, var(--chat-secondary) 86%, var(--chat-text-main));
-  background: color-mix(in srgb, var(--chat-secondary) 12%, transparent);
-  border-color: color-mix(in srgb, var(--chat-secondary) 22%, transparent);
+  /* 对齐 app：wait 状态用 tertiaryContainer/tertiary */
+  color: color-mix(in srgb, var(--chat-tertiary) 86%, var(--chat-text-main));
+  background: color-mix(in srgb, var(--chat-tertiary) 12%, transparent);
+  border-color: color-mix(in srgb, var(--chat-tertiary) 22%, transparent);
 }
 
 .structured-html-card {
@@ -561,7 +563,7 @@
 }
 
 .structured-modal-title-icon.is-error {
-  color: #ff6f7b;
+  color: var(--chat-error);
 }
 
 .structured-modal-header strong {
@@ -632,7 +634,7 @@
 
 .structured-modal-surface.is-result.is-error {
   padding: 12px;
-  background: color-mix(in srgb, #ff6f7b 16%, transparent);
+  background: color-mix(in srgb, var(--chat-error) 16%, transparent);
 }
 
 .structured-modal-surface.is-diff {
@@ -707,16 +709,17 @@
   padding: 0 12px;
 }
 
+/* A18：diff 语义色对齐 app DialogComponents——增 primaryContainer、删 errorContainer、hunk secondaryContainer */
 .structured-diff-row.is-addition {
   background: color-mix(in srgb, var(--chat-primary-container) 20%, transparent);
 }
 
 .structured-diff-row.is-deletion {
-  background: color-mix(in srgb, #ff6f7b 16%, transparent);
+  background: color-mix(in srgb, var(--chat-error-container) 20%, transparent);
 }
 
 .structured-diff-row.is-hunk {
-  background: color-mix(in srgb, var(--chat-secondary) 14%, transparent);
+  background: color-mix(in srgb, var(--chat-secondary-container) 22%, transparent);
 }
 
 .structured-diff-text {
@@ -734,14 +737,12 @@
 }
 
 .structured-diff-row.is-deletion .structured-diff-text {
-  color: #ff6f7b;
+  color: var(--chat-error);
 }
 
 .structured-diff-row.is-hunk .structured-diff-text {
   color: var(--chat-secondary);
-}
-
-.param-visualizer {
+}.param-visualizer {
   display: flex;
   flex-direction: column;
   gap: 8px;

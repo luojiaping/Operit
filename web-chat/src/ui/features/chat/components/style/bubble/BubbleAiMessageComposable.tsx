@@ -1,4 +1,6 @@
 import { MessageAttachmentTag } from '../../attachments';
+import { MessageFooterBar } from '../../MessageFooterBar';
+import { AssistantIcon } from '../../../util/chatIcons';
 import { CustomXmlRenderer } from '../../part/CustomXmlRenderer';
 import { BubbleImageBackgroundSurface } from './BubbleImageBackgroundSurface';
 import {
@@ -22,7 +24,16 @@ function BubbleAvatar({
     return <img alt={name} className={className} src={url} />;
   }
 
-  return <div className={`${className} bubble-avatar-fallback`}>{name.slice(0, 1) || 'A'}</div>;
+  return (
+    <div
+      aria-label={name || 'Assistant'}
+      className={`${className} bubble-avatar-fallback is-assistant`}
+      role="img"
+    >
+      {/* B11：对齐 app 的矢量图标 fallback，tint secondary，不再用首字母 */}
+      <AssistantIcon size={22} />
+    </div>
+  );
 }
 
 export function BubbleAiMessageComposable({
@@ -117,6 +128,7 @@ export function BubbleAiMessageComposable({
             ))}
           </div>
         ) : null}
+        <MessageFooterBar message={message} theme={theme} />
       </article>
     );
   }
@@ -171,6 +183,7 @@ export function BubbleAiMessageComposable({
           ))}
         </div>
       ) : null}
+      <MessageFooterBar message={message} theme={theme} />
     </article>
   );
 }

@@ -27,6 +27,10 @@ export function AIChatScreen() {
     }),
     [chatThemeStyle]
   );
+  // A2：视频壁纸渲染 video 元素；muted/loop 缺省对齐 app 默认值 true
+  const background = viewModel.theme?.background;
+  const isVideoBackground =
+    background?.type === 'video' && Boolean(background.asset_url);
   const suggestedUrl = useMemo(() => {
     if (typeof window === 'undefined') {
       return 'http://127.0.0.1:8094/';
@@ -52,7 +56,20 @@ export function AIChatScreen() {
         className="chat-glass-backdrop-source"
         style={backdropBaseStyle}
       >
-        <div className="chat-glass-backdrop-image" style={backdropImageStyle} />
+        {isVideoBackground && background?.asset_url ? (
+          <video
+            aria-hidden="true"
+            autoPlay
+            className="chat-glass-backdrop-video"
+            loop={background.loop ?? true}
+            muted={background.muted ?? true}
+            playsInline
+            src={background.asset_url}
+            style={backdropImageStyle}
+          />
+        ) : (
+          <div className="chat-glass-backdrop-image" style={backdropImageStyle} />
+        )}
         <div className="chat-glass-backdrop-tint" style={backdropTintStyle} />
       </div>
 

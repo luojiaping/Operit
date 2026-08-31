@@ -364,6 +364,21 @@ export function PersonIcon(props: IconProps) {
   );
 }
 
+// 对齐 app 侧 Icons.Default.Assistant 的机器人头像形态
+export function AssistantIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <rect height="12" rx="3" width="14" x="5" y="6" />
+      <path d="M12 6V3.5" />
+      <circle cx="9.3" cy="12" r="1.1" fill="currentColor" stroke="none" />
+      <circle cx="14.7" cy="12" r="1.1" fill="currentColor" stroke="none" />
+      <path d="M9.5 15h5" />
+      <path d="M5 12H3.2" />
+      <path d="M20.8 12H19" />
+    </IconBase>
+  );
+}
+
 export function GroupIcon(props: IconProps) {
   return (
     <IconBase {...props}>

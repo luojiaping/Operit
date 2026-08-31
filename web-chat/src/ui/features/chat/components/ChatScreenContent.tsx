@@ -300,8 +300,15 @@ export function ChatScreenContent({
             'chat-composer-host',
             viewModel.theme?.input.floating ? 'is-floating' : '',
             viewModel.theme?.input.transparent ? 'is-transparent' : '',
-            viewModel.theme?.input.liquid_glass ? 'is-liquid-glass' : '',
-            viewModel.theme?.input.water_glass ? 'is-water-glass' : '',
+            // A7：玻璃启用条件对齐 app——要求 transparent 前置，liquid 额外排除 water
+            viewModel.theme?.input.liquid_glass &&
+            viewModel.theme?.input.transparent &&
+            !viewModel.theme?.input.water_glass
+              ? 'is-liquid-glass'
+              : '',
+            viewModel.theme?.input.water_glass && viewModel.theme?.input.transparent
+              ? 'is-water-glass'
+              : '',
             viewModel.activeInputStyle === 'agent' ? 'is-agent' : 'is-classic'
           ]
             .filter(Boolean)
