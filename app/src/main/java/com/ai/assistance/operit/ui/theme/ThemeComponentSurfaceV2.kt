@@ -1,5 +1,6 @@
 package com.ai.assistance.operit.ui.theme
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.LocalContentColor
@@ -9,6 +10,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.unit.dp
 import com.ai.assistance.operit.data.theme.packages.ThemeComponentIdV2
 
@@ -19,12 +21,14 @@ internal fun ThemeComponentSurfaceV2(
     state: ThemeComponentStateV2 = ThemeComponentStateV2.NORMAL,
     modifier: Modifier = Modifier,
     applyContentPadding: Boolean = true,
+    clipContent: Boolean = true,
     content: @Composable () -> Unit,
 ) {
     ThemeComponentSurfaceV2(
         skin = LocalThemePackageUiRuntimeV2.current.componentSkin(component, state),
         modifier = modifier,
         applyContentPadding = applyContentPadding,
+        clipContent = clipContent,
         content = content,
     )
 }
@@ -34,6 +38,7 @@ internal fun ThemeComponentSurfaceV2(
     skin: ResolvedThemeComponentSkinV2,
     modifier: Modifier = Modifier,
     applyContentPadding: Boolean = true,
+    clipContent: Boolean = true,
     content: @Composable () -> Unit,
 ) {
     val shape = remember(skin.frame) { skin.frame.toComposeShape() }
@@ -49,25 +54,46 @@ internal fun ThemeComponentSurfaceV2(
             Modifier
         }
 
-    Surface(
-        modifier =
-            modifier.drawWithCache {
-                val framePlan = skin.frame.createRenderPlan(size, this)
-                onDrawWithContent {
-                    drawContent()
-                    drawThemeComponentFrame(framePlan)
-                }
-            },
-        shape = shape,
-        color = skin.container,
-        contentColor = skin.content,
-        tonalElevation = 0.dp,
-        shadowElevation = skin.elevationDp.dp,
-    ) {
-        CompositionLocalProvider(LocalContentColor provides skin.content) {
-            Box(modifier = contentModifier) {
-                content()
+    val frameModifier =
+        modifier.drawWithCache {
+            val framePlan = skin.frame.createRenderPlan(size, this)
+            onDrawWithContent {
+                drawContent()
+                drawThemeComponentFrame(framePlan)
             }
+        }
+    if (clipContent) {
+        Surface(
+            modifier = frameModifier,
+            shape = shape,
+            color = skin.container,
+            contentColor = skin.content,
+            tonalElevation = 0.dp,
+            shadowElevation = skin.elevationDp.dp,
+        ) {
+            ThemeComponentSurfaceContentV2(skin, contentModifier, content)
+        }
+    } else {
+        Box(
+            modifier =
+                frameModifier
+                    .shadow(skin.elevationDp.dp, shape = shape, clip = false)
+                    .background(skin.container, shape),
+        ) {
+            ThemeComponentSurfaceContentV2(skin, contentModifier, content)
+        }
+    }
+}
+
+@Composable
+private fun ThemeComponentSurfaceContentV2(
+    skin: ResolvedThemeComponentSkinV2,
+    contentModifier: Modifier,
+    content: @Composable () -> Unit,
+) {
+    CompositionLocalProvider(LocalContentColor provides skin.content) {
+        Box(modifier = contentModifier) {
+            content()
         }
     }
 }

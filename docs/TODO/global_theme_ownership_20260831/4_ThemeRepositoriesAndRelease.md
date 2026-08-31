@@ -14,7 +14,10 @@
 
 ## 进展
 
-[DONE] 两仓库已发布 V2 `v2.0.0`（含中途修正 token 命名后重建的 Release）；打包脚本确定性归档与本地/CI 字节一致性已验证。
+[SUPERSEDED] V2 `v2.0.0` 的 token 命名修正归档已被当前 component-frame 开发基线取代。
 
-- 默认主题：`operit.default@2.0.0`，SHA-256 `8d5c512555a059a871259071adfd26b3257d57e533d0ba80f03537c58e6b4102`
-- 赛博主题：`operit.cyber_grid@2.0.0`（basis 指向上述默认坐标）
+[DONE] 默认主题开发预览：`operit.default@2.1.0`，SHA-256 `3ada292d108f11efaaa78e029db307229e2fada18ed15b4bd09a75b8323c8f13`；该 archive 固定内置于 APK。
+
+[DONE] 赛博主题开发预览：`operit.cyber_grid@2.1.0`，SHA-256 `e60316ce282ffd7b035645217647ad28a67b9a575ad975841e5b59d6a17b0b1e`，basis 精确指向上述默认坐标。
+
+[DECISION] `2.1.0` GitHub prerelease 仅是开发预览，不构成长期主题包接口。全 UI surface host contract 以当前开发基线为准，正式发布前会重新打包并记录新的精确坐标。

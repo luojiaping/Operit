@@ -65,7 +65,7 @@ internal object NativeThemeOperationStatusRendererV1 :
             horizontalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
         ) {
             CircularProgressIndicator(
-                modifier = Modifier.size(24.dp).clearAndSetSemantics {}
+                modifier = Modifier.size(24.dp).clearAndSetSemantics {},
             )
             Spacer(modifier = Modifier.width(16.dp))
             Text(
@@ -104,7 +104,7 @@ internal object NativeThemeOperationStatusRendererV1 :
             ) {
                 CompositionLocalProvider(LocalContentColor provides contentColor) {
                     slots.leading?.invoke(
-                        Modifier.padding(end = 16.dp).clearAndSetSemantics {}
+                        Modifier.padding(end = 16.dp).clearAndSetSemantics {},
                     )
                 }
                 Column {

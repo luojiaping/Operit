@@ -371,6 +371,14 @@ internal object ThemePackageArchiveValidatorV2 {
                     "Theme package declares an unsupported surface: ${surface.surfaceId}",
                 )
             }
+            try {
+                ThemeSurfaceHostPolicyV2.requireSupportedImplementation(
+                    surface = ThemeSurfaceIdV2(surface.surfaceId),
+                    implementation = surface,
+                )
+            } catch (error: IllegalArgumentException) {
+                throw ThemePackageArchiveValidationExceptionV2(error.message ?: "Invalid theme surface kind.")
+            }
         }
         val supportedComponents = ThemeComponentCatalogV2.requiredComponents.map { component -> component.value }.toSet()
         manifest.presentation.componentSkins.keys.forEach { componentId ->

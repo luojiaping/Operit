@@ -277,6 +277,74 @@ class ThemePackageArchiveAndPublicationV2Test {
     }
 
     @Test
+    fun unsupportedSurfaceImplementationKindIsRejected() {
+        val manifest =
+            minimalManifest().copy(
+                surfaces =
+                    listOf(
+                        ThemeSurfaceImplementationV2(
+                            surfaceId = "chat.main",
+                            kind = ThemeSurfaceImplementationKindV2.TEMPLATE,
+                        ),
+                    ),
+            )
+        val archive = writeArchive(manifest)
+
+        assertThrows(ThemePackageArchiveValidationExceptionV2::class.java) {
+            ThemePackageArchiveValidatorV2.validate(archive)
+        }
+    }
+
+    @Test
+    fun sceneSurfaceReferencingAnotherRegisteredSceneIsRejected() {
+        val appShell =
+            com.ai.assistance.operit.ui.theme.scene.ThemeSceneDefinitionV1(
+                sceneId = ThemeSceneIdV1("app.shell"),
+                version = ThemeSceneVersionV1(major = 1, minor = 0),
+                rootNode =
+                    ThemeSceneStageNodeV1(
+                        nodeId = ThemeSceneNodeIdV1("app_root"),
+                        children =
+                            listOf(
+                                ThemeSceneHostSlotNodeV1(
+                                    nodeId = ThemeSceneNodeIdV1("navigation_slot"),
+                                    slotId = ThemeSceneSlotIdV1("app_bar.navigation"),
+                                ),
+                                ThemeSceneHostSlotNodeV1(
+                                    nodeId = ThemeSceneNodeIdV1("title_slot"),
+                                    slotId = ThemeSceneSlotIdV1("app_bar.title"),
+                                ),
+                                ThemeSceneHostSlotNodeV1(
+                                    nodeId = ThemeSceneNodeIdV1("actions_slot"),
+                                    slotId = ThemeSceneSlotIdV1("app_bar.actions"),
+                                ),
+                                ThemeSceneHostSlotNodeV1(
+                                    nodeId = ThemeSceneNodeIdV1("route_slot"),
+                                    slotId = ThemeSceneSlotIdV1("route.content"),
+                                ),
+                            ),
+                    ),
+            )
+        val manifest =
+            minimalManifest().copy(
+                scenes = listOf(chatMainScene(), appShell),
+                surfaces =
+                    listOf(
+                        ThemeSurfaceImplementationV2(
+                            surfaceId = "app.shell",
+                            kind = ThemeSurfaceImplementationKindV2.SCENE,
+                            sceneId = "chat.main",
+                        ),
+                    ),
+            )
+        val archive = writeArchive(manifest)
+
+        assertThrows(ThemePackageArchiveValidationExceptionV2::class.java) {
+            ThemePackageArchiveValidatorV2.validate(archive)
+        }
+    }
+
+    @Test
     fun sceneSurfaceWithoutSceneIsRejected() {
         // 构造期即拒绝：SCENE surface 引用的场景必须在同一 manifest 中存在。
         assertThrows(IllegalArgumentException::class.java) {

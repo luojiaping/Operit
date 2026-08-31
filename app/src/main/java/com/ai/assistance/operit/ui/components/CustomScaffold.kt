@@ -19,8 +19,8 @@ fun CustomScaffold(
     snackbarHost: @Composable () -> Unit = {},
     floatingActionButton: @Composable () -> Unit = {},
     floatingActionButtonPosition: FabPosition = FabPosition.End,
-    containerColor: Color = MaterialTheme.colorScheme.background,
-    contentColor: Color = contentColorFor(containerColor),
+    containerColor: Color = Color.Transparent,
+    contentColor: Color = LocalContentColor.current,
     content: @Composable (PaddingValues) -> Unit
 ) {
     Scaffold(
@@ -35,4 +35,4 @@ fun CustomScaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0), // 自动禁用内容窗口插图
         content = content
     )
-} 
+}

@@ -45,7 +45,6 @@ import com.ai.assistance.operit.data.preferences.ExternalHttpApiPreferences
 import com.ai.assistance.operit.data.preferences.GlobalPresentationManager
 import com.ai.assistance.operit.data.preferences.UserPreferencesManager
 import com.ai.assistance.operit.data.theme.packages.ThemePackageDefaultV2
-import com.ai.assistance.operit.data.theme.packages.ThemePackageInstallerV2
 import com.ai.assistance.operit.data.theme.packages.ThemePackageSelectionRepositoryV2
 import com.ai.assistance.operit.data.theme.packages.ThemeRuntimeRepositoryV2
 import com.ai.assistance.operit.data.preferences.WakeWordPreferences
@@ -213,19 +212,19 @@ class OperitApplication : Application(), ImageLoaderFactory, WorkConfiguration.P
         try {
             runBlocking(Dispatchers.IO) {
                 ThemePackageDefaultV2.ensureInstalled(applicationContext)
-                val installer = ThemePackageInstallerV2.getInstance(applicationContext)
-                val installedCoordinates =
-                    installer.catalog().installations.map { installation -> installation.coordinate }.toSet()
+                val runtimeIndex = ThemeRuntimeRepositoryV2.refresh(applicationContext)
+                check(ThemePackageDefaultV2.coordinate in runtimeIndex.linkedCoordinates) {
+                    "Bundled default V2 theme package could not be linked."
+                }
                 val repairedCoordinate =
                     ThemePackageSelectionRepositoryV2.getInstance(applicationContext)
-                        .repairUnavailableSelection(installedCoordinates)
+                        .repairUnavailableSelection(runtimeIndex.linkedCoordinates)
                 if (repairedCoordinate != null) {
                     AppLogger.w(
                         TAG,
                         "Unavailable V2 theme selection repaired: ${repairedCoordinate.packageId.value}",
                     )
                 }
-                ThemeRuntimeRepositoryV2.refresh(applicationContext)
             }
         } catch (error: Throwable) {
             AppLogger.e(TAG, "V2 theme initialization failed", error)

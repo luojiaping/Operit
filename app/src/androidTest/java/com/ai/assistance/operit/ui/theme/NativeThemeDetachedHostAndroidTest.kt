@@ -2,8 +2,6 @@ package com.ai.assistance.operit.ui.theme
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -29,29 +27,22 @@ class NativeThemeDetachedHostAndroidTest {
                 themeMode = GlobalThemeMode.LIGHT,
                 fontScale = fontScale,
             )
-        val resolvedTheme =
-            resolveGlobalThemeForDetachedComposeHost(
-                presentation = presentation,
-                hostSurface = NativeThemeHostSurface.FLOATING,
-                systemDarkTheme = true,
-                lightColorScheme = lightColorScheme(),
-                darkColorScheme = darkColorScheme(),
-            )
+        val packageRuntime = themePackageRuntimeForAndroidTest(userFontScale = fontScale)
         var providedPresentation: GlobalPresentationSnapshot? = null
-        var providedResolvedTheme: ResolvedGlobalTheme? = null
+        var providedPackageRuntime: ThemePackageUiRuntimeV2? = null
         var providedBodyLargeSize = Typography().bodyLarge.fontSize
 
         composeTestRule.setContent {
             NativeThemeOffscreenHost(
                 presentation = presentation,
-                resolvedTheme = resolvedTheme,
+                packageRuntime = packageRuntime,
             ) {
                 val localPresentation = LocalGlobalPresentation.current
-                val localResolvedTheme = LocalResolvedGlobalTheme.current
+                val localPackageRuntime = LocalThemePackageUiRuntimeV2.current
                 val materialBodyLargeSize = MaterialTheme.typography.bodyLarge.fontSize
                 SideEffect {
                     providedPresentation = localPresentation
-                    providedResolvedTheme = localResolvedTheme
+                    providedPackageRuntime = localPackageRuntime
                     providedBodyLargeSize = materialBodyLargeSize
                 }
             }
@@ -59,8 +50,8 @@ class NativeThemeDetachedHostAndroidTest {
 
         composeTestRule.runOnIdle {
             assertSame(presentation, providedPresentation)
-            assertSame(resolvedTheme, providedResolvedTheme)
-            assertEquals(Typography().bodyLarge.fontSize * fontScale, providedBodyLargeSize)
+            assertSame(packageRuntime, providedPackageRuntime)
+            assertEquals(packageRuntime.typography.bodyLarge.fontSize, providedBodyLargeSize)
         }
     }
 }

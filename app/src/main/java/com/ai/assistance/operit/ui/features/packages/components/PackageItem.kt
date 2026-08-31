@@ -2,16 +2,19 @@ package com.ai.assistance.operit.ui.features.packages.components
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.ai.assistance.operit.data.theme.packages.ThemeComponentCatalogV2
+import com.ai.assistance.operit.ui.theme.ThemeComponentStateV2
+import com.ai.assistance.operit.ui.theme.ThemeComponentSurfaceV2
 
 @Composable
 fun PackageItem(
@@ -21,16 +24,16 @@ fun PackageItem(
         onClick: () -> Unit,
         onToggleImport: (Boolean) -> Unit
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
-                        )
-        ) {
-                Row(
-            modifier = Modifier.fillMaxWidth().padding(12.dp),
+    ThemeComponentSurfaceV2(
+        component = ThemeComponentCatalogV2.LIST_ITEM,
+        state = if (isImported) ThemeComponentStateV2.SELECTED else ThemeComponentStateV2.NORMAL,
+        modifier = Modifier.fillMaxWidth().clickable(role = Role.Button) { onClick() },
+        applyContentPadding = false,
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
-                ) {
+        ) {
             // 图标
                                         Icon(
                                                 imageVector = Icons.Default.Extension,
@@ -55,7 +58,7 @@ fun PackageItem(
                                 Text(
                                         text = description,
                                         style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = LocalContentColor.current.copy(alpha = 0.72f),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                                 )
@@ -72,7 +75,7 @@ fun PackageItem(
                     uncheckedThumbColor = MaterialTheme.colorScheme.outline,
                     uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant
                                         )
-                        )
-                }
+            )
         }
+    }
 }

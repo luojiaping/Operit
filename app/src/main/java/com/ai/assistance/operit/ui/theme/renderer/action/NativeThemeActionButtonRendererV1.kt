@@ -1,17 +1,26 @@
 package com.ai.assistance.operit.ui.theme.renderer.action
 
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
+import com.ai.assistance.operit.data.theme.packages.ThemeComponentCatalogV2
+import com.ai.assistance.operit.ui.theme.ThemeComponentStateV2
+import com.ai.assistance.operit.ui.theme.ThemeComponentSurfaceV2
 import com.ai.assistance.operit.ui.theme.renderer.catalog.NativeThemeComponentCatalogV1
 import com.ai.assistance.operit.ui.theme.renderer.catalog.NativeThemeComponentRendererV1
 
@@ -28,34 +37,71 @@ internal object NativeThemeActionButtonRendererV1 :
         onEvent: (NativeThemeActionButtonEventV1) -> Unit,
         modifier: Modifier,
     ) {
-        val colors =
-            when (state.emphasis) {
-                NativeThemeActionButtonEmphasisV1.STANDARD ->
-                    ButtonDefaults.filledTonalButtonColors()
-                NativeThemeActionButtonEmphasisV1.CAUTION ->
-                    ButtonDefaults.filledTonalButtonColors(
-                        containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-                        contentColor = MaterialTheme.colorScheme.tertiary,
+        if (state.emphasis == NativeThemeActionButtonEmphasisV1.STANDARD) {
+            ThemeComponentSurfaceV2(
+                component = ThemeComponentCatalogV2.BUTTON,
+                state =
+                    if (state.enabled) {
+                        ThemeComponentStateV2.NORMAL
+                    } else {
+                        ThemeComponentStateV2.DISABLED
+                    },
+                modifier =
+                    Modifier
+                        .heightIn(min = 48.dp)
+                        .then(modifier)
+                        .clickable(
+                            enabled = state.enabled,
+                            role = Role.Button,
+                            onClick = { onEvent(NativeThemeActionButtonEventV1.Activate) },
+                        ),
+                applyContentPadding = false,
+            ) {
+                Row(
+                    modifier =
+                        Modifier
+                            .heightIn(min = 48.dp)
+                            .padding(horizontal = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    slots.leading(
+                        Modifier.size(ButtonDefaults.IconSize).clearAndSetSemantics {},
                     )
-                NativeThemeActionButtonEmphasisV1.DESTRUCTIVE ->
-                    ButtonDefaults.filledTonalButtonColors(
-                        containerColor = MaterialTheme.colorScheme.errorContainer,
-                        contentColor = MaterialTheme.colorScheme.error,
-                    )
+                    Spacer(modifier = Modifier.size(ButtonDefaults.IconSpacing))
+                    Text(text = state.label, color = LocalContentColor.current)
+                }
             }
+        } else {
+            val colors =
+                when (state.emphasis) {
+                    NativeThemeActionButtonEmphasisV1.CAUTION ->
+                        ButtonDefaults.filledTonalButtonColors(
+                            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                            contentColor = MaterialTheme.colorScheme.tertiary,
+                        )
 
-        FilledTonalButton(
-            onClick = { onEvent(NativeThemeActionButtonEventV1.Activate) },
-            modifier = Modifier.heightIn(min = 48.dp).then(modifier),
-            colors = colors,
-            enabled = state.enabled,
-            shape = RoundedCornerShape(14.dp),
-        ) {
-            slots.leading(
-                Modifier.size(ButtonDefaults.IconSize).clearAndSetSemantics {}
-            )
-            Spacer(modifier = Modifier.size(ButtonDefaults.IconSpacing))
-            Text(text = state.label)
+                    NativeThemeActionButtonEmphasisV1.DESTRUCTIVE ->
+                        ButtonDefaults.filledTonalButtonColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer,
+                            contentColor = MaterialTheme.colorScheme.error,
+                        )
+
+                    NativeThemeActionButtonEmphasisV1.STANDARD -> error("Standard action uses V2 button skin.")
+                }
+
+            FilledTonalButton(
+                onClick = { onEvent(NativeThemeActionButtonEventV1.Activate) },
+                modifier = Modifier.heightIn(min = 48.dp).then(modifier),
+                colors = colors,
+                enabled = state.enabled,
+                shape = RoundedCornerShape(14.dp),
+            ) {
+                slots.leading(
+                    Modifier.size(ButtonDefaults.IconSize).clearAndSetSemantics {},
+                )
+                Spacer(modifier = Modifier.size(ButtonDefaults.IconSpacing))
+                Text(text = state.label)
+            }
         }
     }
 }

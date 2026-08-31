@@ -1,7 +1,9 @@
 package com.ai.assistance.operit.data.theme.packages
 
 import com.ai.assistance.operit.ui.theme.scene.ThemeSceneHostSlotNodeV1
+import com.ai.assistance.operit.ui.theme.scene.ThemeSceneAssetIdV1
 import com.ai.assistance.operit.ui.theme.scene.ThemeSceneDefinitionV1
+import com.ai.assistance.operit.ui.theme.scene.ThemeSceneImageNodeV1
 import com.ai.assistance.operit.ui.theme.scene.ThemeSceneIdV1
 import com.ai.assistance.operit.ui.theme.scene.ThemeSceneNodeIdV1
 import com.ai.assistance.operit.ui.theme.scene.ThemeSceneSlotIdV1
@@ -73,6 +75,30 @@ class ThemePackageRuntimeLinkerV2Test {
                 ),
         )
 
+    private fun chatMainScene(): ThemeSceneDefinitionV1 =
+        ThemeSceneDefinitionV1(
+            sceneId = ThemeSceneIdV1("chat.main"),
+            version = ThemeSceneVersionV1(major = 1, minor = 0),
+            rootNode =
+                ThemeSceneStageNodeV1(
+                    nodeId = ThemeSceneNodeIdV1("chat_root"),
+                    children =
+                        listOf(
+                            "configuration_gate",
+                            "header",
+                            "transcript",
+                            "composer",
+                            "classic_settings_rail",
+                            "overlay_stack",
+                        ).map { slotId ->
+                            ThemeSceneHostSlotNodeV1(
+                                nodeId = ThemeSceneNodeIdV1("${slotId}_slot"),
+                                slotId = ThemeSceneSlotIdV1(slotId),
+                            )
+                        },
+                ),
+        )
+
     private fun completeManifest(packageId: String = "author.complete"): ThemePackageManifestV2 =
         ThemePackageManifestV2(
             schemaVersion = THEME_PACKAGE_SCHEMA_VERSION_V2,
@@ -80,21 +106,17 @@ class ThemePackageRuntimeLinkerV2Test {
             version = "1.0.0",
             displayName = ThemePackageLocalizedTextV2(values = mapOf("*" to packageId)),
             tokens = fullTokenSet(),
-            scenes = listOf(appShellScene()),
+            scenes = listOf(appShellScene(), chatMainScene()),
             surfaces =
                 ThemeSurfaceCatalogV2.requiredDailySurfaces
-                    .minus(ThemeSurfaceCatalogV2.APP_SHELL)
                     .map { surface ->
+                        val kind = ThemeSurfaceHostPolicyV2.expectedKind(surface)
                         ThemeSurfaceImplementationV2(
                             surfaceId = surface.value,
-                            kind = ThemeSurfaceImplementationKindV2.TEMPLATE,
+                            kind = kind,
+                            sceneId = surface.value.takeIf { kind == ThemeSurfaceImplementationKindV2.SCENE },
                         )
-                    } +
-                    ThemeSurfaceImplementationV2(
-                        surfaceId = ThemeSurfaceCatalogV2.APP_SHELL.value,
-                        kind = ThemeSurfaceImplementationKindV2.SCENE,
-                        sceneId = "app.shell",
-                    ),
+                    },
             presentation =
                 ThemePackagePresentationPatchV2(
                     material = materialProjection(),
@@ -170,6 +192,7 @@ class ThemePackageRuntimeLinkerV2Test {
         assertEquals(ThemeSurfaceCatalogV2.requiredDailySurfaces.size, linked.surfaces.size)
         assertEquals(ThemeComponentCatalogV2.requiredComponents.size, linked.componentSkins.size)
         assertTrue(linked.scenes.containsKey("app.shell"))
+        assertTrue(linked.scenes.containsKey("chat.main"))
     }
 
     @Test
@@ -212,6 +235,149 @@ class ThemePackageRuntimeLinkerV2Test {
                 PublishedThemeCatalogV2(listOf(installation), emptyList()),
             )
         }
+    }
+
+    @Test
+    fun unsupportedLinkedSurfaceKindIsRejected() {
+        val manifest =
+            completeManifest().copy(
+                surfaces =
+                    completeManifest().surfaces.map { surface ->
+                        if (surface.surfaceId == ThemeSurfaceCatalogV2.SETTINGS_INDEX.value) {
+                            surface.copy(kind = ThemeSurfaceImplementationKindV2.HOST_SHELL)
+                        } else {
+                            surface
+                        }
+                    },
+            )
+        val installation = installation(manifest, tmp.newFolder("wrong-kind"))
+
+        val error =
+            assertThrows(ThemePackageLinkExceptionV2::class.java) {
+                ThemePackageRuntimeLinkerV2.link(
+                    installation,
+                    PublishedThemeCatalogV2(listOf(installation), emptyList()),
+                )
+            }
+
+        assertTrue(error.message!!.contains("settings.index"))
+    }
+
+    @Test
+    fun swappedRegisteredScenesAreRejected() {
+        val manifest =
+            completeManifest().copy(
+                surfaces =
+                    completeManifest().surfaces.map { surface ->
+                        when (surface.surfaceId) {
+                            ThemeSurfaceCatalogV2.APP_SHELL.value -> surface.copy(sceneId = "chat.main")
+                            ThemeSurfaceCatalogV2.CHAT_MAIN.value -> surface.copy(sceneId = "app.shell")
+                            else -> surface
+                        }
+                    },
+            )
+        val installation = installation(manifest, tmp.newFolder("swapped-scenes"))
+
+        val error =
+            assertThrows(ThemePackageLinkExceptionV2::class.java) {
+                ThemePackageRuntimeLinkerV2.link(
+                    installation,
+                    PublishedThemeCatalogV2(listOf(installation), emptyList()),
+                )
+            }
+
+        assertTrue(error.message!!.contains("app.shell"))
+    }
+
+    @Test
+    fun invalidInstalledPackageDoesNotBlockOtherLinkedThemePackages() {
+        val valid = installation(completeManifest("author.valid"), tmp.newFolder("valid"))
+        val invalidManifest =
+            completeManifest("author.invalid").copy(
+                surfaces =
+                    completeManifest("author.invalid").surfaces.map { surface ->
+                        if (surface.surfaceId == ThemeSurfaceCatalogV2.SETTINGS_INDEX.value) {
+                            surface.copy(kind = ThemeSurfaceImplementationKindV2.HOST_SHELL)
+                        } else {
+                            surface
+                        }
+                    },
+            )
+        val invalid = installation(invalidManifest, tmp.newFolder("invalid"))
+
+        val index =
+            linkThemeCatalogV2(
+                PublishedThemeCatalogV2(
+                    installations = listOf(valid, invalid),
+                    brokenInstallations = emptyList(),
+                ),
+            )
+
+        assertEquals(setOf(valid.coordinate), index.linkedCoordinates)
+        assertEquals(listOf(invalid.coordinate), index.failures.map { failure -> failure.coordinate })
+    }
+
+    @Test
+    fun inheritedAssetKindMismatchIsRejectedBeforeSceneRendering() {
+        val baseDirectory = tmp.newFolder("asset-base")
+        val pathBytes = "M 0 0 L 1 1".toByteArray(Charsets.UTF_8)
+        val baseManifest =
+            completeManifest("author.asset_base").copy(
+                assets =
+                    listOf(
+                        ThemePackageAssetEntryV2(
+                            key = "inherited_path",
+                            path = "assets/inherited.path",
+                            kind = ThemeAssetKindV2.PATH,
+                            sha256 = sha256Of("inherited_path"),
+                            byteSize = pathBytes.size.toLong(),
+                        ),
+                    ),
+        )
+        val assetFile = File(baseDirectory, "assets/inherited.path")
+        val assetDirectory = requireNotNull(assetFile.parentFile)
+        check(assetDirectory.exists() || assetDirectory.mkdirs())
+        assetFile.writeBytes(pathBytes)
+        val base = installation(baseManifest, baseDirectory)
+
+        val childChatScene =
+            chatMainScene().copy(
+                rootNode =
+                    chatMainScene().rootNode.copy(
+                        children =
+                            chatMainScene().rootNode.children +
+                                ThemeSceneImageNodeV1(
+                                    nodeId = ThemeSceneNodeIdV1("invalid_inherited_image"),
+                                    assetId = ThemeSceneAssetIdV1("inherited_path"),
+                                ),
+                    ),
+            )
+        val childManifest =
+            completeManifest("author.asset_child").copy(
+                basis = base.coordinate,
+                scenes = listOf(childChatScene),
+                surfaces =
+                    listOf(
+                        ThemeSurfaceImplementationV2(
+                            surfaceId = ThemeSurfaceCatalogV2.CHAT_MAIN.value,
+                            kind = ThemeSurfaceImplementationKindV2.SCENE,
+                            sceneId = "chat.main",
+                        ),
+                    ),
+                presentation = ThemePackagePresentationPatchV2(),
+                parameters = emptyList(),
+            )
+        val child = installation(childManifest, tmp.newFolder("asset-child"))
+
+        val error =
+            assertThrows(ThemePackageLinkExceptionV2::class.java) {
+                ThemePackageRuntimeLinkerV2.link(
+                    child,
+                    PublishedThemeCatalogV2(listOf(base, child), emptyList()),
+                )
+            }
+
+        assertTrue(error.message!!.contains("inherited_path"))
     }
 
     @Test

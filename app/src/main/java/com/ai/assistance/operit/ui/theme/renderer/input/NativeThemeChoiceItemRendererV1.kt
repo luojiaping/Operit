@@ -1,6 +1,5 @@
 package com.ai.assistance.operit.ui.theme.renderer.input
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -10,9 +9,9 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -20,11 +19,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.semantics.role
-import androidx.compose.ui.semantics.selected
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.ai.assistance.operit.data.theme.packages.ThemeComponentCatalogV2
+import com.ai.assistance.operit.ui.theme.ThemeComponentStateV2
+import com.ai.assistance.operit.ui.theme.ThemeComponentSurfaceV2
 import com.ai.assistance.operit.ui.theme.renderer.catalog.NativeThemeComponentCatalogV1
 import com.ai.assistance.operit.ui.theme.renderer.catalog.NativeThemeComponentRendererV1
 
@@ -41,35 +40,27 @@ internal object NativeThemeChoiceItemRendererV1 :
         onEvent: (NativeThemeChoiceItemEventV1) -> Unit,
         modifier: Modifier,
     ) {
-        val shape = MaterialTheme.shapes.medium
-        Card(
+        val componentState =
+            when {
+                !state.enabled -> ThemeComponentStateV2.DISABLED
+                state.selected -> ThemeComponentStateV2.SELECTED
+                else -> ThemeComponentStateV2.NORMAL
+            }
+        ThemeComponentSurfaceV2(
+            component = ThemeComponentCatalogV2.LIST_ITEM,
+            state = componentState,
             modifier =
                 Modifier
                     .heightIn(min = 48.dp)
                     .then(modifier)
                     .fillMaxWidth()
-                    .semantics {
-                        role = Role.RadioButton
-                        selected = state.selected
-                    },
-            onClick = { onEvent(NativeThemeChoiceItemEventV1.Select) },
-            enabled = state.enabled,
-            colors =
-                CardDefaults.cardColors(
-                    containerColor =
-                        if (state.selected) {
-                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-                        } else {
-                            MaterialTheme.colorScheme.surface
-                        }
-                ),
-            border =
-                if (state.selected) {
-                    BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
-                } else {
-                    BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-                },
-            shape = shape,
+                    .selectable(
+                        selected = state.selected,
+                        enabled = state.enabled,
+                        role = Role.RadioButton,
+                        onClick = { onEvent(NativeThemeChoiceItemEventV1.Select) },
+                    ),
+            applyContentPadding = false,
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(12.dp),
@@ -97,7 +88,7 @@ internal object NativeThemeChoiceItemRendererV1 :
                         Text(
                             text = supportingText,
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = LocalContentColor.current.copy(alpha = 0.72f),
                         )
                     }
                 }

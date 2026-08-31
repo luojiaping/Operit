@@ -14,11 +14,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.foundation.clickable
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import com.ai.assistance.operit.R
 import com.ai.assistance.operit.core.tools.defaultTool.standard.CookiePrivacyManager
@@ -28,7 +26,9 @@ import com.ai.assistance.operit.data.repository.ChatHistoryManager
 import com.ai.assistance.operit.ui.features.github.GitHubLoginDialog
 import com.ai.assistance.operit.util.AppLogger
 import kotlinx.coroutines.launch
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
+import com.ai.assistance.operit.data.theme.packages.ThemeComponentCatalogV2
+import com.ai.assistance.operit.ui.theme.ThemeComponentSurfaceV2
 
 // 保存滑动状态变量，使其跨重组保持
 private val SettingsScreenScrollPosition = mutableStateOf(0)
@@ -73,8 +73,6 @@ fun SettingsScreen(
                 }
         }
 
-        val cardContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
-
         Column(
                 modifier = Modifier.fillMaxSize()
                         .padding(horizontal = 16.dp, vertical = 8.dp)
@@ -84,7 +82,6 @@ fun SettingsScreen(
                 SettingsSection(
                         title = stringResource(id = R.string.settings_section_account),
                         icon = Icons.Default.AccountCircle,
-                        containerColor = cardContainerColor
                 ) {
                         CompactSettingsItem(
                                 title = stringResource(R.string.github_account),
@@ -126,7 +123,6 @@ fun SettingsScreen(
                 SettingsSection(
                         title = stringResource(id = R.string.settings_section_personalization),
                         icon = Icons.Default.Person,
-                        containerColor = cardContainerColor
                 ) {
                         CompactSettingsItem(
                                 title = stringResource(id = R.string.settings_user_preferences),
@@ -169,7 +165,6 @@ fun SettingsScreen(
                 SettingsSection(
                         title = stringResource(id = R.string.settings_section_ai_model),
                         icon = Icons.Default.Settings,
-                        containerColor = cardContainerColor
                 ) {
                         CompactSettingsItem(
                                 title = stringResource(id = R.string.settings_model_parameters),
@@ -198,7 +193,6 @@ fun SettingsScreen(
                 SettingsSection(
                         title = stringResource(R.string.settings_prompt_section),
                         icon = Icons.Default.Message,
-                        containerColor = cardContainerColor
                 ) {
                         CompactSettingsItem(
                                 title = stringResource(R.string.settings_prompt_title),
@@ -228,7 +222,6 @@ fun SettingsScreen(
                 SettingsSection(
                         title = stringResource(id = R.string.settings_section_context_summary),
                         icon = Icons.Default.Analytics,
-                        containerColor = cardContainerColor
                 ) {
                         CompactSettingsItem(
                                 title = stringResource(id = R.string.settings_section_context_summary),
@@ -242,7 +235,6 @@ fun SettingsScreen(
                 SettingsSection(
                         title = stringResource(id = R.string.settings_data_permissions),
                         icon = Icons.Default.Security,
-                        containerColor = cardContainerColor
                 ) {
                         CompactSettingsItem(
                                 title = stringResource(id = R.string.settings_tool_permissions),
@@ -277,7 +269,6 @@ fun SettingsScreen(
                 SettingsSection(
                         title = stringResource(id = R.string.settings_privacy_data_cleanup),
                         icon = Icons.Default.DeleteSweep,
-                        containerColor = cardContainerColor
                 ) {
                         CompactSettingsItem(
                                 title = stringResource(id = R.string.settings_clear_cookies),
@@ -291,7 +282,6 @@ fun SettingsScreen(
                 SettingsSection(
                         title = stringResource(id = R.string.settings_section_external_calls),
                         icon = Icons.Default.SettingsEthernet,
-                        containerColor = cardContainerColor
                 ) {
                         CompactSettingsItem(
                                 title = stringResource(id = R.string.settings_external_http_chat),
@@ -348,7 +338,6 @@ fun SettingsScreen(
 private fun SettingsSection(
         title: String,
         icon: ImageVector,
-        containerColor: Color,
         content: @Composable ColumnScope.() -> Unit
 ) {
         Column(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)) {
@@ -373,11 +362,10 @@ private fun SettingsSection(
                 }
                 
                 // 内容区域
-                Card(
+                ThemeComponentSurfaceV2(
+                        component = ThemeComponentCatalogV2.SECTION,
                         modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(
-                                containerColor = containerColor
-                        )
+                        applyContentPadding = false,
                 ) {
                         Column(
                                 modifier = Modifier.padding(12.dp),
@@ -394,12 +382,13 @@ private fun CompactSettingsItem(
         icon: ImageVector,
         onClick: () -> Unit
 ) {
+        ThemeComponentSurfaceV2(
+                component = ThemeComponentCatalogV2.LIST_ITEM,
+                modifier = Modifier.fillMaxWidth().clickable(role = Role.Button) { onClick() },
+                applyContentPadding = false,
+        ) {
         Row(
-                modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(6.dp))
-                        .clickable { onClick() }
-                        .padding(8.dp),
+                modifier = Modifier.padding(8.dp),
                 verticalAlignment = Alignment.CenterVertically
         ) {
                 Icon(
@@ -422,7 +411,7 @@ private fun CompactSettingsItem(
                         Text(
                                 text = subtitle,
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = LocalContentColor.current.copy(alpha = 0.72f),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                         )
@@ -431,8 +420,9 @@ private fun CompactSettingsItem(
                 Icon(
                         imageVector = Icons.Default.ChevronRight,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        tint = LocalContentColor.current.copy(alpha = 0.72f),
                         modifier = Modifier.size(16.dp)
                 )
+        }
         }
 }

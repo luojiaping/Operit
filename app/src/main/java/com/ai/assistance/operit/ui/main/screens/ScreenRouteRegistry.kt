@@ -22,6 +22,8 @@ import androidx.compose.material.icons.filled.Token
 import androidx.compose.material.icons.filled.VideoSettings
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.ai.assistance.operit.R
+import com.ai.assistance.operit.data.theme.packages.ThemeSurfaceCatalogV2
+import com.ai.assistance.operit.data.theme.packages.ThemeSurfaceIdV2
 import com.ai.assistance.operit.ui.common.NavItem
 import com.ai.assistance.operit.ui.main.navigation.NavigationEntrySpec
 import com.ai.assistance.operit.ui.main.navigation.NavigationSurface
@@ -100,9 +102,21 @@ object ScreenRouteRegistry {
         screenTypes.associateBy(::routeIdForClass)
 
     private val nativeRouteIds: List<String> = routeTypeById.keys.sorted()
+    private val nativeThemeSurfaceByType: Map<Class<out Screen>, ThemeSurfaceIdV2> =
+        buildNativeThemeSurfaceByType()
     private val objectScreensByRouteId = ConcurrentHashMap<String, Screen>()
     private val routeReflectorsById = ConcurrentHashMap<String, ScreenRouteReflector>()
     private val argExtractorsByClass = ConcurrentHashMap<Class<out Screen>, ScreenArgExtractor>()
+
+    init {
+        val registeredTypes = nativeThemeSurfaceByType.keys
+        val screenTypeSet = screenTypes.toSet()
+        check(registeredTypes == screenTypeSet) {
+            val missing = (screenTypeSet - registeredTypes).map { type -> type.simpleName }.sorted()
+            val stale = (registeredTypes - screenTypeSet).map { type -> type.simpleName }.sorted()
+            "Theme surface bindings must match native screen types. Missing=$missing, stale=$stale"
+        }
+    }
 
     // Host navigation is declared in one place.
     // `surface != null` means the entry is visible in navigation UI.
@@ -389,6 +403,25 @@ object ScreenRouteRegistry {
             )
         }
 
+    fun themeSurfaceOf(screen: Screen): ThemeSurfaceIdV2 =
+        requireNotNull(nativeThemeSurfaceByType[screen.javaClass]) {
+            "No V2 theme surface registered for native screen ${screen.javaClass.simpleName}."
+        }
+
+    fun themeSurfaceForRouteId(routeId: String): ThemeSurfaceIdV2 =
+        requireNotNull(routeTypeById[routeId]) {
+            "No native screen registered for route $routeId."
+        }.let { screenType ->
+            requireNotNull(nativeThemeSurfaceByType[screenType]) {
+                "No V2 theme surface registered for native route $routeId."
+            }
+        }
+
+    internal fun nativeRouteSurfaceBindings(): Map<String, ThemeSurfaceIdV2> =
+        nativeRouteIds.associateWith(::themeSurfaceForRouteId)
+
+    internal fun nativeRouteCount(): Int = nativeRouteIds.size
+
     fun mainSidebarEntries(context: Context): List<NavigationEntrySpec> =
         hostEntryDefinitions
             .filter { definition ->
@@ -594,7 +627,123 @@ object ScreenRouteRegistry {
         title: String? = null,
         navItem: NavItem? = null
     ): RouteSpec =
-        RouteSpec(routeId = routeId, runtime = RouteRuntime.NATIVE, title = title, icon = navItem?.icon)
+        RouteSpec(
+            routeId = routeId,
+            runtime = RouteRuntime.NATIVE,
+            title = title,
+            icon = navItem?.icon,
+        )
+
+    private fun buildNativeThemeSurfaceByType(): Map<Class<out Screen>, ThemeSurfaceIdV2> =
+        buildMap {
+            fun bind(
+                surface: ThemeSurfaceIdV2,
+                vararg types: Class<out Screen>,
+            ) {
+                types.forEach { type ->
+                    check(put(type, surface) == null) {
+                        "Native screen ${type.simpleName} has more than one V2 theme surface binding."
+                    }
+                }
+            }
+
+            bind(ThemeSurfaceCatalogV2.CHAT_MAIN, Screen.AiChat::class.java)
+            bind(ThemeSurfaceCatalogV2.MEMORY_GRAPH_LIBRARY, Screen.MemoryBase::class.java)
+            bind(ThemeSurfaceCatalogV2.PACKAGES_MANAGER, Screen.Packages::class.java)
+            bind(
+                ThemeSurfaceCatalogV2.MARKET_HOME,
+                Screen.Market::class.java,
+                Screen.MarketNotifications::class.java,
+            )
+            bind(ThemeSurfaceCatalogV2.MARKET_CATEGORY, Screen.MarketCategory::class.java)
+            bind(
+                ThemeSurfaceCatalogV2.MARKET_ENTRY_DETAIL,
+                Screen.MarketEntryDetail::class.java,
+                Screen.MarketAuthor::class.java,
+            )
+            bind(ThemeSurfaceCatalogV2.MARKET_PUBLISHER_CONSOLE, Screen.MarketManage::class.java)
+            bind(
+                ThemeSurfaceCatalogV2.MARKET_ARTIFACT_EDITOR,
+                Screen.ArtifactPublish::class.java,
+                Screen.ArtifactContinuePublish::class.java,
+                Screen.ArtifactEdit::class.java,
+            )
+            bind(
+                ThemeSurfaceCatalogV2.MARKET_REPOSITORY_EDITOR,
+                Screen.RepoPublish::class.java,
+                Screen.RepoEdit::class.java,
+                Screen.RepoPublishVersion::class.java,
+            )
+            bind(ThemeSurfaceCatalogV2.TOOLBOX_INDEX, Screen.Toolbox::class.java)
+            bind(
+                ThemeSurfaceCatalogV2.TOOLBOX_TOOL,
+                Screen.ShizukuCommands::class.java,
+                Screen.TokenConfig::class.java,
+                Screen.AppPermissions::class.java,
+                Screen.UIDebugger::class.java,
+                Screen.ShellExecutor::class.java,
+                Screen.Logcat::class.java,
+                Screen.SqlViewer::class.java,
+                Screen.FFmpegToolbox::class.java,
+                Screen.MarkdownDemo::class.java,
+                Screen.ToolTester::class.java,
+                Screen.TextToSpeech::class.java,
+                Screen.SpeechToText::class.java,
+                Screen.DefaultAssistantGuide::class.java,
+                Screen.ProcessLimitRemover::class.java,
+                Screen.HtmlPackager::class.java,
+                Screen.AutoGlmOneClick::class.java,
+                Screen.AutoGlmTool::class.java,
+            )
+            bind(ThemeSurfaceCatalogV2.SETTINGS_INDEX, Screen.Settings::class.java)
+            bind(
+                ThemeSurfaceCatalogV2.SETTINGS_FORM,
+                Screen.GitHubAccount::class.java,
+                Screen.Help::class.java,
+                Screen.About::class.java,
+                Screen.Agreement::class.java,
+                Screen.UpdateHistory::class.java,
+                Screen.UserPreferencesSettings::class.java,
+                Screen.ToolPermission::class.java,
+                Screen.ModelConfig::class.java,
+                Screen.ModelConfigOnboarding::class.java,
+                Screen.SpeechServicesSettings::class.java,
+                Screen.ExternalHttpChatSettings::class.java,
+                Screen.MnnModelDownload::class.java,
+                Screen.WaifuModeSettings::class.java,
+                Screen.CustomEmojiManagement::class.java,
+                Screen.FunctionalConfig::class.java,
+                Screen.ThemePackages::class.java,
+                Screen.GlobalDisplaySettings::class.java,
+                Screen.LayoutAdjustmentSettings::class.java,
+                Screen.ChatHistorySettings::class.java,
+                Screen.ChatBackupSettings::class.java,
+                Screen.LanguageSettings::class.java,
+                Screen.ContextSummarySettings::class.java,
+            )
+            bind(ThemeSurfaceCatalogV2.ASSISTANT_PROFILE, Screen.AssistantConfig::class.java)
+            bind(ThemeSurfaceCatalogV2.WORKFLOW_LIBRARY, Screen.Workflow::class.java)
+            bind(ThemeSurfaceCatalogV2.WORKFLOW_CANVAS_EDITOR, Screen.WorkflowDetail::class.java)
+            bind(
+                ThemeSurfaceCatalogV2.PERSONA_CARD_STUDIO,
+                Screen.PersonaCardGeneration::class.java,
+                Screen.ModelPromptsSettings::class.java,
+            )
+            bind(ThemeSurfaceCatalogV2.PROMPT_TAG_MARKET, Screen.TagMarket::class.java)
+            bind(ThemeSurfaceCatalogV2.SETTINGS_STATISTICS, Screen.TokenUsageStatistics::class.java)
+            bind(
+                ThemeSurfaceCatalogV2.PLUGIN_HOST_SHELL,
+                Screen.ToolPkgComposeDsl::class.java,
+                Screen.ToolPkgPluginConfig::class.java,
+            )
+            bind(ThemeSurfaceCatalogV2.FILES_BROWSER, Screen.FileManager::class.java)
+            bind(
+                ThemeSurfaceCatalogV2.TERMINAL_SHELL,
+                Screen.Terminal::class.java,
+                Screen.TerminalSetup::class.java,
+                Screen.TerminalAutoConfig::class.java,
+            )
+        }
 
     private fun hostEntryDefinition(
         entryId: String,

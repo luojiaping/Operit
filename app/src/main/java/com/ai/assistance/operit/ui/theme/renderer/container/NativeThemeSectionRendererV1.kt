@@ -8,8 +8,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -19,6 +19,8 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.ai.assistance.operit.data.theme.packages.ThemeComponentCatalogV2
+import com.ai.assistance.operit.ui.theme.ThemeComponentSurfaceV2
 import com.ai.assistance.operit.ui.theme.renderer.catalog.NativeThemeComponentCatalogV1
 import com.ai.assistance.operit.ui.theme.renderer.catalog.NativeThemeComponentRendererV1
 
@@ -35,7 +37,11 @@ internal object NativeThemeSectionRendererV1 :
         onEvent: (NativeThemeSectionEventV1) -> Unit,
         modifier: Modifier,
     ) {
-        ElevatedCard(modifier = modifier.fillMaxWidth()) {
+        ThemeComponentSurfaceV2(
+            component = ThemeComponentCatalogV2.SECTION,
+            modifier = modifier.fillMaxWidth(),
+            applyContentPadding = false,
+        ) {
             Column(
                 modifier = Modifier.padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -63,7 +69,7 @@ internal object NativeThemeSectionRendererV1 :
                         Text(
                             text = state.description,
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = LocalContentColor.current.copy(alpha = 0.72f),
                         )
                     }
                 }

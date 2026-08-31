@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -36,11 +37,10 @@ import com.ai.assistance.operit.ui.theme.renderer.feedback.NativeThemeOperationS
 import com.ai.assistance.operit.ui.theme.renderer.feedback.NativeThemeOperationStatusV1
 import com.ai.assistance.operit.ui.theme.renderer.input.NativeThemeChoiceItemV1
 import com.ai.assistance.operit.data.preferences.GlobalPresentationSnapshot
-import com.ai.assistance.operit.ui.theme.NativeThemeHostSurface
+import com.ai.assistance.operit.ui.theme.LocalResolvedThemeParametersV2
+import com.ai.assistance.operit.ui.theme.LocalThemePackageUiRuntimeV2
 import com.ai.assistance.operit.ui.theme.NativeThemeOffscreenHost
-import com.ai.assistance.operit.ui.theme.NativeThemeV1DarkColorScheme
-import com.ai.assistance.operit.ui.theme.NativeThemeV1LightColorScheme
-import com.ai.assistance.operit.ui.theme.resolveGlobalThemeForDetachedComposeHost
+import com.ai.assistance.operit.ui.theme.themePackageRuntimeForAndroidTest
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -56,7 +56,7 @@ class NativeThemeFoundationComponentsAndroidTest {
         var activations = 0
 
         composeTestRule.setContent {
-            MaterialTheme {
+            ThemePackageTestHost {
                 NativeThemeActionButtonV1(
                     label = "Export",
                     leading = { modifier ->
@@ -82,7 +82,7 @@ class NativeThemeFoundationComponentsAndroidTest {
         var activations = 0
 
         composeTestRule.setContent {
-            MaterialTheme {
+            ThemePackageTestHost {
                 NativeThemeActionButtonV1(
                     label = "Unavailable",
                     leading = { modifier -> Box(modifier) },
@@ -102,7 +102,7 @@ class NativeThemeFoundationComponentsAndroidTest {
     @Test
     fun actionButtonKeepsItsTouchTargetUnderAConstrainedCallerModifier() {
         composeTestRule.setContent {
-            MaterialTheme {
+            ThemePackageTestHost {
                 NativeThemeActionButtonV1(
                     label = "Compact export",
                     leading = { modifier -> Box(modifier) },
@@ -120,7 +120,7 @@ class NativeThemeFoundationComponentsAndroidTest {
         var selections = 0
 
         composeTestRule.setContent {
-            MaterialTheme {
+            ThemePackageTestHost {
                 NativeThemeChoiceItemV1(
                     label = "Keep existing",
                     supportingText = "Do not replace matching records.",
@@ -147,7 +147,7 @@ class NativeThemeFoundationComponentsAndroidTest {
         var selections = 0
 
         composeTestRule.setContent {
-            MaterialTheme {
+            ThemePackageTestHost {
                 NativeThemeChoiceItemV1(
                     label = "Unavailable choice",
                     selected = false,
@@ -167,7 +167,7 @@ class NativeThemeFoundationComponentsAndroidTest {
     @Test
     fun sectionExposesHeadingAndBothControlledSlots() {
         composeTestRule.setContent {
-            MaterialTheme {
+            ThemePackageTestHost {
                 NativeThemeSectionV1(
                     title = "Chat history",
                     description = "Manage stored conversations.",
@@ -190,7 +190,7 @@ class NativeThemeFoundationComponentsAndroidTest {
     @Test
     fun loadingStatusExposesPoliteLiveRegionAndIndeterminateProgress() {
         composeTestRule.setContent {
-            MaterialTheme {
+            ThemePackageTestHost {
                 NativeThemeOperationStatusV1(
                     message = "Exporting chat history",
                     kind = NativeThemeOperationStatusKindV1.LOADING,
@@ -217,7 +217,7 @@ class NativeThemeFoundationComponentsAndroidTest {
     @Test
     fun errorStatusExposesTitleLiveRegionAndOptionalLeadingSlot() {
         composeTestRule.setContent {
-            MaterialTheme {
+            ThemePackageTestHost {
                 NativeThemeOperationStatusV1(
                     title = "Backup failed",
                     message = "The destination cannot be written.",
@@ -265,20 +265,27 @@ class NativeThemeFoundationComponentsAndroidTest {
 
     @Composable
     private fun NativeThemeStatTestHost(content: @Composable () -> Unit) {
-        val presentation = GlobalPresentationSnapshot.default()
-        val resolvedTheme =
-            resolveGlobalThemeForDetachedComposeHost(
-                presentation = presentation,
-                hostSurface = NativeThemeHostSurface.MAIN,
-                systemDarkTheme = false,
-                lightColorScheme = NativeThemeV1LightColorScheme,
-                darkColorScheme = NativeThemeV1DarkColorScheme,
-            )
         NativeThemeOffscreenHost(
-            presentation = presentation,
-            resolvedTheme = resolvedTheme,
+            presentation = GlobalPresentationSnapshot.default(),
+            packageRuntime = themePackageRuntimeForAndroidTest(),
             content = content,
         )
+    }
+
+    @Composable
+    private fun ThemePackageTestHost(content: @Composable () -> Unit) {
+        val packageRuntime = themePackageRuntimeForAndroidTest()
+        CompositionLocalProvider(
+            LocalThemePackageUiRuntimeV2 provides packageRuntime,
+            LocalResolvedThemeParametersV2 provides packageRuntime.parameters,
+        ) {
+            MaterialTheme(
+                colorScheme = packageRuntime.colorScheme,
+                typography = packageRuntime.typography,
+                shapes = packageRuntime.shapes,
+                content = content,
+            )
+        }
     }
 
 }

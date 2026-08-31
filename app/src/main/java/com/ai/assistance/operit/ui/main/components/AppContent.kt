@@ -25,7 +25,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -43,6 +42,7 @@ import com.ai.assistance.operit.R
 import com.ai.assistance.operit.data.preferences.ActivePromptManager
 import com.ai.assistance.operit.data.repository.ChatHistoryManager
 import com.ai.assistance.operit.data.theme.packages.ThemeComponentCatalogV2
+import com.ai.assistance.operit.data.theme.packages.ThemeSurfaceCatalogV2
 import com.ai.assistance.operit.ui.common.NavItem
 import com.ai.assistance.operit.ui.common.displays.FpsCounter
 import com.ai.assistance.operit.ui.main.NavigationTransitionSource
@@ -52,8 +52,11 @@ import com.ai.assistance.operit.ui.main.navigation.LocalRouteInstanceId
 import com.ai.assistance.operit.ui.main.navigation.ScreenRouteViewModelStoreOwnerManager
 import com.ai.assistance.operit.ui.main.navigation.retainedRouteKeysOnContentAttach
 import com.ai.assistance.operit.ui.main.screens.Screen
+import com.ai.assistance.operit.ui.main.screens.ScreenRouteRegistry
 import com.ai.assistance.operit.ui.common.composedsl.ToolPkgComposeDslToolScreen
 import com.ai.assistance.operit.ui.theme.LocalThemePackageUiRuntimeV2
+import com.ai.assistance.operit.ui.theme.ThemeComponentSurfaceV2
+import com.ai.assistance.operit.ui.theme.ThemeSurfaceHostV2
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import androidx.compose.animation.ExperimentalAnimationApi
@@ -331,33 +334,35 @@ fun AppContent(
                                         ),
                 ) {
                 if (isLoading) {
-                    // 加载中状态
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Surface(
-                                modifier = Modifier.size(48.dp),
-                                shape = MaterialTheme.shapes.small,
-                                color = MaterialTheme.colorScheme.primary,
-                                contentColor = MaterialTheme.colorScheme.onPrimary
-                            ) {
-                                Box(
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentAlignment = Alignment.Center
+                    ThemeSurfaceHostV2(
+                        surface = ThemeSurfaceCatalogV2.STATE_LOADING,
+                        modifier = Modifier.fillMaxSize(),
+                    ) {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                ThemeComponentSurfaceV2(
+                                    component = ThemeComponentCatalogV2.STATUS,
+                                    modifier = Modifier.size(48.dp),
+                                    applyContentPadding = false,
                                 ) {
-                                    Text(
-                                        text = "...",
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.Bold
-                                    )
+                                    Box(
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        Text(
+                                            text = "...",
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Bold,
+                                        )
+                                    }
                                 }
-                            }
 
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Text(
-                                text = stringResource(R.string.app_content_loading),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Text(
+                                    text = stringResource(R.string.app_content_loading),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                )
+                            }
                         }
                     }
                 } else {
@@ -368,49 +373,73 @@ fun AppContent(
                             val screenSnapshot = currentScreen
                             screenKeepAliveCache[currentScreenKey] = screenSnapshot.keepAlive
                             screenCache[currentScreenKey] = {
-                                when (screenSnapshot) {
+                                val surface = ScreenRouteRegistry.themeSurfaceOf(screenSnapshot)
+                                val screenContent: @Composable () -> Unit =
+                                    when (screenSnapshot) {
                                     is Screen.ToolPkgComposeDsl ->
-                                        ToolPkgComposeDslToolScreen(
-                                            navController = navController,
-                                            routeInstanceId = currentScreenKey,
-                                            containerPackageName = screenSnapshot.containerPackageName,
-                                            uiModuleId = screenSnapshot.uiModuleId,
-                                            fallbackTitle = screenSnapshot.title
-                                        )
-                                    is Screen.ToolPkgPluginConfig ->
-                                        ToolPkgComposeDslToolScreen(
-                                            navController = navController,
-                                            routeInstanceId = currentScreenKey,
-                                            containerPackageName = screenSnapshot.containerPackageName,
-                                            uiModuleId = screenSnapshot.uiModuleId,
-                                            fallbackTitle = screenSnapshot.title
-                                        )
-                                    else -> {
-                                        val content: @Composable () -> Unit = {
-                                            screenSnapshot.Content(
+                                        {
+                                            ToolPkgComposeDslToolScreen(
                                                 navController = navController,
-                                                navigateTo = onScreenChange,
-                                                onGoBack = onGoBack,
-                                                hasBackgroundImage = false,
-                                                onLoading = onLoading,
-                                                onError = onError,
-                                                onGestureConsumed = if (screenSnapshot is Screen.AiChat) onGestureConsumed else { _ -> }
+                                                routeInstanceId = currentScreenKey,
+                                                containerPackageName = screenSnapshot.containerPackageName,
+                                                uiModuleId = screenSnapshot.uiModuleId,
+                                                fallbackTitle = screenSnapshot.title,
                                             )
                                         }
-                                        if (screenSnapshot.usesRouteViewModelStore) {
-                                            // 路由级 ViewModelStore（P1）：配置变化保留实例，
-                                            // 路由出栈/替换/清栈时 store.clear() 触发 onCleared
-                                            val routeOwner =
-                                                routeViewModelStoreManager.ownerFor(currentScreenKey)
-                                            CompositionLocalProvider(
-                                                LocalViewModelStoreOwner provides routeOwner
-                                            ) {
+
+                                    is Screen.ToolPkgPluginConfig ->
+                                        {
+                                            ToolPkgComposeDslToolScreen(
+                                                navController = navController,
+                                                routeInstanceId = currentScreenKey,
+                                                containerPackageName = screenSnapshot.containerPackageName,
+                                                uiModuleId = screenSnapshot.uiModuleId,
+                                                fallbackTitle = screenSnapshot.title,
+                                            )
+                                        }
+
+                                    else -> {
+                                        {
+                                            val content: @Composable () -> Unit = {
+                                                screenSnapshot.Content(
+                                                    navController = navController,
+                                                    navigateTo = onScreenChange,
+                                                    onGoBack = onGoBack,
+                                                    hasBackgroundImage = false,
+                                                    onLoading = onLoading,
+                                                    onError = onError,
+                                                    onGestureConsumed =
+                                                        if (screenSnapshot is Screen.AiChat) {
+                                                            onGestureConsumed
+                                                        } else {
+                                                            { _ -> }
+                                                        },
+                                                )
+                                            }
+                                            if (screenSnapshot.usesRouteViewModelStore) {
+                                                // 路由级 ViewModelStore（P1）：配置变化保留实例，
+                                                // 路由出栈/替换/清栈时 store.clear() 触发 onCleared
+                                                val routeOwner =
+                                                    routeViewModelStoreManager.ownerFor(currentScreenKey)
+                                                CompositionLocalProvider(
+                                                    LocalViewModelStoreOwner provides routeOwner,
+                                                ) {
+                                                    content()
+                                                }
+                                            } else {
                                                 content()
                                             }
-                                        } else {
-                                            content()
                                         }
                                     }
+                                }
+                                if (surface == ThemeSurfaceCatalogV2.CHAT_MAIN) {
+                                    screenContent()
+                                } else {
+                                    ThemeSurfaceHostV2(
+                                        surface = surface,
+                                        modifier = Modifier.fillMaxSize(),
+                                        content = screenContent,
+                                    )
                                 }
                             }
                         }

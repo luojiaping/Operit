@@ -18,6 +18,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -25,10 +27,10 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
@@ -49,9 +51,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.ai.assistance.operit.R
 import com.ai.assistance.operit.data.theme.packages.PublishedThemeInstallationV2
+import com.ai.assistance.operit.data.theme.packages.ThemeComponentCatalogV2
 import com.ai.assistance.operit.data.theme.packages.ThemeInstanceV2
 import com.ai.assistance.operit.data.theme.packages.ThemePackageDefaultV2
 import com.ai.assistance.operit.data.theme.packages.ThemePackageInstallerV2
@@ -60,6 +65,8 @@ import com.ai.assistance.operit.data.theme.packages.ThemePackageReferenceV2
 import com.ai.assistance.operit.data.theme.packages.ThemePackageSelectionRepositoryV2
 import com.ai.assistance.operit.data.theme.packages.ThemeParameterValueV2
 import com.ai.assistance.operit.data.theme.packages.ThemeRuntimeRepositoryV2
+import com.ai.assistance.operit.ui.theme.ThemeComponentStateV2
+import com.ai.assistance.operit.ui.theme.ThemeComponentSurfaceV2
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
@@ -150,7 +157,8 @@ fun ThemePackagesScreen(
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
-        containerColor = MaterialTheme.colorScheme.background,
+        containerColor = Color.Transparent,
+        contentColor = LocalContentColor.current,
     ) { padding ->
         Column(
             modifier =
@@ -177,18 +185,28 @@ fun ThemePackagesScreen(
                 }
             }
 
+            Column(modifier = Modifier.selectableGroup()) {
             installed.forEach { installedPackage ->
                 val coordinate = installedPackage.coordinate
                 val isDefault = ThemePackageDefaultV2.isDefault(coordinate)
+                val isLinked = ThemeRuntimeRepositoryV2.isLinked(coordinate)
                 ThemeEntryCard(
                     title = installedPackage.manifest.displayName.resolve(Locale.getDefault().language),
                     subtitle =
-                        if (isDefault) {
-                            stringResource(R.string.theme_packages_builtin)
-                        } else {
-                            "${coordinate.packageId.value} · v${coordinate.version.value}"
-                        },
+                        (
+                            if (isDefault) {
+                                stringResource(R.string.theme_packages_builtin)
+                            } else {
+                                "${coordinate.packageId.value} · v${coordinate.version.value}"
+                            }
+                        ) +
+                            if (isLinked) {
+                                ""
+                            } else {
+                                " · ${stringResource(R.string.theme_packages_activation_unavailable)}"
+                            },
                     selected = activeInstance.reference.coordinate == coordinate,
+                    enabled = isLinked,
                     onActivate = {
                         scope.launch {
                             selectionRepository.replace(
@@ -231,6 +249,7 @@ fun ThemePackagesScreen(
                             }
                         },
                 )
+            }
             }
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -321,34 +340,53 @@ private fun ThemeEntryCard(
     title: String,
     subtitle: String,
     selected: Boolean,
+    enabled: Boolean,
     onActivate: () -> Unit,
     trailing: (@Composable () -> Unit)? = null,
 ) {
-    Card(
+    ThemeComponentSurfaceV2(
+        component = ThemeComponentCatalogV2.LIST_ITEM,
+        state =
+            when {
+                !enabled -> ThemeComponentStateV2.DISABLED
+                selected -> ThemeComponentStateV2.SELECTED
+                else -> ThemeComponentStateV2.NORMAL
+            },
         modifier =
             Modifier
                 .fillMaxWidth()
                 .padding(vertical = 4.dp)
-                .clickable(onClick = onActivate),
+                .selectable(
+                    selected = selected,
+                    enabled = enabled,
+                    role = Role.RadioButton,
+                    onClick = onActivate,
+                ),
+        applyContentPadding = false,
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            RadioButton(selected = selected, onClick = onActivate)
+            RadioButton(
+                selected = selected,
+                onClick = null,
+                enabled = enabled,
+                modifier = Modifier.clearAndSetSemantics {},
+            )
             Column(modifier = Modifier.weight(1f)) {
                 Text(text = title, style = MaterialTheme.typography.titleMedium)
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = LocalContentColor.current.copy(alpha = 0.72f),
                 )
             }
             if (selected) {
                 Icon(
                     imageVector = Icons.Default.Check,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = LocalContentColor.current,
                 )
             }
             trailing?.invoke()

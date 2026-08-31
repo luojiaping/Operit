@@ -23,6 +23,9 @@ import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.ai.assistance.operit.data.preferences.GlobalPresentationSnapshot
 import com.ai.assistance.operit.ui.theme.LocalGlobalPresentation
+import com.ai.assistance.operit.ui.theme.LocalResolvedThemeParametersV2
+import com.ai.assistance.operit.ui.theme.LocalThemePackageUiRuntimeV2
+import com.ai.assistance.operit.ui.theme.themePackageRuntimeForAndroidTest
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -112,10 +115,18 @@ class NativeThemeNavigationDrawerItemAndroidTest {
 
     @androidx.compose.runtime.Composable
     private fun TestTheme(content: @androidx.compose.runtime.Composable () -> Unit) {
+        val packageRuntime = themePackageRuntimeForAndroidTest()
         CompositionLocalProvider(
             LocalGlobalPresentation provides GlobalPresentationSnapshot.default(),
+            LocalThemePackageUiRuntimeV2 provides packageRuntime,
+            LocalResolvedThemeParametersV2 provides packageRuntime.parameters,
         ) {
-            MaterialTheme(content = content)
+            MaterialTheme(
+                colorScheme = packageRuntime.colorScheme,
+                typography = packageRuntime.typography,
+                shapes = packageRuntime.shapes,
+                content = content,
+            )
         }
     }
 }

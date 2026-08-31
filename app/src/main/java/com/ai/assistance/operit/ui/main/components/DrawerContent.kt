@@ -28,6 +28,7 @@ import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -45,6 +46,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -57,11 +60,16 @@ import com.ai.assistance.operit.core.tools.system.action.ActionListenerFactory
 import com.ai.assistance.operit.data.preferences.UserPreferencesManager
 import com.ai.assistance.operit.data.preferences.androidPermissionPreferences
 import com.ai.assistance.operit.data.repository.WorkflowRepository
+import com.ai.assistance.operit.data.theme.packages.ThemeComponentCatalogV2
+import com.ai.assistance.operit.data.theme.packages.ThemeSurfaceCatalogV2
 import com.ai.assistance.operit.ui.common.NavItem
 import com.ai.assistance.operit.ui.main.screens.ScreenRouteRegistry
 import com.ai.assistance.operit.ui.main.navigation.NavigationEntrySpec
 import com.ai.assistance.operit.ui.main.screens.Screen
 import com.ai.assistance.operit.ui.theme.liquidGlass
+import com.ai.assistance.operit.ui.theme.ThemeComponentStateV2
+import com.ai.assistance.operit.ui.theme.ThemeComponentSurfaceV2
+import com.ai.assistance.operit.ui.theme.ThemeSurfaceHostV2
 import com.ai.assistance.operit.ui.theme.renderer.navigation.NativeThemeNavigationDrawerItemV1
 import com.ai.assistance.operit.ui.theme.renderer.navigation.NativeThemeNavigationDrawerItemSemanticRoleV1
 import kotlinx.coroutines.CoroutineScope
@@ -231,48 +239,53 @@ fun DrawerContent(
                 }
         }
 
-        Column(
-                modifier =
-                        Modifier.fillMaxHeight()
-                                .padding(
-                                        top = resolvedTopContentPadding,
-                                        end = 8.dp,
-                                        bottom = bottomInset
-                                )
+        ThemeSurfaceHostV2(
+                surface = ThemeSurfaceCatalogV2.APP_NAVIGATION,
+                modifier = Modifier.fillMaxSize(),
         ) {
                 Column(
-                        modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())
+                        modifier =
+                                Modifier.fillMaxHeight()
+                                        .padding(
+                                                top = resolvedTopContentPadding,
+                                                end = 8.dp,
+                                                bottom = bottomInset
+                                        )
                 ) {
-                        NewSidebarTopContent(
-                                selectedItem = selectedItem,
-                                pluginEntries = pluginEntries,
-                                selectedRouteId = selectedRouteId,
-                                brandName = drawerBrandName,
-                                isNetworkAvailable = isNetworkAvailable,
-                                networkType = networkType,
-                                appearance = appearance,
-                                navItems = primaryNavItems,
-                                activePackageCount = activePackageCount,
-                                workflowCount = workflowCount,
-                                permissionStatus = permissionStatus,
-                                onNavItemClick = handleNavItemClick,
-                                onNavigationEntryClick = handleNavigationEntryClick
+                        Column(
+                                modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())
+                        ) {
+                                NewSidebarTopContent(
+                                        selectedItem = selectedItem,
+                                        pluginEntries = pluginEntries,
+                                        selectedRouteId = selectedRouteId,
+                                        brandName = drawerBrandName,
+                                        isNetworkAvailable = isNetworkAvailable,
+                                        networkType = networkType,
+                                        appearance = appearance,
+                                        navItems = primaryNavItems,
+                                        activePackageCount = activePackageCount,
+                                        workflowCount = workflowCount,
+                                        permissionStatus = permissionStatus,
+                                        onNavItemClick = handleNavItemClick,
+                                        onNavigationEntryClick = handleNavigationEntryClick
+                                )
+                                Spacer(modifier = Modifier.height(16.dp))
+                        }
+
+                        HorizontalDivider(
+                                modifier = Modifier.padding(horizontal = 20.dp),
+                                thickness = 0.5.dp,
+                                color = appearance.dividerColor.copy(alpha = 0.5f)
                         )
-                        Spacer(modifier = Modifier.height(16.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        DrawerBottomShortcutRow(
+                                selectedItem = selectedItem,
+                                appearance = appearance,
+                                onNavItemClick = handleNavItemClick
+                        )
                 }
-
-                HorizontalDivider(
-                        modifier = Modifier.padding(horizontal = 20.dp),
-                        thickness = 0.5.dp,
-                        color = appearance.dividerColor.copy(alpha = 0.5f)
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-
-                DrawerBottomShortcutRow(
-                        selectedItem = selectedItem,
-                        appearance = appearance,
-                        onNavItemClick = handleNavItemClick
-                )
         }
 }
 
@@ -288,6 +301,10 @@ fun CollapsedDrawerContent(
         onScreenSelected: (Screen) -> Unit,
         onNavigationEntrySelected: (NavigationEntrySpec) -> Unit
 ) {
+        ThemeSurfaceHostV2(
+                surface = ThemeSurfaceCatalogV2.APP_NAVIGATION,
+                modifier = Modifier.fillMaxSize(),
+        ) {
         Column(
                 modifier =
                         Modifier.fillMaxHeight()
@@ -298,22 +315,10 @@ fun CollapsedDrawerContent(
         ) {
                 Spacer(modifier = Modifier.height(8.dp))
 
-                Surface(
-                        modifier =
-                                Modifier.size(44.dp)
-                                        .liquidGlass(
-                                                enabled = appearance.buttonLiquidGlassEnabled,
-                                                shape = CircleShape,
-                                                containerColor = appearance.buttonContainerColor,
-                                                shadowElevation = 5.dp,
-                                                borderWidth = 0.5.dp,
-                                                blurRadius = 14.dp,
-                                                overlayAlphaBoost = 0.05f,
-                                                enableLens = false
-                                        )
-                                        .clip(CircleShape),
-                        color = Color.Transparent,
-                        shape = CircleShape
+                ThemeComponentSurfaceV2(
+                        component = ThemeComponentCatalogV2.NAVIGATION,
+                        modifier = Modifier.size(44.dp),
+                        applyContentPadding = false,
                 ) {
                         IconButton(onClick = { }) {
                                 Icon(
@@ -321,7 +326,7 @@ fun CollapsedDrawerContent(
                                                 if (isNetworkAvailable) Icons.Default.Wifi
                                                 else Icons.Default.WifiOff,
                                         contentDescription = stringResource(id = R.string.network_status_label),
-                                        tint = appearance.statusAvailableColor,
+                                        tint = LocalContentColor.current,
                                         modifier = Modifier.size(24.dp)
                                 )
                         }
@@ -335,34 +340,24 @@ fun CollapsedDrawerContent(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 for (item in navItems) {
-                        val selectedGlassOverlayColor =
-                                if (selectedItem == item) {
-                                        appearance.selectedContainerColor.copy(alpha = 0.18f)
-                                } else {
-                                        Color.Transparent
-                                }
-                        Surface(
+                        ThemeComponentSurfaceV2(
+                                component = ThemeComponentCatalogV2.NAVIGATION,
+                                state =
+                                        if (selectedItem == item) {
+                                                ThemeComponentStateV2.SELECTED
+                                        } else {
+                                                ThemeComponentStateV2.NORMAL
+                                        },
                                 modifier =
                                         Modifier.padding(vertical = 8.dp)
-                                                .size(44.dp)
-                                                .liquidGlass(
-                                                        enabled = appearance.buttonLiquidGlassEnabled,
-                                                        shape = CircleShape,
-                                                        containerColor =
-                                                                appearance.buttonContainerColor,
-                                                        shadowElevation =
-                                                                if (selectedItem == item) 6.dp else 5.dp,
-                                                        borderWidth = 0.5.dp,
-                                                        blurRadius = 14.dp,
-                                                        overlayAlphaBoost = 0.05f,
-                                                        enableLens = false
-                                                )
-                                                .clip(CircleShape)
-                                                .background(selectedGlassOverlayColor),
-                                color = Color.Transparent,
-                                shape = CircleShape
+                                                .size(44.dp),
+                                applyContentPadding = false,
                         ) {
                                 IconButton(
+                                        modifier =
+                                                Modifier.semantics {
+                                                        this.selected = selectedItem == item
+                                                },
                                         onClick = {
                                                 onScreenSelected(
                                                         ScreenRouteRegistry.defaultScreenForNavItem(item)
@@ -372,16 +367,7 @@ fun CollapsedDrawerContent(
                                         Icon(
                                                 imageVector = item.icon,
                                                 contentDescription = stringResource(id = item.titleResId),
-                                                tint =
-                                                        if (selectedItem == item) {
-                                                                if (appearance.buttonLiquidGlassEnabled) {
-                                                                        appearance.selectedContentColor
-                                                                } else {
-                                                                        appearance.titleColor
-                                                                }
-                                                        } else {
-                                                                appearance.itemColor
-                                                        },
+                                                tint = LocalContentColor.current,
                                                 modifier = Modifier.size(24.dp)
                                         )
                                 }
@@ -396,46 +382,30 @@ fun CollapsedDrawerContent(
                         )
                         Spacer(modifier = Modifier.height(12.dp))
                         pluginEntries.forEach { entry ->
-                                val selectedGlassOverlayColor =
-                                        if (selectedRouteId == entry.routeId) {
-                                                appearance.selectedContainerColor.copy(alpha = 0.18f)
-                                        } else {
-                                                Color.Transparent
-                                        }
-                                Surface(
+                                ThemeComponentSurfaceV2(
+                                        component = ThemeComponentCatalogV2.NAVIGATION,
+                                        state =
+                                                if (selectedRouteId == entry.routeId) {
+                                                        ThemeComponentStateV2.SELECTED
+                                                } else {
+                                                        ThemeComponentStateV2.NORMAL
+                                                },
                                         modifier =
                                                 Modifier.padding(vertical = 8.dp)
-                                                        .size(44.dp)
-                                                        .liquidGlass(
-                                                                enabled = appearance.buttonLiquidGlassEnabled,
-                                                                shape = CircleShape,
-                                                                containerColor = appearance.buttonContainerColor,
-                                                                shadowElevation =
-                                                                        if (selectedRouteId == entry.routeId) 6.dp else 5.dp,
-                                                                borderWidth = 0.5.dp,
-                                                                blurRadius = 14.dp,
-                                                                overlayAlphaBoost = 0.05f,
-                                                                enableLens = false
-                                                        )
-                                                        .clip(CircleShape)
-                                                        .background(selectedGlassOverlayColor),
-                                        color = Color.Transparent,
-                                        shape = CircleShape
+                                                        .size(44.dp),
+                                        applyContentPadding = false,
                                 ) {
-                                        IconButton(onClick = { onNavigationEntrySelected(entry) }) {
+                                        IconButton(
+                                                modifier =
+                                                        Modifier.semantics {
+                                                                this.selected = selectedRouteId == entry.routeId
+                                                        },
+                                                onClick = { onNavigationEntrySelected(entry) },
+                                        ) {
                                                 Icon(
                                                         imageVector = entry.icon,
                                                         contentDescription = entry.title,
-                                                        tint =
-                                                                if (selectedRouteId == entry.routeId) {
-                                                                        if (appearance.buttonLiquidGlassEnabled) {
-                                                                                appearance.selectedContentColor
-                                                                        } else {
-                                                                                appearance.titleColor
-                                                                        }
-                                                                } else {
-                                                                        appearance.itemColor
-                                                                },
+                                                        tint = LocalContentColor.current,
                                                         modifier = Modifier.size(24.dp)
                                                 )
                                         }
@@ -444,6 +414,7 @@ fun CollapsedDrawerContent(
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
+        }
         }
 }
 

@@ -105,6 +105,87 @@ internal object ThemeSurfaceCatalogV2 {
         )
 }
 
+/**
+ * Host-supported implementation kinds for every daily surface. A package cannot turn a template
+ * route into an arbitrary scene because that would require unregistered slots and host behavior.
+ */
+internal object ThemeSurfaceHostPolicyV2 {
+    private val expectedKindBySurface: Map<ThemeSurfaceIdV2, ThemeSurfaceImplementationKindV2> =
+        mapOf(
+            ThemeSurfaceCatalogV2.APP_SHELL to ThemeSurfaceImplementationKindV2.SCENE,
+            ThemeSurfaceCatalogV2.APP_NAVIGATION to ThemeSurfaceImplementationKindV2.TEMPLATE,
+            ThemeSurfaceCatalogV2.CHAT_MAIN to ThemeSurfaceImplementationKindV2.SCENE,
+            ThemeSurfaceCatalogV2.CHAT_FLOATING to ThemeSurfaceImplementationKindV2.TEMPLATE,
+            ThemeSurfaceCatalogV2.CHAT_PERMISSION_OVERLAY to ThemeSurfaceImplementationKindV2.TEMPLATE,
+            ThemeSurfaceCatalogV2.BROWSER_SHELL to ThemeSurfaceImplementationKindV2.HOST_SHELL,
+            ThemeSurfaceCatalogV2.WEB_CHAT_MAIN to ThemeSurfaceImplementationKindV2.TEMPLATE,
+            ThemeSurfaceCatalogV2.MEMORY_GRAPH_LIBRARY to ThemeSurfaceImplementationKindV2.TEMPLATE,
+            ThemeSurfaceCatalogV2.MARKET_HOME to ThemeSurfaceImplementationKindV2.TEMPLATE,
+            ThemeSurfaceCatalogV2.MARKET_CATEGORY to ThemeSurfaceImplementationKindV2.TEMPLATE,
+            ThemeSurfaceCatalogV2.MARKET_ENTRY_DETAIL to ThemeSurfaceImplementationKindV2.TEMPLATE,
+            ThemeSurfaceCatalogV2.MARKET_PUBLISHER_CONSOLE to ThemeSurfaceImplementationKindV2.TEMPLATE,
+            ThemeSurfaceCatalogV2.MARKET_ARTIFACT_EDITOR to ThemeSurfaceImplementationKindV2.TEMPLATE,
+            ThemeSurfaceCatalogV2.MARKET_REPOSITORY_EDITOR to ThemeSurfaceImplementationKindV2.TEMPLATE,
+            ThemeSurfaceCatalogV2.PACKAGES_MANAGER to ThemeSurfaceImplementationKindV2.TEMPLATE,
+            ThemeSurfaceCatalogV2.WORKFLOW_LIBRARY to ThemeSurfaceImplementationKindV2.TEMPLATE,
+            ThemeSurfaceCatalogV2.WORKFLOW_CANVAS_EDITOR to ThemeSurfaceImplementationKindV2.TEMPLATE,
+            ThemeSurfaceCatalogV2.FILES_BROWSER to ThemeSurfaceImplementationKindV2.TEMPLATE,
+            ThemeSurfaceCatalogV2.ASSISTANT_PROFILE to ThemeSurfaceImplementationKindV2.TEMPLATE,
+            ThemeSurfaceCatalogV2.PERSONA_CARD_STUDIO to ThemeSurfaceImplementationKindV2.TEMPLATE,
+            ThemeSurfaceCatalogV2.PROMPT_TAG_MARKET to ThemeSurfaceImplementationKindV2.TEMPLATE,
+            ThemeSurfaceCatalogV2.SETTINGS_INDEX to ThemeSurfaceImplementationKindV2.TEMPLATE,
+            ThemeSurfaceCatalogV2.SETTINGS_FORM to ThemeSurfaceImplementationKindV2.TEMPLATE,
+            ThemeSurfaceCatalogV2.SETTINGS_STATISTICS to ThemeSurfaceImplementationKindV2.TEMPLATE,
+            ThemeSurfaceCatalogV2.TOOLBOX_INDEX to ThemeSurfaceImplementationKindV2.TEMPLATE,
+            ThemeSurfaceCatalogV2.TOOLBOX_TOOL to ThemeSurfaceImplementationKindV2.TEMPLATE,
+            ThemeSurfaceCatalogV2.TERMINAL_SHELL to ThemeSurfaceImplementationKindV2.HOST_SHELL,
+            ThemeSurfaceCatalogV2.MEDIA_SHELL to ThemeSurfaceImplementationKindV2.HOST_SHELL,
+            ThemeSurfaceCatalogV2.PLUGIN_HOST_SHELL to ThemeSurfaceImplementationKindV2.HOST_SHELL,
+            ThemeSurfaceCatalogV2.OVERLAY_DIALOG to ThemeSurfaceImplementationKindV2.TEMPLATE,
+            ThemeSurfaceCatalogV2.OVERLAY_SHEET to ThemeSurfaceImplementationKindV2.TEMPLATE,
+            ThemeSurfaceCatalogV2.OVERLAY_MENU to ThemeSurfaceImplementationKindV2.TEMPLATE,
+            ThemeSurfaceCatalogV2.OVERLAY_SNACKBAR to ThemeSurfaceImplementationKindV2.TEMPLATE,
+            ThemeSurfaceCatalogV2.OVERLAY_TOAST to ThemeSurfaceImplementationKindV2.TEMPLATE,
+            ThemeSurfaceCatalogV2.STATE_LOADING to ThemeSurfaceImplementationKindV2.TEMPLATE,
+            ThemeSurfaceCatalogV2.STATE_EMPTY to ThemeSurfaceImplementationKindV2.TEMPLATE,
+            ThemeSurfaceCatalogV2.STATE_ERROR to ThemeSurfaceImplementationKindV2.TEMPLATE,
+        )
+
+    init {
+        check(expectedKindBySurface.keys == ThemeSurfaceCatalogV2.requiredDailySurfaces) {
+            "Theme surface host policy must cover every required daily surface."
+        }
+    }
+
+    fun expectedKind(surface: ThemeSurfaceIdV2): ThemeSurfaceImplementationKindV2 =
+        requireNotNull(expectedKindBySurface[surface]) {
+            "No host policy is registered for theme surface ${surface.value}."
+        }
+
+    fun requireExpectedKind(
+        surface: ThemeSurfaceIdV2,
+        actualKind: ThemeSurfaceImplementationKindV2,
+    ) {
+        val expectedKind = expectedKind(surface)
+        require(actualKind == expectedKind) {
+            "Theme surface ${surface.value} must be declared as $expectedKind, not $actualKind."
+        }
+    }
+
+    fun requireSupportedImplementation(
+        surface: ThemeSurfaceIdV2,
+        implementation: ThemeSurfaceImplementationV2,
+    ) {
+        requireExpectedKind(surface, implementation.kind)
+        if (implementation.kind == ThemeSurfaceImplementationKindV2.SCENE) {
+            require(implementation.sceneId == surface.value) {
+                "Theme scene surface ${surface.value} must reference scene ${surface.value}, " +
+                    "not ${implementation.sceneId}."
+            }
+        }
+    }
+}
+
 internal object ThemeComponentCatalogV2 {
     val APP_BAR = ThemeComponentIdV2("app_bar")
     val NAVIGATION = ThemeComponentIdV2("navigation")

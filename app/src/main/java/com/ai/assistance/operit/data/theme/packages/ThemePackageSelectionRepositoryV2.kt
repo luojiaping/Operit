@@ -53,9 +53,9 @@ internal class ThemePackageSelectionRepositoryV2 private constructor(context: Co
     }
 
     /**
-     * Repairs a persisted selection whose exact immutable installation no longer exists. The
-     * whole record is replaced so parameters from an unavailable package cannot leak into the
-     * bundled default package.
+     * Repairs a persisted selection whose exact immutable runtime is unavailable. The whole
+     * record is replaced so parameters from that package cannot leak into the bundled default
+     * package.
      */
     suspend fun repairUnavailableSelection(
         installedCoordinates: Set<ThemePackageCoordinateV2>,

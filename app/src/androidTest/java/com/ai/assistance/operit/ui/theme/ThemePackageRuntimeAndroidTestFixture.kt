@@ -1,0 +1,97 @@
+package com.ai.assistance.operit.ui.theme
+
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
+import com.ai.assistance.operit.data.theme.packages.LinkedThemeRuntimeV2
+import com.ai.assistance.operit.data.theme.packages.ResolvedThemeParametersV2
+import com.ai.assistance.operit.data.theme.packages.ThemeArchiveSha256V2
+import com.ai.assistance.operit.data.theme.packages.ThemeComponentCatalogV2
+import com.ai.assistance.operit.data.theme.packages.ThemeComponentFrameSpecV2
+import com.ai.assistance.operit.data.theme.packages.ThemeComponentSkinV2
+import com.ai.assistance.operit.data.theme.packages.ThemeComponentStateSkinV2
+import com.ai.assistance.operit.data.theme.packages.ThemeMaterialColorSchemeV2
+import com.ai.assistance.operit.data.theme.packages.ThemeMaterialProjectionV2
+import com.ai.assistance.operit.data.theme.packages.ThemePackageCoordinateV2
+import com.ai.assistance.operit.data.theme.packages.ThemePackageIdV2
+import com.ai.assistance.operit.data.theme.packages.ThemePackageVersionV2
+import com.ai.assistance.operit.data.theme.packages.ThemeShapesV2
+import com.ai.assistance.operit.data.theme.packages.ThemeTypographyV2
+import com.ai.assistance.operit.ui.theme.scene.ThemeSceneTokenSetV1
+import com.ai.assistance.operit.ui.theme.scene.ThemeSceneTokenValueV1
+
+internal fun themePackageRuntimeForAndroidTest(
+    userFontScale: Float = 1f,
+): ThemePackageUiRuntimeV2 {
+    val container = Color(0xFF102030)
+    val content = Color(0xFFE5F6FF)
+    val selected = Color(0xFF16435A)
+    val disabled = Color(0xFF24313B)
+    val error = Color(0xFF5D1C2B)
+    val tokens =
+        ThemeSceneTokenSetV1(
+            tokens =
+                mapOf(
+                    "test.container" to colorToken(container),
+                    "test.content" to colorToken(content),
+                    "test.selected" to colorToken(selected),
+                    "test.disabled" to colorToken(disabled),
+                    "test.error" to colorToken(error),
+                ),
+        )
+    val coordinate =
+        ThemePackageCoordinateV2(
+            packageId = ThemePackageIdV2("test.android_theme"),
+            version = ThemePackageVersionV2("1.0.0"),
+            archiveSha256 = ThemeArchiveSha256V2("ab".repeat(32)),
+        )
+    val normal = componentState("test.container", "test.content")
+    val componentSkins =
+        ThemeComponentCatalogV2.requiredComponents.associateWith {
+            ThemeComponentSkinV2(
+                normal = normal,
+                disabled = componentState("test.disabled", "test.content"),
+                selected = componentState("test.selected", "test.content"),
+                focused = componentState("test.selected", "test.content"),
+                error = componentState("test.error", "test.content"),
+            )
+        }
+    val linked =
+        LinkedThemeRuntimeV2(
+            coordinate = coordinate,
+            packageChain = listOf(coordinate),
+            material =
+                ThemeMaterialProjectionV2(
+                    colors = ThemeMaterialColorSchemeV2.uniform("test.container"),
+                    typography = ThemeTypographyV2(),
+                    shapes = ThemeShapesV2(2f, 4f, 8f, 16f, 28f),
+                ),
+            componentSkins = componentSkins,
+            surfaces = emptyMap(),
+            tokens = tokens,
+            scenes = emptyMap(),
+            assets = emptyMap(),
+            parameterDefinitions = emptyMap(),
+        )
+    return createThemePackageUiRuntimeV2(
+        linked = linked,
+        parameters = ResolvedThemeParametersV2(emptyMap()),
+        darkTheme = true,
+        userFontScale = userFontScale,
+    )
+}
+
+private fun componentState(
+    containerToken: String,
+    contentToken: String,
+): ThemeComponentStateSkinV2 =
+    ThemeComponentStateSkinV2(
+        containerToken = containerToken,
+        contentToken = contentToken,
+        frame = ThemeComponentFrameSpecV2.RoundRect(cornerRadiusDp = 0f),
+    )
+
+private fun colorToken(color: Color): ThemeSceneTokenValueV1.ColorToken =
+    ThemeSceneTokenValueV1.ColorToken(
+        lightArgb = color.toArgb().toLong() and 0xFFFFFFFFL,
+        darkArgb = color.toArgb().toLong() and 0xFFFFFFFFL,
+    )

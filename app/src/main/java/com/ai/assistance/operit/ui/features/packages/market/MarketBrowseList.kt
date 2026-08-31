@@ -37,6 +37,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
@@ -54,11 +55,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.ai.assistance.operit.R
+import com.ai.assistance.operit.data.theme.packages.ThemeComponentCatalogV2
 import com.ai.assistance.operit.ui.common.icons.rememberRemoteLogoPainter
+import com.ai.assistance.operit.ui.theme.ThemeComponentSurfaceV2
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -349,14 +353,14 @@ fun MarketBrowseCard(
 ) {
     val cardModifier =
         if (interactive) {
-            Modifier.clickable { onViewDetails() }
+            Modifier.clickable(role = Role.Button) { onViewDetails() }
         } else {
             Modifier
         }
-    Card(
+    ThemeComponentSurfaceV2(
+        component = ThemeComponentCatalogV2.LIST_ITEM,
         modifier = modifier.fillMaxWidth().then(cardModifier),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        applyContentPadding = false,
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
@@ -383,7 +387,7 @@ fun MarketBrowseCard(
                     Text(
                         text = model.description,
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = LocalContentColor.current.copy(alpha = 0.72f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )

@@ -22,6 +22,7 @@ internal data class LinkedThemeRuntimeV2(
     val tokens: ThemeSceneTokenSetV1,
     val scenes: Map<String, ThemeSceneDefinitionV1>,
     val assets: Map<String, File>,
+    val assetKinds: Map<String, ThemeAssetKindV2> = emptyMap(),
     val parameterDefinitions: Map<String, ThemeParameterDefinitionV2>,
 )
 
@@ -104,6 +105,7 @@ private data class LinkedThemeAccumulatorV2(
     val tokens: Map<String, ThemeSceneTokenValueV1> = emptyMap(),
     val scenes: Map<String, ThemeSceneDefinitionV1> = emptyMap(),
     val assets: Map<String, File> = emptyMap(),
+    val assetKinds: Map<String, ThemeAssetKindV2> = emptyMap(),
     val parameters: Map<String, ThemeParameterDefinitionV2> = emptyMap(),
 ) {
     fun merge(installation: PublishedThemeInstallationV2): LinkedThemeAccumulatorV2 {
@@ -133,6 +135,7 @@ private data class LinkedThemeAccumulatorV2(
                     manifest.assets.associate { asset ->
                         asset.key to File(installation.rootDir, asset.path)
                     },
+            assetKinds = assetKinds + manifest.assets.associate { asset -> asset.key to asset.kind },
             parameters = parameters + manifest.parameters.associateBy { parameter -> parameter.id },
         )
     }
@@ -147,7 +150,7 @@ private data class LinkedThemeAccumulatorV2(
         val surfaceMap = surfaces.mapKeys { (id, _) -> ThemeSurfaceIdV2(id) }
         validateCoverage(componentSkinMap, surfaceMap)
         validateTokenReferences(resolvedMaterial, componentSkinMap, tokens)
-        validateSceneReferences(surfaces, scenes, tokens, assets)
+        validateSceneReferences(surfaces, scenes, tokens, assets, assetKinds)
         return LinkedThemeRuntimeV2(
             coordinate = coordinate,
             packageChain = packageChain,
@@ -157,6 +160,7 @@ private data class LinkedThemeAccumulatorV2(
             tokens = ThemeSceneTokenSetV1(tokens),
             scenes = scenes,
             assets = assets,
+            assetKinds = assetKinds,
             parameterDefinitions = parameters,
         )
     }
@@ -178,6 +182,13 @@ private data class LinkedThemeAccumulatorV2(
                 "Theme package does not provide required component skins: " +
                     missingComponents.map { component -> component.value }.sorted().joinToString(),
             )
+        }
+        surfaces.forEach { (surface, implementation) ->
+            try {
+                ThemeSurfaceHostPolicyV2.requireSupportedImplementation(surface, implementation)
+            } catch (error: IllegalArgumentException) {
+                throw ThemePackageLinkExceptionV2(error.message ?: "Invalid linked theme surface kind.")
+            }
         }
     }
 
@@ -203,6 +214,7 @@ private data class LinkedThemeAccumulatorV2(
         scenes: Map<String, ThemeSceneDefinitionV1>,
         tokens: Map<String, ThemeSceneTokenValueV1>,
         assets: Map<String, File>,
+        assetKinds: Map<String, ThemeAssetKindV2>,
     ) {
         surfaces.values.forEach { surface ->
             if (surface.kind == ThemeSurfaceImplementationKindV2.SCENE) {
@@ -215,7 +227,7 @@ private data class LinkedThemeAccumulatorV2(
             }
         }
         scenes.values.forEach { scene ->
-            validateSceneNode(scene.rootNode, tokens, assets)
+            validateSceneNode(scene.rootNode, tokens, assets, assetKinds)
         }
     }
 
@@ -223,6 +235,7 @@ private data class LinkedThemeAccumulatorV2(
         node: ThemeSceneNodeV1,
         tokens: Map<String, ThemeSceneTokenValueV1>,
         assets: Map<String, File>,
+        assetKinds: Map<String, ThemeAssetKindV2>,
     ) {
         when (node) {
             is com.ai.assistance.operit.ui.theme.scene.ThemeSceneStageNodeV1 ->
@@ -236,14 +249,14 @@ private data class LinkedThemeAccumulatorV2(
             is com.ai.assistance.operit.ui.theme.scene.ThemeScenePathNodeV1 -> {
                 node.fillToken?.let { tokenId -> requireColor(tokens, tokenId.value, "Scene") }
                 node.outlineToken?.let { tokenId -> requireColor(tokens, tokenId.value, "Scene") }
-                requireAsset(assets, node.assetId.value, "Scene")
+                requireAsset(assets, assetKinds, node.assetId.value, ThemeAssetKindV2.PATH, "Scene")
             }
 
             is com.ai.assistance.operit.ui.theme.scene.ThemeSceneImageNodeV1 ->
-                requireAsset(assets, node.assetId.value, "Scene")
+                requireAsset(assets, assetKinds, node.assetId.value, ThemeAssetKindV2.BITMAP, "Scene")
 
             is com.ai.assistance.operit.ui.theme.scene.ThemeSceneNineSliceNodeV1 ->
-                requireAsset(assets, node.assetId.value, "Scene")
+                requireAsset(assets, assetKinds, node.assetId.value, ThemeAssetKindV2.NINE_SLICE, "Scene")
 
             is com.ai.assistance.operit.ui.theme.scene.ThemeSceneTextNodeV1 -> {
                 val styleToken = requireNotNull(node.styleToken) {
@@ -254,12 +267,14 @@ private data class LinkedThemeAccumulatorV2(
                         "Scene references missing or non-text-style token: ${styleToken.value}",
                     )
                 requireColor(tokens, style.color.value, "Scene text")
-                style.fontAsset?.let { assetId -> requireAsset(assets, assetId.value, "Scene text") }
+                style.fontAsset?.let { assetId ->
+                    requireAsset(assets, assetKinds, assetId.value, ThemeAssetKindV2.FONT, "Scene text")
+                }
             }
 
             else -> Unit
         }
-        childrenOf(node).forEach { child -> validateSceneNode(child, tokens, assets) }
+        childrenOf(node).forEach { child -> validateSceneNode(child, tokens, assets, assetKinds) }
     }
 
     private fun requireColor(
@@ -275,11 +290,19 @@ private data class LinkedThemeAccumulatorV2(
 
     private fun requireAsset(
         assets: Map<String, File>,
+        assetKinds: Map<String, ThemeAssetKindV2>,
         assetId: String,
+        expectedKind: ThemeAssetKindV2,
         owner: String,
     ) {
         if (assets[assetId]?.isFile != true) {
             throw ThemePackageLinkExceptionV2("$owner references missing linked asset: $assetId")
+        }
+        val actualKind = assetKinds[assetId]
+        if (actualKind != expectedKind) {
+            throw ThemePackageLinkExceptionV2(
+                "$owner uses linked asset $assetId as $expectedKind but it is declared as $actualKind.",
+            )
         }
     }
 
