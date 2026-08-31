@@ -48,4 +48,6 @@
 
 [DONE] Overlay primitive 试点已新增 surface-to-component unit test、dialog skin container/frame/content 与 child click semantics 的 Compose test、ChatToast close callback test，以及 WebSession prompt input/confirm callback test；尚未执行测试命令。sheet scrim/IME 留作 device acceptance。
 
+[DONE] 构建服务已同步 `8d1322af` 并完成 release 编译：`operit-release-feat_plugin-interface-8d1322af.apk`，SHA-256 `249608305136aa6989a8370c42967fce7964d7b0ba1e84c14e3ef75fc621f39d`。本次未执行 JVM/Android test。
+
 [TODO] 第一批 device acceptance。
