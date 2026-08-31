@@ -11,6 +11,7 @@ import {
   StopIcon
 } from '../../../../util/chatIcons';
 import { PendingMessageQueuePanel } from '../common/PendingMessageQueuePanel';
+import { InputSlotHost } from '../../../../composedsl/InputSlotHost';
 import type {
   InputProcessingStage,
   PendingQueueMessageItem,
@@ -41,6 +42,7 @@ export function ClassicChatInputSection({
   onAttachmentPanelChange,
   pendingQueueMessages,
   isPendingQueueExpanded,
+  theme,
   onPendingQueueExpandedChange,
   onDeletePendingQueueMessage,
   onEditPendingQueueMessage,
@@ -117,6 +119,7 @@ export function ClassicChatInputSection({
 
   return (
     <div className="classic-chat-input-section">
+      <InputSlotHost layout="above-input-classic" slot="above_input" theme={theme} />
       <PendingMessageQueuePanel
         expanded={isPendingQueueExpanded}
         onDeleteMessage={onDeletePendingQueueMessage}
@@ -148,6 +151,8 @@ export function ClassicChatInputSection({
         </div>
       ) : null}
 
+      <InputSlotHost layout="drawer" slot="input_drawer" theme={theme} />
+
       <div className="classic-input-row">
         <label className="classic-input-field">
           <textarea
@@ -167,6 +172,8 @@ export function ClassicChatInputSection({
             <FullscreenIcon size={16} />
           </button>
         </label>
+
+        <InputSlotHost layout="toolbar-right" slot="input_toolbar_right" theme={theme} />
 
         <button
           className={`classic-input-circle ${attachmentPanelOpen ? 'is-active' : ''}`}

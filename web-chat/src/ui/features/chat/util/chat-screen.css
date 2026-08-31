@@ -4,3 +4,4 @@
 @import "./styles/chat-structured.css";
 @import "./styles/chat-composer.css";
 @import "./styles/chat-dialogs.css";
+@import "../composedsl/composeDsl.css";

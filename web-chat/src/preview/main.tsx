@@ -5,7 +5,33 @@ import { useChatViewModel } from '../ui/features/chat/viewmodel/ChatViewModel';
 import { previewControls } from '../ui/features/chat/util/mock/mockTransport';
 import { isMockMode } from '../ui/features/chat/util/chatTransport';
 import type { ChatViewModel } from '../ui/features/chat/viewmodel/ChatViewModel';
+import { PreviewSlotProvider } from '../ui/features/chat/composedsl/InputSlotHost';
+import type { InputSlotContentMap } from '../ui/features/chat/composedsl/composeDslTypes';
 import './preview.css';
+
+// 初始演示内容 = examples/input_slot_demo 三个插槽的等价物，
+// above_input 用 DSL screen、input_drawer 返回文本、toolbar_right 返回文本
+const DEMO_SLOT_SCREEN = `function SlotScreen(ctx) {
+  const { UI } = ctx;
+  return UI.Card(
+    { fillMaxWidth: true, containerColor: "rgba(127, 150, 220, 0.16)", elevation: 0 },
+    UI.Column(
+      { fillMaxWidth: true, padding: 8, spacing: 2 },
+      [
+        UI.Text({ text: "Input slot Compose DSL", style: "labelLarge", color: "#8ca9ff" }),
+        UI.Text({ text: "Rendered above the chat input", style: "bodySmall", color: "#9ca8bb" })
+      ]
+    )
+  );
+}
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.default = SlotScreen;`;
+
+const INITIAL_SLOT_CONTENTS: InputSlotContentMap = {
+  above_input: { kind: 'dsl', screenSource: DEMO_SLOT_SCREEN },
+  input_drawer: { kind: 'text', text: 'Demo drawer' },
+  input_toolbar_right: { kind: 'text', text: 'Slot' }
+};
 
 const DEVICE_WIDTHS = [
   { id: 's', label: '360', value: 360 },
@@ -160,6 +186,7 @@ function SimulatorToolbar({
 function PreviewApp() {
   const viewModel = useChatViewModel();
   const [deviceWidthId, setDeviceWidthId] = useState<DeviceWidthId>('m');
+  const [slotContents] = useState<InputSlotContentMap>(INITIAL_SLOT_CONTENTS);
   const deviceWidth = DEVICE_WIDTHS.find((width) => width.id === deviceWidthId)?.value ?? null;
 
   return (
@@ -174,7 +201,9 @@ function PreviewApp() {
           className="preview-device"
           style={deviceWidth !== null ? { width: `${deviceWidth}px` } : undefined}
         >
-          <AIChatScreenView viewModel={viewModel} />
+          <PreviewSlotProvider contents={slotContents}>
+            <AIChatScreenView viewModel={viewModel} />
+          </PreviewSlotProvider>
         </div>
       </div>
     </div>

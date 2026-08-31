@@ -22,6 +22,7 @@ import {
 import { InputOverlayPopup } from '../common/InputOverlayPopup';
 import { CharacterCardModelBindingSwitchConfirmDialog } from '../common/CharacterCardModelBindingSwitchConfirmDialog';
 import { PendingMessageQueuePanel } from '../common/PendingMessageQueuePanel';
+import { InputSlotHost } from '../../../../composedsl/InputSlotHost';
 import { ThinkingQualitySlider } from '../common/ThinkingQualitySlider';
 import type {
   InputProcessingStage,
@@ -681,6 +682,7 @@ export function AgentChatInputSection({
   onAttachmentPanelChange,
   pendingQueueMessages,
   isPendingQueueExpanded,
+  theme,
   onPendingQueueExpandedChange,
   onDeletePendingQueueMessage,
   onEditPendingQueueMessage,
@@ -827,6 +829,7 @@ export function AgentChatInputSection({
 
   return (
     <div className="agent-chat-input-section">
+      <InputSlotHost layout="above-input-agent" slot="above_input" theme={theme} />
       <PendingMessageQueuePanel
         expanded={isPendingQueueExpanded}
         onDeleteMessage={onDeletePendingQueueMessage}
@@ -858,6 +861,7 @@ export function AgentChatInputSection({
       ) : null}
 
       <div className="agent-input-card">
+        <InputSlotHost layout="drawer" slot="input_drawer" theme={theme} />
         <label className="agent-input-field">
           <textarea
             onChange={(event) => onMessageInputChange(event.target.value)}
@@ -893,6 +897,8 @@ export function AgentChatInputSection({
               {showModelSelector ? <ChevronUpIcon size={16} /> : <ChevronDownIcon size={16} />}
             </button>
           </div>
+
+          <InputSlotHost layout="toolbar-right" slot="input_toolbar_right" theme={theme} />
 
           <button
             className={`agent-icon-button ${showExtraSettings ? 'is-active' : ''}`}
