@@ -403,12 +403,12 @@ object ScreenRouteRegistry {
             )
         }
 
-    fun themeSurfaceOf(screen: Screen): ThemeSurfaceIdV2 =
+    internal fun themeSurfaceOf(screen: Screen): ThemeSurfaceIdV2 =
         requireNotNull(nativeThemeSurfaceByType[screen.javaClass]) {
             "No V2 theme surface registered for native screen ${screen.javaClass.simpleName}."
         }
 
-    fun themeSurfaceForRouteId(routeId: String): ThemeSurfaceIdV2 =
+    internal fun themeSurfaceForRouteId(routeId: String): ThemeSurfaceIdV2 =
         requireNotNull(routeTypeById[routeId]) {
             "No native screen registered for route $routeId."
         }.let { screenType ->

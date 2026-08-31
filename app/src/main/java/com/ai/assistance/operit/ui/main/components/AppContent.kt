@@ -378,24 +378,28 @@ fun AppContent(
                                     when (screenSnapshot) {
                                     is Screen.ToolPkgComposeDsl ->
                                         {
-                                            ToolPkgComposeDslToolScreen(
-                                                navController = navController,
-                                                routeInstanceId = currentScreenKey,
-                                                containerPackageName = screenSnapshot.containerPackageName,
-                                                uiModuleId = screenSnapshot.uiModuleId,
-                                                fallbackTitle = screenSnapshot.title,
-                                            )
+                                            {
+                                                ToolPkgComposeDslToolScreen(
+                                                    navController = navController,
+                                                    routeInstanceId = currentScreenKey,
+                                                    containerPackageName = screenSnapshot.containerPackageName,
+                                                    uiModuleId = screenSnapshot.uiModuleId,
+                                                    fallbackTitle = screenSnapshot.title,
+                                                )
+                                            }
                                         }
 
                                     is Screen.ToolPkgPluginConfig ->
                                         {
-                                            ToolPkgComposeDslToolScreen(
-                                                navController = navController,
-                                                routeInstanceId = currentScreenKey,
-                                                containerPackageName = screenSnapshot.containerPackageName,
-                                                uiModuleId = screenSnapshot.uiModuleId,
-                                                fallbackTitle = screenSnapshot.title,
-                                            )
+                                            {
+                                                ToolPkgComposeDslToolScreen(
+                                                    navController = navController,
+                                                    routeInstanceId = currentScreenKey,
+                                                    containerPackageName = screenSnapshot.containerPackageName,
+                                                    uiModuleId = screenSnapshot.uiModuleId,
+                                                    fallbackTitle = screenSnapshot.title,
+                                                )
+                                            }
                                         }
 
                                     else -> {
