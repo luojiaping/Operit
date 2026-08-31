@@ -2,10 +2,14 @@ import { useRef, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import type { ChatViewModel } from '../ui/features/chat/viewmodel/ChatViewModel';
 import type { InputSlotContentMap } from '../ui/features/chat/composedsl/composeDslTypes';
+import type { InputSlotName } from '../ui/features/chat/composedsl/composeDslTypes';
 import { buildRunnerPayload, resolveSlotContent, runToolPkgMain } from './slotRunner';
 import { findFileBySuffix, readToolpkgZip } from './toolpkgLoader';
+import { SLOT_TEMPLATES, buildToolpkgSources } from './templates';
+import type { SlotTemplate } from './templates';
+import { createStoredZip } from './zipWriter';
 
-type PanelMode = 'demo' | 'paste' | 'upload';
+type PanelMode = 'demo' | 'paste' | 'template' | 'upload';
 
 const DEMO_MAIN_PLACEHOLDER = `exports.registerToolPkg = function () {
   ToolPkg.registerInputSlotPlugin({
@@ -31,7 +35,67 @@ export function CodePreviewPanel({
   const [screenSource, setScreenSource] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string>('演示模式');
+  const [templateId, setTemplateId] = useState<string>(SLOT_TEMPLATES[0].id);
+  const [templateSlot, setTemplateSlot] = useState<InputSlotName>(
+    SLOT_TEMPLATES[0].slots[0]
+  );
+  const [templateValues, setTemplateValues] = useState<
+    Record<string, string | number | boolean>
+  >({});
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const template: SlotTemplate =
+    SLOT_TEMPLATES.find((item) => item.id === templateId) ?? SLOT_TEMPLATES[0];
+
+  function applyTemplateToSimulator() {
+    setError(null);
+    try {
+      const state = template.buildState(templateValues);
+      const sources = buildToolpkgSources({
+        template,
+        slot: templateSlot,
+        pluginId: `${template.id}_${Date.now().toString(36)}`,
+        displayName: `${template.name}（Preview Studio）`,
+        state
+      });
+      const registrations = runToolPkgMain(sources.mainSource);
+      runRegistrations(registrations, () => sources.screenSource);
+    } catch (templateError: unknown) {
+      console.error('applyTemplateToSimulator failed', templateError);
+      setError((templateError as Error).message);
+      setStatus('模板预览失败');
+    }
+  }
+
+  function downloadTemplateToolpkg() {
+    setError(null);
+    try {
+      const state = template.buildState(templateValues);
+      const sources = buildToolpkgSources({
+        template,
+        slot: templateSlot,
+        pluginId: `${template.id}_${Date.now().toString(36)}`,
+        displayName: `${template.name}（Preview Studio）`,
+        state
+      });
+      const encoder = new TextEncoder();
+      const blob = createStoredZip([
+        { name: 'manifest.json', bytes: encoder.encode(sources.manifestJson) },
+        { name: 'dist/main.js', bytes: encoder.encode(sources.mainSource) },
+        { name: sources.screenPath, bytes: encoder.encode(sources.screenSource) }
+      ]);
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `${template.id}-slot-plugin.toolpkg`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      setStatus('已生成 .toolpkg 下载');
+    } catch (downloadError: unknown) {
+      console.error('downloadTemplateToolpkg failed', downloadError);
+      setError((downloadError as Error).message);
+      setStatus('生成失败');
+    }
+  }
 
   function basePayload() {
     return {
@@ -136,6 +200,7 @@ export function CodePreviewPanel({
           [
             ['demo', '演示'],
             ['paste', '粘贴代码'],
+            ['template', '模板生成'],
             ['upload', '上传 .toolpkg']
           ] as const
         ).map(([value, label]) => (
@@ -186,6 +251,105 @@ export function CodePreviewPanel({
           <button className="preview-panel-apply" onClick={applyPasted} type="button">
             应用到模拟器
           </button>
+        </div>
+      ) : null}
+
+      {mode === 'template' ? (
+        <div className="preview-panel-editors">
+          <label className="preview-panel-label">
+            模板
+            <select
+              onChange={(event) => {
+                const nextTemplate =
+                  SLOT_TEMPLATES.find((item) => item.id === event.target.value) ??
+                  SLOT_TEMPLATES[0];
+                setTemplateId(nextTemplate.id);
+                setTemplateSlot(nextTemplate.slots[0]);
+                setTemplateValues({});
+              }}
+              value={template.id}
+            >
+              {SLOT_TEMPLATES.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <p className="preview-panel-hint">{template.description}</p>
+          <label className="preview-panel-label">
+            插槽位置
+            <select
+              onChange={(event) => setTemplateSlot(event.target.value as InputSlotName)}
+              value={templateSlot}
+            >
+              {template.slots.map((slot) => (
+                <option key={slot} value={slot}>
+                  {slot}
+                </option>
+              ))}
+            </select>
+          </label>
+          {template.fields.map((field) => (
+            <label className="preview-panel-label" key={field.key}>
+              {field.label}
+              {field.type === 'multiline' ? (
+                <textarea
+                  onChange={(event) =>
+                    setTemplateValues((current) => ({
+                      ...current,
+                      [field.key]: event.target.value
+                    }))
+                  }
+                  placeholder={field.placeholder}
+                  spellCheck={false}
+                  value={String(templateValues[field.key] ?? '')}
+                />
+              ) : field.type === 'boolean' ? (
+                <input
+                  checked={templateValues[field.key] === true}
+                  onChange={(event) =>
+                    setTemplateValues((current) => ({
+                      ...current,
+                      [field.key]: event.target.checked
+                    }))
+                  }
+                  type="checkbox"
+                />
+              ) : (
+                <input
+                  onChange={(event) =>
+                    setTemplateValues((current) => ({
+                      ...current,
+                      [field.key]:
+                        field.type === 'number'
+                          ? Number(event.target.value)
+                          : event.target.value
+                    }))
+                  }
+                  placeholder={field.placeholder}
+                  type={field.type === 'number' ? 'number' : 'text'}
+                  value={String(templateValues[field.key] ?? '')}
+                />
+              )}
+            </label>
+          ))}
+          <div className="preview-panel-actions">
+            <button
+              className="preview-panel-apply"
+              onClick={applyTemplateToSimulator}
+              type="button"
+            >
+              预览到模拟器
+            </button>
+            <button
+              className="preview-panel-secondary"
+              onClick={downloadTemplateToolpkg}
+              type="button"
+            >
+              下载 .toolpkg
+            </button>
+          </div>
         </div>
       ) : null}
 

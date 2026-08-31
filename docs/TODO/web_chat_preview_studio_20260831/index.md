@@ -38,12 +38,22 @@ snapshot 转 CSS 变量体系，但它只能在连接真机 HTTP 后端时使用
 2. [DONE: transport 抽象与 MockTransport](./02_mock_transport.md)
 3. [DONE: SimulatorShell 与多入口构建、docker 部署](./03_simulator_shell.md)
 4. [DONE: 输入插槽注入与 Compose DSL 渲染器](./04_slot_dsl_renderer.md)
-5. [IN_PROGRESS: 代码预览模式](./05_code_preview.md)
-6. [TODO: 低代码模板与 .toolpkg 导出](./06_template_export.md)
-7. [TODO: CI、测试与文档收尾](./07_ci_tests_docs.md)
+5. [DONE: 代码预览模式](./05_code_preview.md)
+6. [DONE: 低代码模板与 .toolpkg 导出](./06_template_export.md)
+7. [IN_PROGRESS: CI、测试与文档收尾](./07_ci_tests_docs.md)
 
 ## 验收
 
 - mock 模式下预览站全流程可用，不依赖真机
 - 模板生成的 .toolpkg 能被 app 的 PackageManager 导入并在输入区渲染
 - docker 容器本机可访问
+
+## 完成记录
+
+- 本地 worktree 分支 feat/web-preview-studio（自 fix/api-interface@b8cc583e）
+- docker：web-chat/docker-compose.yml，容器 operit-preview-studio，本机 8447 端口，
+  访问 http://127.0.0.1:8447/preview.html
+- 已验证：mock 主题三场景渲染、消息统计条、SSE 流式、三插槽注入、
+  DSL 渲染、粘贴代码应用、模板生成预览、.toolpkg 上传解析闭环、
+  下载包可被标准 unzip 解析且与 examples/input_slot_demo 同构
+- 待真机验证：模板生成与上传演示的 .toolpkg 导入 app 后在输入区渲染
