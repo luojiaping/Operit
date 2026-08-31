@@ -71,6 +71,120 @@
   overflow: hidden;
 }
 
+.preview-workbench {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.preview-panel {
+  display: flex;
+  flex: 0 0 340px;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  background: #131722;
+  overflow-y: auto;
+}
+
+.preview-panel-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.preview-panel-tab {
+  flex: 1 1 auto;
+  padding: 6px 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: rgba(232, 236, 244, 0.72);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.preview-panel-tab.is-active {
+  background: #3b62d9;
+  color: #ffffff;
+}
+
+.preview-panel-hint {
+  margin: 0;
+  color: rgba(232, 236, 244, 0.6);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.preview-panel-editors {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.preview-panel-label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: rgba(232, 236, 244, 0.75);
+  font-size: 12px;
+}
+
+.preview-panel-label textarea {
+  min-height: 150px;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  background: #0d1017;
+  color: #dce4f4;
+  font-family: "Cascadia Mono", "SFMono-Regular", "Consolas", monospace;
+  font-size: 12px;
+  line-height: 1.55;
+  resize: vertical;
+}
+
+.preview-panel-apply {
+  padding: 9px 0;
+  border: 0;
+  border-radius: 10px;
+  background: #2f9e6e;
+  color: #ffffff;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.preview-panel-apply:hover {
+  background: #37b47d;
+}
+
+.preview-panel-status {
+  color: rgba(232, 236, 244, 0.7);
+  font-size: 12px;
+}
+
+.preview-panel-error {
+  margin: 0;
+  padding: 10px;
+  border: 1px solid rgba(240, 108, 122, 0.5);
+  border-radius: 10px;
+  background: rgba(240, 108, 122, 0.12);
+  color: #ffb4bd;
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.preview-panel-note {
+  margin: auto 0 0;
+  color: rgba(232, 236, 244, 0.38);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
 .preview-device {
   display: flex;
   flex-direction: column;

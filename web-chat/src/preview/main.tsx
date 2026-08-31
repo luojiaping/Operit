@@ -7,6 +7,7 @@ import { isMockMode } from '../ui/features/chat/util/chatTransport';
 import type { ChatViewModel } from '../ui/features/chat/viewmodel/ChatViewModel';
 import { PreviewSlotProvider } from '../ui/features/chat/composedsl/InputSlotHost';
 import type { InputSlotContentMap } from '../ui/features/chat/composedsl/composeDslTypes';
+import { CodePreviewPanel } from './CodePreviewPanel';
 import './preview.css';
 
 // 初始演示内容 = examples/input_slot_demo 三个插槽的等价物，
@@ -186,7 +187,7 @@ function SimulatorToolbar({
 function PreviewApp() {
   const viewModel = useChatViewModel();
   const [deviceWidthId, setDeviceWidthId] = useState<DeviceWidthId>('m');
-  const [slotContents] = useState<InputSlotContentMap>(INITIAL_SLOT_CONTENTS);
+  const [slotContents, setSlotContents] = useState<InputSlotContentMap>(INITIAL_SLOT_CONTENTS);
   const deviceWidth = DEVICE_WIDTHS.find((width) => width.id === deviceWidthId)?.value ?? null;
 
   return (
@@ -196,14 +197,21 @@ function PreviewApp() {
         onDeviceWidthChange={setDeviceWidthId}
         viewModel={viewModel}
       />
-      <div className="preview-stage">
-        <div
-          className="preview-device"
-          style={deviceWidth !== null ? { width: `${deviceWidth}px` } : undefined}
-        >
-          <PreviewSlotProvider contents={slotContents}>
-            <AIChatScreenView viewModel={viewModel} />
-          </PreviewSlotProvider>
+      <div className="preview-workbench">
+        <CodePreviewPanel
+          onContentsChange={setSlotContents}
+          onResetDemo={() => setSlotContents(INITIAL_SLOT_CONTENTS)}
+          viewModel={viewModel}
+        />
+        <div className="preview-stage">
+          <div
+            className="preview-device"
+            style={deviceWidth !== null ? { width: `${deviceWidth}px` } : undefined}
+          >
+            <PreviewSlotProvider contents={slotContents}>
+              <AIChatScreenView viewModel={viewModel} />
+            </PreviewSlotProvider>
+          </div>
         </div>
       </div>
     </div>
