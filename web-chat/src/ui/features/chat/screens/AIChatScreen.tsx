@@ -1,11 +1,18 @@
 import { useMemo } from 'react';
+import type { CSSProperties } from 'react';
 import { ChatScreenContent } from '../components/ChatScreenContent';
 import { ConfigurationScreen } from './ConfigurationScreen';
 import { buildChatFontFaceCss, buildChatThemeStyle } from '../util/chatTheme';
 import { useChatViewModel } from '../viewmodel/ChatViewModel';
+import type { ChatViewModel } from '../viewmodel/ChatViewModel';
 
 export function AIChatScreen() {
   const viewModel = useChatViewModel();
+  return <AIChatScreenView viewModel={viewModel} />;
+}
+
+// 预览站复用：viewModel 由外部注入（PreviewApp 持有同一实例驱动工具栏）
+export function AIChatScreenView({ viewModel }: { viewModel: ChatViewModel }) {
   const fontFaceCss = buildChatFontFaceCss(viewModel.theme);
   const chatThemeStyle = useMemo(() => buildChatThemeStyle(viewModel.theme), [viewModel.theme]);
   const backdropBaseStyle = useMemo(

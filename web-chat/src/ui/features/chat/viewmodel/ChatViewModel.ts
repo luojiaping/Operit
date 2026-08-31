@@ -476,6 +476,7 @@ export interface ChatViewModelState {
 export interface ChatViewModelActions {
   setTokenDraft: (value: string) => void;
   submitToken: () => void;
+  reloadCurrentConversation: () => Promise<void>;
   createConversation: (options?: { group?: string | null }) => Promise<void>;
   renameConversation: (chat: WebChatSummary, title: string) => Promise<void>;
   deleteConversation: (chat: WebChatSummary) => Promise<void>;
@@ -1076,6 +1077,21 @@ export function useChatViewModel(): ChatViewModel {
     writeStoredToken(normalizedToken);
     setToken(normalizedToken);
     setError(null);
+  }
+
+  // 预览站的会话重载入口：主题被外部覆盖（previewControls.patchTheme）后
+  // 由 SimulatorShell 调用，重新拉取当前会话的主题与消息
+  async function reloadCurrentConversation() {
+    const chatId = selectedChatIdRef.current;
+    if (!token || !chatId) {
+      return;
+    }
+    try {
+      await loadConversation(token, chatId, 'merge-latest');
+    } catch (actionError: unknown) {
+      console.error('reloadCurrentConversation failed', actionError);
+      handleApiFailure(actionError);
+    }
   }
 
   async function createConversation(options?: { group?: string | null }) {
@@ -1702,6 +1718,7 @@ export function useChatViewModel(): ChatViewModel {
     memorySelector,
     setTokenDraft,
     submitToken,
+    reloadCurrentConversation,
     createConversation,
     renameConversation,
     deleteConversation,

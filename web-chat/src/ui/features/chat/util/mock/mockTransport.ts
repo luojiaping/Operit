@@ -32,24 +32,55 @@ function cloneChats(chats: WebChatSummary[]): WebChatSummary[] {
   return chats.map((chat) => ({ ...chat }));
 }
 
-// 内存状态机：全部端点与 SSE 流的 mock 实现。
-// token 参数为形状兼容保留，mock 不做鉴权
-export function createMockChatTransportInternal(): ChatTransportApi {
-  const chats: WebChatSummary[] = cloneChats(MOCK_CHATS);
-  const messagesByChat = new Map<string, WebChatMessage[]>(
-    Object.entries(MOCK_MESSAGES).map(([chatId, messages]) => [chatId, messages.map((m) => ({ ...m }))])
-  );
-  const themesByChat = new Map<string, WebThemeSnapshot>(Object.entries(MOCK_THEMES));
-  const characterState: WebCharacterSelectorResponse = {
+// 模块级单例状态：transport 实例与 previewControls 共享，
+// 同一页面重复创建实例也保持数据一致
+const state = {
+  chats: cloneChats(MOCK_CHATS),
+  messagesByChat: new Map<string, WebChatMessage[]>(
+    Object.entries(MOCK_MESSAGES).map(([chatId, messages]) => [
+      chatId,
+      messages.map((m) => ({ ...m }))
+    ])
+  ),
+  themesByChat: new Map<string, WebThemeSnapshot>(Object.entries(MOCK_THEMES)),
+  characterState: {
     active_prompt: { ...MOCK_CHARACTER_SELECTOR.active_prompt },
     cards: MOCK_CHARACTER_SELECTOR.cards.map((c) => ({ ...c })),
     groups: MOCK_CHARACTER_SELECTOR.groups.map((g) => ({ ...g }))
-  };
-  const modelState: WebModelSelectorState = JSON.parse(JSON.stringify(MOCK_MODEL_SELECTOR));
-  const memoryState: WebMemorySelectorState = JSON.parse(JSON.stringify(MOCK_MEMORY_SELECTOR));
-  const inputSettingsState: WebInputSettingsState = { ...MOCK_INPUT_SETTINGS };
-  let currentChatId = 'chat-main';
-  let messageIdSeq = 100;
+  } as WebCharacterSelectorResponse,
+  modelState: JSON.parse(JSON.stringify(MOCK_MODEL_SELECTOR)) as WebModelSelectorState,
+  memoryState: JSON.parse(JSON.stringify(MOCK_MEMORY_SELECTOR)) as WebMemorySelectorState,
+  inputSettingsState: { ...MOCK_INPUT_SETTINGS } as WebInputSettingsState,
+  currentChatId: 'chat-main' as string | null,
+  messageIdSeq: 100
+};
+
+// 预览站控制接口：SimulatorShell 用来实时覆盖 mock 主题，
+// patch 后由调用方触发会话重载来刷新界面
+export const previewControls = {
+  patchTheme(patch: Partial<WebThemeSnapshot>) {
+    const chatId = state.currentChatId ?? 'chat-main';
+    const theme = state.themesByChat.get(chatId);
+    if (!theme) {
+      throw new Error(`mock: cannot patch theme, chat not found: ${chatId}`);
+    }
+    state.themesByChat.set(chatId, { ...theme, ...patch });
+  },
+  resetTheme() {
+    for (const [chatId, theme] of Object.entries(MOCK_THEMES)) {
+      state.themesByChat.set(chatId, JSON.parse(JSON.stringify(theme)) as WebThemeSnapshot);
+    }
+  }
+};
+
+// 内存状态机：全部端点与 SSE 流的 mock 实现，状态保存在上方模块级单例。
+// token 参数为形状兼容保留，mock 不做鉴权
+export function createMockChatTransportInternal(): ChatTransportApi {
+  const { chats, messagesByChat, themesByChat } = state;
+  const characterState = state.characterState;
+  const modelState = state.modelState;
+  const memoryState = state.memoryState;
+  const inputSettingsState = state.inputSettingsState;
 
   function messagesOf(chatId: string): WebChatMessage[] {
     const list = messagesByChat.get(chatId);
@@ -127,7 +158,7 @@ export function createMockChatTransportInternal(): ChatTransportApi {
 
   return {
     async bootstrap() {
-      return { ...MOCK_BOOTSTRAP, current_chat_id: currentChatId };
+      return { ...MOCK_BOOTSTRAP, current_chat_id: state.currentChatId };
     },
 
     async getCharacterSelector() {
@@ -203,10 +234,10 @@ export function createMockChatTransportInternal(): ChatTransportApi {
         set_current?: boolean;
       }
     ): Promise<WebChatSummary> {
-      const chatId = `chat-mock-${++messageIdSeq}`;
+      const chatId = `chat-mock-${++state.messageIdSeq}`;
       const chat: WebChatSummary = {
         id: chatId,
-        title: payload?.title?.trim() || `新会话 ${messageIdSeq}`,
+        title: payload?.title?.trim() || `新会话 ${state.messageIdSeq}`,
         updated_at: Date.now(),
         group: payload?.group ?? null,
         character_card_name: payload?.character_card_name ?? null,
@@ -219,12 +250,14 @@ export function createMockChatTransportInternal(): ChatTransportApi {
       };
       chats.unshift(chat);
       messagesByChat.set(chatId, []);
-      const inheritedTheme = themesByChat.get(currentChatId);
-      if (inheritedTheme) {
-        themesByChat.set(chatId, inheritedTheme);
+      if (state.currentChatId !== null) {
+        const inheritedTheme = themesByChat.get(state.currentChatId);
+        if (inheritedTheme) {
+          themesByChat.set(chatId, inheritedTheme);
+        }
       }
       if (payload?.set_current !== false) {
-        currentChatId = chatId;
+        state.currentChatId = chatId;
       }
       return { ...chat };
     },
@@ -244,14 +277,14 @@ export function createMockChatTransportInternal(): ChatTransportApi {
       }
       messagesByChat.delete(chatId);
       themesByChat.delete(chatId);
-      if (currentChatId === chatId) {
-        currentChatId = chats[0]?.id ?? null;
+      if (state.currentChatId === chatId) {
+        state.currentChatId = chats[0]?.id ?? null;
       }
     },
 
     async selectChat(_token: string, chatId: string) {
       chatById(chatId);
-      currentChatId = chatId;
+      state.currentChatId = chatId;
     },
 
     async getMessages(
@@ -406,7 +439,7 @@ export function createMockChatTransportInternal(): ChatTransportApi {
 
     async uploadAttachment(_token: string, file: File): Promise<WebUploadedAttachment> {
       return {
-        attachment_id: `mock-upload-${++messageIdSeq}`,
+        attachment_id: `mock-upload-${++state.messageIdSeq}`,
         file_name: file.name,
         mime_type: file.type || 'application/octet-stream',
         file_size: file.size
@@ -423,7 +456,7 @@ export function createMockChatTransportInternal(): ChatTransportApi {
       const messages = messagesOf(chatId);
       const now = Date.now();
       const userMessage: WebChatMessage = {
-        id: `msg-mock-user-${++messageIdSeq}`,
+        id: `msg-mock-user-${++state.messageIdSeq}`,
         sender: 'user',
         content_raw: payload.message,
         timestamp: now,
@@ -460,7 +493,7 @@ export function createMockChatTransportInternal(): ChatTransportApi {
         message: { ...userMessage, attachments }
       });
 
-      const replyId = `msg-mock-assistant-${messageIdSeq}`;
+      const replyId = `msg-mock-assistant-${state.messageIdSeq}`;
       const chunks: string[] = [];
       for (let index = 0; index < MOCK_STREAM_REPLY.length; index += STREAM_CHUNK_SIZE) {
         chunks.push(MOCK_STREAM_REPLY.slice(index, index + STREAM_CHUNK_SIZE));

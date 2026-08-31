@@ -1,0 +1,10 @@
+services:
+  operit-preview-studio:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: operit-preview-studio
+    ports:
+      # 8094 是真机 web-chat 服务端口，预览站用 8447 避免冲突
+      - "8447:80"
+    restart: unless-stopped
