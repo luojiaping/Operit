@@ -67,4 +67,6 @@ V2 主题包已经声明 37 个日常 surface 和 16 个组件 skin，但运行�
 
 [PARTIAL] 第二批：共享 navigation、section、choice、standard action primitive 已接入；其余输入、弹层和反馈组件待迁移。
 
+[DONE] 当前批次已推送并完成 release 编译，产物记录见 [测试、发布与验收](9_TestingRolloutAndAcceptance.md)。
+
 [TODO] 后续页面家族、独立宿主、主题归档与设备验收按各步骤文档推进。

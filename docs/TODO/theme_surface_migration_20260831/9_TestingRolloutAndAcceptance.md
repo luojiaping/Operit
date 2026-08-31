@@ -44,4 +44,6 @@
 
 [DONE] 第一批已新增 route binding、surface host policy、archive kind rejection、linker kind rejection 与不兼容已安装包隔离测试；尚未执行测试命令。
 
+[DONE] 构建服务已同步 `194f5671` 并完成 release 编译：`operit-release-feat_plugin-interface-194f5671.apk`，SHA-256 `024f09739ab9c2a286de7eb3201a43c104be30fe81baa213312708836370f568`。本次只执行 release build，未执行 JVM/Android test。
+
 [TODO] 第一批 device acceptance。
