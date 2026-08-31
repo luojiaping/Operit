@@ -144,13 +144,15 @@
   width: 3px;
 }
 
-/* 预览站适配：壳按舞台尺寸整体缩放，屏幕区承载手机视口 iframe */
+/* 预览站适配：壳按舞台尺寸整体缩放，屏幕区承载手机视口 iframe；
+   手机靠舞台左侧展示，右侧留给操作面板 */
 .device-stage {
   display: flex;
   flex: 1 1 auto;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   min-height: 0;
+  padding-left: 48px;
   overflow: hidden;
 }
 

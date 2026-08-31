@@ -68,10 +68,11 @@
 
 .studio-side {
   display: flex;
-  flex: 0 0 340px;
+  flex: 0 0 360px;
   flex-direction: column;
   min-height: 0;
-  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  margin-left: auto;
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
   background: #131722;
   overflow-y: auto;
 }
@@ -245,7 +246,7 @@
 
 .preview-panel {
   display: flex;
-  flex: 0 0 340px;
+  flex: 0 0 360px;
   flex-direction: column;
   gap: 12px;
   padding: 14px;
@@ -254,7 +255,7 @@
 
 .studio-side .preview-panel {
   flex: 0 0 auto;
-  border-right: 0;
+  border-left: 0;
   background: transparent;
 }
 

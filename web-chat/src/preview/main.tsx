@@ -154,7 +154,9 @@ function DeviceMockup({
     }
     const update = () => {
       const rect = element.getBoundingClientRect();
-      const next = Math.min(1, (rect.height - 28) / 866, (rect.width - 20) / 408);
+      // 手机壳实体 404x866，按舞台实际尺寸整体放大（iframe 逻辑视口固定 376x816，
+      // transform 缩放不损清晰度）；上限 1.4 由舞台宽高自然约束
+      const next = Math.min(1.4, (rect.height - 28) / 866, (rect.width - 20) / 408);
       setScale(Math.max(0.35, next));
     };
     update();
@@ -289,6 +291,7 @@ function PreviewApp() {
         <span className="studio-hint">mock 数据驱动 · 手机视口独立渲染 · 一切都在浏览器本地</span>
       </header>
       <div className="studio-body">
+        <DeviceMockup iframeRef={iframeRef} onReady={handleIframeReady} />
         <aside className="studio-side">
           {studioMode === 'theme' ? (
             <ThemeStudioPanel onApplyTheme={applyTheme} />
@@ -300,7 +303,6 @@ function PreviewApp() {
             />
           )}
         </aside>
-        <DeviceMockup iframeRef={iframeRef} onReady={handleIframeReady} />
       </div>
     </div>
   );
