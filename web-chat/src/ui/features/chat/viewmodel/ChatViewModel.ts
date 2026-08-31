@@ -1,32 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  bootstrap,
-  createChat,
-  deleteChat,
-  deleteGroup as deleteGroupOnServer,
-  getCharacterSelector,
-  getInputSettings,
-  getMemorySelector,
-  getMessageLocatorEntries,
-  getMessages,
-  getModelSelector,
-  getTheme,
-  listChats,
-  renameGroup as renameGroupOnServer,
-  reorderChats as reorderChatsOnServer,
-  runManualConversationSummary as runManualConversationSummaryOnServer,
-  runManualMemoryUpdate as runManualMemoryUpdateOnServer,
-  selectModel as selectModelOnServer,
-  selectMemoryProfile as selectMemoryProfileOnServer,
-  selectChat as selectChatOnServer,
-  setActivePrompt as setActivePromptOnServer,
-  streamMessage,
-  revealMessageWindow,
-  toggleMessageFavorite as toggleMessageFavoriteOnServer,
-  updateChat as updateChatOnServer,
-  updateInputSettings as updateInputSettingsOnServer,
-  uploadAttachment
-} from '../util/chatApi';
+import { MOCK_TOKEN, isMockMode, resolveChatTransport } from '../util/chatTransport';
 import {
   clearStoredToken,
   readStoredToken,
@@ -581,8 +554,13 @@ export interface ChatViewModelActions {
 export type ChatViewModel = ChatViewModelState & ChatViewModelActions;
 
 export function useChatViewModel(): ChatViewModel {
-  const [token, setToken] = useState<string>(() => readStoredToken());
-  const [tokenDraft, setTokenDraft] = useState<string>(() => readStoredToken());
+  const api = useMemo(() => resolveChatTransport(), []);
+  const [token, setToken] = useState<string>(() =>
+    isMockMode() ? MOCK_TOKEN : readStoredToken()
+  );
+  const [tokenDraft, setTokenDraft] = useState<string>(() =>
+    isMockMode() ? MOCK_TOKEN : readStoredToken()
+  );
   const [boot, setBoot] = useState<WebBootstrapResponse | null>(null);
   const [theme, setTheme] = useState<WebThemeSnapshot | null>(null);
   const [characterSelector, setCharacterSelector] = useState<WebCharacterSelectorResponse | null>(null);
@@ -691,7 +669,7 @@ export function useChatViewModel(): ChatViewModel {
   async function refreshCharacterSelector(currentToken: string) {
     setCharacterSelectorLoading(true);
     try {
-      const selectorData = await getCharacterSelector(currentToken);
+      const selectorData = await api.getCharacterSelector(currentToken);
       setCharacterSelector(selectorData);
     } finally {
       setCharacterSelectorLoading(false);
@@ -701,7 +679,7 @@ export function useChatViewModel(): ChatViewModel {
   async function refreshModelSelector(currentToken: string) {
     setModelSelectorLoading(true);
     try {
-      const selectorData = await getModelSelector(currentToken);
+      const selectorData = await api.getModelSelector(currentToken);
       setModelSelector(selectorData);
       return selectorData;
     } finally {
@@ -710,13 +688,13 @@ export function useChatViewModel(): ChatViewModel {
   }
 
   async function refreshMemorySelector(currentToken: string) {
-    const selectorData = await getMemorySelector(currentToken);
+    const selectorData = await api.getMemorySelector(currentToken);
     setMemorySelector(selectorData);
     return selectorData;
   }
 
   async function refreshChats(currentToken: string) {
-    const chatList = await listChats(currentToken);
+    const chatList = await api.listChats(currentToken);
     setChats(chatList);
     setHistoryLoaded(true);
     return chatList;
@@ -742,11 +720,11 @@ export function useChatViewModel(): ChatViewModel {
     try {
       const [bootData, selectorData, modelSelectorData, inputSettingsData, memorySelectorData] =
         await Promise.all([
-        bootstrap(currentToken),
-        getCharacterSelector(currentToken),
-        getModelSelector(currentToken),
-        getInputSettings(currentToken),
-        getMemorySelector(currentToken)
+        api.bootstrap(currentToken),
+        api.getCharacterSelector(currentToken),
+        api.getModelSelector(currentToken),
+        api.getInputSettings(currentToken),
+        api.getMemorySelector(currentToken)
       ]);
       setBoot(bootData);
       setCharacterSelector(selectorData);
@@ -778,15 +756,15 @@ export function useChatViewModel(): ChatViewModel {
 
     try {
       if (mode === 'replace') {
-        await selectChatOnServer(currentToken, chatId);
+        await api.selectChat(currentToken, chatId);
       }
       const [themeData, messagePage, selectorData, modelSelectorData, inputSettingsData] =
         await Promise.all([
-        getTheme(currentToken, chatId),
-        getMessages(currentToken, chatId, { limit: INITIAL_MESSAGES_PAGE_SIZE }),
-        getCharacterSelector(currentToken),
-        getModelSelector(currentToken),
-        getInputSettings(currentToken)
+        api.getTheme(currentToken, chatId),
+        api.getMessages(currentToken, chatId, { limit: INITIAL_MESSAGES_PAGE_SIZE }),
+        api.getCharacterSelector(currentToken),
+        api.getModelSelector(currentToken),
+        api.getInputSettings(currentToken)
       ]);
       setTheme(themeData);
       setCharacterSelector(selectorData);
@@ -865,7 +843,7 @@ export function useChatViewModel(): ChatViewModel {
 
     setLoadingHistoryBefore(true);
     try {
-      const page = await getMessages(token, selectedChatId, {
+      const page = await api.getMessages(token, selectedChatId, {
         beforeTimestamp: oldestTimestamp,
         limit: INITIAL_MESSAGES_PAGE_SIZE
       });
@@ -891,7 +869,7 @@ export function useChatViewModel(): ChatViewModel {
 
     setLoadingHistoryAfter(true);
     try {
-      const page = await getMessages(token, selectedChatId, {
+      const page = await api.getMessages(token, selectedChatId, {
         afterTimestamp: newestTimestamp,
         limit: INITIAL_MESSAGES_PAGE_SIZE
       });
@@ -939,12 +917,12 @@ export function useChatViewModel(): ChatViewModel {
       return;
     }
 
-    const selectorData = await setActivePromptOnServer(currentToken, target);
+    const selectorData = await api.setActivePrompt(currentToken, target);
     setCharacterSelector(selectorData);
     await refreshModelSelector(currentToken);
 
     if (selectedChatId === chat.id) {
-      const themeData = await getTheme(currentToken, chat.id);
+      const themeData = await api.getTheme(currentToken, chat.id);
       setTheme(themeData);
     }
   }
@@ -979,7 +957,7 @@ export function useChatViewModel(): ChatViewModel {
 
     try {
       if (!targetChatId) {
-        const chat = await createChat(token, {
+        const chat = await api.createChat(token, {
           ...buildCreateChatBinding(characterSelector?.active_prompt ?? null),
           set_current: true
         });
@@ -1019,7 +997,7 @@ export function useChatViewModel(): ChatViewModel {
       setAutoScrollToBottom(true);
       streamAbortRef.current = new AbortController();
 
-      await streamMessage(
+      await api.streamMessage(
         token,
         targetChatId,
         {
@@ -1107,7 +1085,7 @@ export function useChatViewModel(): ChatViewModel {
     setBusy(true);
 
     try {
-      const chat = await createChat(token, {
+      const chat = await api.createChat(token, {
         group: options?.group ?? null,
         ...buildCreateChatBinding(characterSelector?.active_prompt ?? null),
         set_current: true
@@ -1158,7 +1136,7 @@ export function useChatViewModel(): ChatViewModel {
         chat,
         characterSelector?.active_prompt ?? null
       );
-      await deleteChat(token, chat.id);
+      await api.deleteChat(token, chat.id);
       clearMessageDraft(chat.id);
       setChats((currentChats) => currentChats.filter((item) => item.id !== chat.id));
       const nextChats = await refreshChats(token);
@@ -1182,7 +1160,7 @@ export function useChatViewModel(): ChatViewModel {
           return;
         }
 
-        const createdChat = await createChat(token, {
+        const createdChat = await api.createChat(token, {
           ...buildCreateChatBindingFromDeleteTarget(deleteReplacementTarget),
           set_current: true
         });
@@ -1244,7 +1222,7 @@ export function useChatViewModel(): ChatViewModel {
     try {
       const uploaded: WebUploadedAttachment[] = [];
       for (const file of normalizedFiles) {
-        uploaded.push(await uploadAttachment(token, file));
+        uploaded.push(await api.uploadAttachment(token, file));
       }
       setPendingUploads((currentUploads) =>
         currentUploads.concat(makeUploadsFileNamesUnique(currentUploads, uploaded))
@@ -1312,14 +1290,14 @@ export function useChatViewModel(): ChatViewModel {
 
     setCharacterSelectorLoading(true);
     try {
-      const selectorData = await setActivePromptOnServer(token, target);
+      const selectorData = await api.setActivePrompt(token, target);
       setCharacterSelector(selectorData);
       const didSwitchChat =
         autoSwitchChatOnCharacterSelect && selectChatForPrompt(target, selectorData);
       const requests: Array<Promise<unknown>> = [refreshModelSelector(token)];
       if (!didSwitchChat && selectedChatId) {
         requests.push(
-          getTheme(token, selectedChatId).then((themeData) => {
+          api.getTheme(token, selectedChatId).then((themeData) => {
             setTheme(themeData);
             return null;
           })
@@ -1422,7 +1400,7 @@ export function useChatViewModel(): ChatViewModel {
     }
 
     try {
-      const updated = await updateChatOnServer(token, chat.id, payload);
+      const updated = await api.updateChat(token, chat.id, payload);
       const refreshedChats = await refreshChats(token);
       const nextChat = refreshedChats.find((item) => item.id === updated.id) ?? updated;
 
@@ -1447,7 +1425,7 @@ export function useChatViewModel(): ChatViewModel {
     }
 
     try {
-      await reorderChatsOnServer(token, items);
+      await api.reorderChats(token, items);
       await refreshChats(token);
     } catch (actionError: unknown) {
       handleApiFailure(actionError);
@@ -1470,7 +1448,7 @@ export function useChatViewModel(): ChatViewModel {
     }
 
     try {
-      await renameGroupOnServer(token, {
+      await api.renameGroup(token, {
         old_name: normalizedOldName,
         new_name: normalizedNewName,
         character_card_name: characterCardName ?? null
@@ -1496,7 +1474,7 @@ export function useChatViewModel(): ChatViewModel {
     }
 
     try {
-      await deleteGroupOnServer(token, {
+      await api.deleteGroup(token, {
         group_name: normalizedGroupName,
         delete_chats: deleteChats,
         character_card_name: characterCardName ?? null
@@ -1534,7 +1512,7 @@ export function useChatViewModel(): ChatViewModel {
     }
 
     try {
-      const nextSettings = await updateInputSettingsOnServer(token, payload);
+      const nextSettings = await api.updateInputSettings(token, payload);
       setInputSettings(nextSettings);
       setError(null);
     } catch (actionError: unknown) {
@@ -1548,7 +1526,7 @@ export function useChatViewModel(): ChatViewModel {
     }
 
     try {
-      const nextSelector = await selectMemoryProfileOnServer(token, profileId);
+      const nextSelector = await api.selectMemoryProfile(token, profileId);
       setMemorySelector(nextSelector);
       setError(null);
     } catch (actionError: unknown) {
@@ -1562,7 +1540,7 @@ export function useChatViewModel(): ChatViewModel {
     }
 
     try {
-      await runManualMemoryUpdateOnServer(token);
+      await api.runManualMemoryUpdate(token);
       setError(null);
     } catch (actionError: unknown) {
       handleApiFailure(actionError);
@@ -1575,7 +1553,7 @@ export function useChatViewModel(): ChatViewModel {
     }
 
     try {
-      await runManualConversationSummaryOnServer(token);
+      await api.runManualConversationSummary(token);
       setError(null);
     } catch (actionError: unknown) {
       handleApiFailure(actionError);
@@ -1588,7 +1566,7 @@ export function useChatViewModel(): ChatViewModel {
     }
 
     try {
-      return await getMessageLocatorEntries(token, chatId, query);
+      return await api.getMessageLocatorEntries(token, chatId, query);
     } catch (actionError: unknown) {
       console.error('加载消息定位列表失败', actionError);
       handleApiFailure(actionError);
@@ -1602,7 +1580,7 @@ export function useChatViewModel(): ChatViewModel {
     }
 
     try {
-      const page = await revealMessageWindow(token, selectedChatId, targetTimestamp);
+      const page = await api.revealMessageWindow(token, selectedChatId, targetTimestamp);
       setMessages(page.messages);
       setHasMoreHistoryBefore(page.has_more_before);
       setHasMoreHistoryAfter(page.has_more_after);
@@ -1620,7 +1598,7 @@ export function useChatViewModel(): ChatViewModel {
     }
 
     try {
-      await toggleMessageFavoriteOnServer(token, selectedChatId, timestamp, isFavorite);
+      await api.toggleMessageFavorite(token, selectedChatId, timestamp, isFavorite);
     } catch (actionError: unknown) {
       handleApiFailure(actionError);
     }
@@ -1661,7 +1639,7 @@ export function useChatViewModel(): ChatViewModel {
 
     setModelSelectorLoading(true);
     try {
-      const response = await selectModelOnServer(token, {
+      const response = await api.selectModel(token, {
         config_id: configId,
         model_index: modelIndex,
         confirm_character_card_switch: confirmCharacterCardSwitch

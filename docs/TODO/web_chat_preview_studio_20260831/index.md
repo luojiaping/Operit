@@ -35,8 +35,8 @@ snapshot 转 CSS 变量体系，但它只能在连接真机 HTTP 后端时使用
 ## 步骤
 
 1. [DONE: web 侧主题类型扩展与渲染对齐](./01_fidelity_alignment.md)
-2. [IN_PROGRESS: transport 抽象与 MockTransport](./02_mock_transport.md)
-3. [TODO: SimulatorShell 与多入口构建、docker 部署](./03_simulator_shell.md)
+2. [DONE: transport 抽象与 MockTransport](./02_mock_transport.md)
+3. [IN_PROGRESS: SimulatorShell 与多入口构建、docker 部署](./03_simulator_shell.md)
 4. [TODO: 输入插槽注入与 Compose DSL 渲染器](./04_slot_dsl_renderer.md)
 5. [TODO: 代码预览模式](./05_code_preview.md)
 6. [TODO: 低代码模板与 .toolpkg 导出](./06_template_export.md)
