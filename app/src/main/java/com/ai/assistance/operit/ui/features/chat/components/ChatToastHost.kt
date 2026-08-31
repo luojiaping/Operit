@@ -6,7 +6,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -23,8 +22,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -32,11 +31,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.ai.assistance.operit.R
+import com.ai.assistance.operit.data.theme.packages.ThemeSurfaceCatalogV2
 import com.ai.assistance.operit.ui.features.chat.viewmodel.ChatToastEvent
+import com.ai.assistance.operit.ui.theme.ThemeOverlaySurfaceHostV2
 import kotlin.math.max
 
 @Composable
@@ -47,13 +49,33 @@ fun ChatToastHost(
     maxWidth: Dp = 720.dp,
     maxHeight: Dp = 240.dp,
 ) {
+    ChatToastHostContent(
+        event = event,
+        onDismiss = onDismiss,
+        modifier = modifier,
+        maxWidth = maxWidth,
+        maxHeight = maxHeight,
+        autoDismissDelayMillis = ::estimateToastDurationMs,
+    )
+}
+
+/** Internal entry keeps auto-dismiss timing deterministic in focused UI tests. */
+@Composable
+internal fun ChatToastHostContent(
+    event: ChatToastEvent?,
+    onDismiss: (Long) -> Unit,
+    modifier: Modifier,
+    maxWidth: Dp,
+    maxHeight: Dp,
+    autoDismissDelayMillis: (String) -> Long,
+) {
     val message = event?.message
     val scrollState = rememberScrollState()
 
     LaunchedEffect(event?.id) {
         val activeEvent = event ?: return@LaunchedEffect
         scrollState.scrollTo(0)
-        kotlinx.coroutines.delay(estimateToastDurationMs(activeEvent.message))
+        kotlinx.coroutines.delay(autoDismissDelayMillis(activeEvent.message))
         onDismiss(activeEvent.id)
     }
 
@@ -71,18 +93,13 @@ fun ChatToastHost(
                     targetOffsetY = { -it / 2 }
                 )
         ) {
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .widthIn(max = maxWidth),
-                shape = MaterialTheme.shapes.large,
-                tonalElevation = 4.dp,
-                shadowElevation = 8.dp,
-                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f),
-                border = BorderStroke(
-                    width = 1.dp,
-                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)
-                )
+            ThemeOverlaySurfaceHostV2(
+                surface = ThemeSurfaceCatalogV2.OVERLAY_TOAST,
+                applyContentPadding = false,
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .widthIn(max = maxWidth),
             ) {
                 val estimatedLines = message
                     ?.lineSequence()
@@ -121,19 +138,18 @@ fun ChatToastHost(
                         Text(
                             text = message.orEmpty(),
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface,
                             overflow = TextOverflow.Clip
                         )
                     }
                     IconButton(
                         onClick = { event?.let { onDismiss(it.id) } },
-                        modifier = Modifier.size(28.dp)
+                        modifier = Modifier.size(28.dp),
                     ) {
                         Icon(
                             imageVector = Icons.Default.Close,
-                            contentDescription = null,
+                            contentDescription = stringResource(R.string.close),
                             modifier = Modifier.size(18.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            tint = LocalContentColor.current,
                         )
                     }
                 }

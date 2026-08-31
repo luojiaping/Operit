@@ -7,6 +7,7 @@ import com.ai.assistance.operit.data.theme.packages.ResolvedThemeParametersV2
 import com.ai.assistance.operit.data.theme.packages.ThemeArchiveSha256V2
 import com.ai.assistance.operit.data.theme.packages.ThemeComponentCatalogV2
 import com.ai.assistance.operit.data.theme.packages.ThemeComponentFrameSpecV2
+import com.ai.assistance.operit.data.theme.packages.ThemeComponentFrameStrokeV2
 import com.ai.assistance.operit.data.theme.packages.ThemeComponentSkinV2
 import com.ai.assistance.operit.data.theme.packages.ThemeComponentStateSkinV2
 import com.ai.assistance.operit.data.theme.packages.ThemeMaterialColorSchemeV2
@@ -15,6 +16,9 @@ import com.ai.assistance.operit.data.theme.packages.ThemePackageCoordinateV2
 import com.ai.assistance.operit.data.theme.packages.ThemePackageIdV2
 import com.ai.assistance.operit.data.theme.packages.ThemePackageVersionV2
 import com.ai.assistance.operit.data.theme.packages.ThemeShapesV2
+import com.ai.assistance.operit.data.theme.packages.ThemeSurfaceCatalogV2
+import com.ai.assistance.operit.data.theme.packages.ThemeSurfaceImplementationKindV2
+import com.ai.assistance.operit.data.theme.packages.ThemeSurfaceImplementationV2
 import com.ai.assistance.operit.data.theme.packages.ThemeTypographyV2
 import com.ai.assistance.operit.ui.theme.scene.ThemeSceneTokenSetV1
 import com.ai.assistance.operit.ui.theme.scene.ThemeSceneTokenValueV1
@@ -27,6 +31,9 @@ internal fun themePackageRuntimeForAndroidTest(
     val selected = Color(0xFF16435A)
     val disabled = Color(0xFF24313B)
     val error = Color(0xFF5D1C2B)
+    val overlayDialogContainer = Color(0xFF3E2D56)
+    val overlayDialogContent = Color(0xFFFFF0C7)
+    val overlayDialogBorder = Color(0xFF00E5FF)
     val tokens =
         ThemeSceneTokenSetV1(
             tokens =
@@ -36,6 +43,9 @@ internal fun themePackageRuntimeForAndroidTest(
                     "test.selected" to colorToken(selected),
                     "test.disabled" to colorToken(disabled),
                     "test.error" to colorToken(error),
+                    "test.overlay_dialog_container" to colorToken(overlayDialogContainer),
+                    "test.overlay_dialog_content" to colorToken(overlayDialogContent),
+                    "test.overlay_dialog_border" to colorToken(overlayDialogBorder),
                 ),
         )
     val coordinate =
@@ -46,15 +56,35 @@ internal fun themePackageRuntimeForAndroidTest(
         )
     val normal = componentState("test.container", "test.content")
     val componentSkins =
-        ThemeComponentCatalogV2.requiredComponents.associateWith {
-            ThemeComponentSkinV2(
-                normal = normal,
-                disabled = componentState("test.disabled", "test.content"),
-                selected = componentState("test.selected", "test.content"),
-                focused = componentState("test.selected", "test.content"),
-                error = componentState("test.error", "test.content"),
+        ThemeComponentCatalogV2.requiredComponents
+            .associateWith {
+                ThemeComponentSkinV2(
+                    normal = normal,
+                    disabled = componentState("test.disabled", "test.content"),
+                    selected = componentState("test.selected", "test.content"),
+                    focused = componentState("test.selected", "test.content"),
+                    error = componentState("test.error", "test.content"),
+                )
+            } +
+            (
+                ThemeComponentCatalogV2.DIALOG to
+                    ThemeComponentSkinV2(
+                        normal =
+                            componentState(
+                                containerToken = "test.overlay_dialog_container",
+                                contentToken = "test.overlay_dialog_content",
+                                frame =
+                                    ThemeComponentFrameSpecV2.RoundRect(
+                                        cornerRadiusDp = 0f,
+                                        border =
+                                            ThemeComponentFrameStrokeV2(
+                                                token = "test.overlay_dialog_border",
+                                                widthDp = 4f,
+                                            ),
+                                    ),
+                            ),
+                    )
             )
-        }
     val linked =
         LinkedThemeRuntimeV2(
             coordinate = coordinate,
@@ -66,7 +96,24 @@ internal fun themePackageRuntimeForAndroidTest(
                     shapes = ThemeShapesV2(2f, 4f, 8f, 16f, 28f),
                 ),
             componentSkins = componentSkins,
-            surfaces = emptyMap(),
+            surfaces =
+                mapOf(
+                    ThemeSurfaceCatalogV2.OVERLAY_DIALOG to
+                        ThemeSurfaceImplementationV2(
+                            surfaceId = ThemeSurfaceCatalogV2.OVERLAY_DIALOG.value,
+                            kind = ThemeSurfaceImplementationKindV2.TEMPLATE,
+                        ),
+                    ThemeSurfaceCatalogV2.OVERLAY_SHEET to
+                        ThemeSurfaceImplementationV2(
+                            surfaceId = ThemeSurfaceCatalogV2.OVERLAY_SHEET.value,
+                            kind = ThemeSurfaceImplementationKindV2.TEMPLATE,
+                        ),
+                    ThemeSurfaceCatalogV2.OVERLAY_TOAST to
+                        ThemeSurfaceImplementationV2(
+                            surfaceId = ThemeSurfaceCatalogV2.OVERLAY_TOAST.value,
+                            kind = ThemeSurfaceImplementationKindV2.TEMPLATE,
+                        ),
+                ),
             tokens = tokens,
             scenes = emptyMap(),
             assets = emptyMap(),
@@ -83,11 +130,12 @@ internal fun themePackageRuntimeForAndroidTest(
 private fun componentState(
     containerToken: String,
     contentToken: String,
+    frame: ThemeComponentFrameSpecV2 = ThemeComponentFrameSpecV2.RoundRect(cornerRadiusDp = 0f),
 ): ThemeComponentStateSkinV2 =
     ThemeComponentStateSkinV2(
         containerToken = containerToken,
         contentToken = contentToken,
-        frame = ThemeComponentFrameSpecV2.RoundRect(cornerRadiusDp = 0f),
+        frame = frame,
     )
 
 private fun colorToken(color: Color): ThemeSceneTokenValueV1.ColorToken =

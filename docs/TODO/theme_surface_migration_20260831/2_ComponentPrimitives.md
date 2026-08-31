@@ -50,4 +50,6 @@
 
 [DONE] `section` 与 `list_item` 的 supporting text 已从 package `contentToken` 派生，避免次级文本绕过 skin 内容色。
 
+[DONE] `ThemeOverlaySurfaceHostV2` 已将 `overlay.dialog`、`overlay.sheet`、`overlay.toast` 分别连接到 `dialog`、`sheet`、`snackbar` skin；WebSession 手写 dialog/sheet 与 `ChatToastHost` 已成为生产消费者，窗口、dismiss、IME、动画和队列仍由原调用方控制。
+
 [TODO] 其余 list item 家族、input、dialog、sheet、menu、snackbar 仍待后续 batch。

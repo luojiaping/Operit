@@ -48,6 +48,8 @@ import com.ai.assistance.operit.core.tools.defaultTool.websession.browser.WebSes
 import com.ai.assistance.operit.core.tools.defaultTool.websession.browser.WebSessionPendingDialogState
 import com.ai.assistance.operit.core.tools.defaultTool.websession.browser.WebSessionWebViewHost
 import com.ai.assistance.operit.core.tools.defaultTool.websession.userscript.ui.WebSessionUserscriptUiState
+import com.ai.assistance.operit.data.theme.packages.ThemeSurfaceCatalogV2
+import com.ai.assistance.operit.ui.theme.ThemeOverlaySurfaceHostV2
 import java.util.Locale
 
 @Composable
@@ -350,7 +352,9 @@ internal fun WebSessionBrowserScreen(
 
             // WebSession lives in an overlay window, so using ModalBottomSheet would
             // create a dialog window that does not have a valid activity token here.
-            Surface(
+            ThemeOverlaySurfaceHostV2(
+                surface = ThemeSurfaceCatalogV2.OVERLAY_SHEET,
+                applyContentPadding = false,
                 modifier =
                     Modifier
                         .align(Alignment.BottomCenter)
@@ -358,11 +362,6 @@ internal fun WebSessionBrowserScreen(
                         .padding(horizontal = 6.dp)
                         .navigationBarsPadding()
                         .imePadding(),
-                shape = RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp),
-                color = MaterialTheme.colorScheme.surface,
-                contentColor = MaterialTheme.colorScheme.onSurface,
-                tonalElevation = 1.dp,
-                shadowElevation = 2.dp
             ) {
                 WebSessionOverlaySheetContent(
                     sheetRoute = activeSheetRoute,
@@ -420,7 +419,7 @@ internal fun WebSessionBrowserScreen(
 }
 
 @Composable
-private fun PendingDialogOverlay(
+internal fun PendingDialogOverlay(
     dialog: WebSessionPendingDialogState,
     promptValue: String,
     onPromptValueChange: (String) -> Unit,
@@ -434,13 +433,10 @@ private fun PendingDialogOverlay(
                 .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.52f)),
         contentAlignment = Alignment.Center
     ) {
-        Surface(
+        ThemeOverlaySurfaceHostV2(
+            surface = ThemeSurfaceCatalogV2.OVERLAY_DIALOG,
+            applyContentPadding = false,
             modifier = Modifier.padding(horizontal = 20.dp),
-            shape = RoundedCornerShape(20.dp),
-            color = MaterialTheme.colorScheme.surface,
-            contentColor = MaterialTheme.colorScheme.onSurface,
-            tonalElevation = 2.dp,
-            shadowElevation = 6.dp
         ) {
             Column(
                 modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp),

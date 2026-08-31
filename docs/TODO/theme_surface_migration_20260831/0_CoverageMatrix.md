@@ -45,11 +45,11 @@
 | `browser.shell` | Browser/WebView outer chrome | 待迁移 | 7 |
 | `web_chat.main` | WebChat bridge/page | 待迁移 | 7 |
 | `media.shell` | Media outer chrome | 待迁移 | 7 |
-| `overlay.dialog` | Shared Operit dialogs | 待迁移 | 7 |
-| `overlay.sheet` | Shared Operit sheets | 待迁移 | 7 |
+| `overlay.dialog` | WebSession pending dialog | 试点已渲染；其余 shared dialogs 待迁移 | 2、7 |
+| `overlay.sheet` | WebSession browser sheets | 试点已渲染；其余 shared sheets 待迁移 | 2、7 |
 | `overlay.menu` | Shared menus | 待迁移 | 7 |
 | `overlay.snackbar` | Shared snackbar | 待迁移 | 3、7 |
-| `overlay.toast` | Shared toast | 待迁移 | 3、7 |
+| `overlay.toast` | ChatToastHost | 试点已渲染；其余 shared toast 待迁移 | 2、3、7 |
 | `state.loading` | AppContent loading | 已渲染 template 与 status skin | 1、3 |
 | `state.empty` | Shared empty state | 待迁移 | 3 |
 | `state.error` | Shared error state | 待迁移 | 3 |

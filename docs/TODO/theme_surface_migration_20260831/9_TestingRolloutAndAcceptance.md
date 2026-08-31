@@ -46,4 +46,6 @@
 
 [DONE] 构建服务已同步 `194f5671` 并完成 release 编译：`operit-release-feat_plugin-interface-194f5671.apk`，SHA-256 `024f09739ab9c2a286de7eb3201a43c104be30fe81baa213312708836370f568`。本次只执行 release build，未执行 JVM/Android test。
 
+[DONE] Overlay primitive 试点已新增 surface-to-component unit test、dialog skin container/frame/content 与 child click semantics 的 Compose test、ChatToast close callback test，以及 WebSession prompt input/confirm callback test；尚未执行测试命令。sheet scrim/IME 留作 device acceptance。
+
 [TODO] 第一批 device acceptance。

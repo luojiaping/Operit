@@ -34,4 +34,4 @@
 
 [TODO] Detached hosts 接入。
 
-[TODO] Shared overlay wrappers 接入。
+[PARTIAL] `ThemeOverlaySurfaceHostV2` 试点已接入 WebSession pending dialog/browser sheet 与 `ChatToastHost`；generic Material dialog/sheet、menu、shared snackbar 和其余 overlay 待迁移，详见 [Overlay Primitive 试点](10_OverlayPrimitivesPilot.md)。

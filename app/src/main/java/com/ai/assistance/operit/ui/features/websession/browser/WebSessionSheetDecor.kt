@@ -33,11 +33,10 @@ internal fun WebSessionSheetScaffold(
     content: @Composable ColumnScope.() -> Unit
 ) {
     Column(
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surface)
-                .padding(horizontal = 14.dp, vertical = 10.dp),
+            modifier =
+                modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         Box(
