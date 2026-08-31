@@ -1,7 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { ChatViewModel } from '../ui/features/chat/viewmodel/ChatViewModel';
 import type { WebThemeSnapshot } from '../ui/features/chat/util/chatTypes';
-import { previewControls } from '../ui/features/chat/util/mock/mockTransport';
 
 // 主题工作室：左侧调参，右侧手机壳实时渲染。
 // 基线 palette 只保留必填字段，用户改色后派生项（容器色、对比文本、
@@ -311,16 +309,18 @@ function SliderField({
   );
 }
 
-export function ThemeStudioPanel({ viewModel }: { viewModel: ChatViewModel }) {
+export function ThemeStudioPanel({
+  onApplyTheme
+}: {
+  onApplyTheme: (theme: WebThemeSnapshot) => void;
+}) {
   const [draft, setDraft] = useState<ThemeDraft>(DEFAULT_DRAFT);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  // 面板参数直接驱动 mock 主题替换；mock 与派生都在浏览器本地，无需节流
+  // 面板合成完整快照后交给手机视口（iframe）应用，
+  // 派生在 iframe 内的 chatTheme 管线完成，mock 本地即时无需节流
   useEffect(() => {
-    previewControls.setTheme(buildTheme(draft));
-    void viewModel.reloadCurrentConversation();
-    // draft 每次变化都应触发；viewModel 引用稳定（同一 hook 实例）
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draft]);
+    onApplyTheme(buildTheme(draft));
+  }, [draft, onApplyTheme]);
 
   function updateDraft(patch: Partial<ThemeDraft>) {
     setDraft((current) => ({ ...current, ...patch }));

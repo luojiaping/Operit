@@ -1,8 +1,7 @@
 import { useRef, useState } from 'react';
-import type { Dispatch, SetStateAction } from 'react';
-import type { ChatViewModel } from '../ui/features/chat/viewmodel/ChatViewModel';
 import type { InputSlotContentMap } from '../ui/features/chat/composedsl/composeDslTypes';
 import type { InputSlotName } from '../ui/features/chat/composedsl/composeDslTypes';
+import type { PreviewRuntimeState } from './main';
 import { buildRunnerPayload, resolveSlotContent, runToolPkgMain } from './slotRunner';
 import { findFileBySuffix, readToolpkgZip } from './toolpkgLoader';
 import { SLOT_TEMPLATES, buildToolpkgSources } from './templates';
@@ -22,13 +21,13 @@ const DEMO_MAIN_PLACEHOLDER = `exports.registerToolPkg = function () {
 };`;
 
 export function CodePreviewPanel({
-  viewModel,
   onContentsChange,
-  onResetDemo
+  onResetDemo,
+  runtimeState
 }: {
-  viewModel: ChatViewModel;
-  onContentsChange: Dispatch<SetStateAction<InputSlotContentMap>>;
+  onContentsChange: (contents: InputSlotContentMap) => void;
   onResetDemo: () => void;
+  runtimeState: PreviewRuntimeState;
 }) {
   const [mode, setMode] = useState<PanelMode>('demo');
   const [mainSource, setMainSource] = useState('');
@@ -98,11 +97,12 @@ export function CodePreviewPanel({
   }
 
   function basePayload() {
+    // 手机视口（iframe）上报的运行状态，与真机 payload 字段一致
     return {
-      chatId: viewModel.selectedChatId,
-      inputStyle: viewModel.activeInputStyle,
-      isProcessing: viewModel.isStreaming,
-      inputText: viewModel.messageInput
+      chatId: runtimeState.chatId,
+      inputStyle: runtimeState.inputStyle,
+      isProcessing: runtimeState.isProcessing,
+      inputText: runtimeState.inputText
     };
   }
 

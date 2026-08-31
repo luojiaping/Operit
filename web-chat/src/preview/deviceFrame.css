@@ -144,7 +144,7 @@
   width: 3px;
 }
 
-/* 预览站适配：壳实体尺寸固定，缩放值由 DeviceMockup 按舞台尺寸计算注入 */
+/* 预览站适配：壳按舞台尺寸整体缩放，屏幕区承载手机视口 iframe */
 .device-stage {
   display: flex;
   flex: 1 1 auto;
@@ -160,14 +160,13 @@
   transform-origin: center center;
 }
 
-.device-screen .device-app {
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-  border-radius: inherit;
-}
-
-.device-screen .device-app .ai-chat-screen,
-.device-screen .device-app .chat-screen-frame {
-  --chat-frame-max-width: 100%;
+/* 手机视口 iframe：占满壳屏、继承圆角，独立 viewport 让
+   100dvh 与媒体查询都按手机尺寸（376x816）计算 */
+.device-screen iframe.device-viewport {
+  width: 376px;
+  height: 816px;
+  padding: 0;
+  border: 0;
+  border-radius: 27px;
+  background: #000;
 }
