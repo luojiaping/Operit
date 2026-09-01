@@ -21,6 +21,11 @@
   color: var(--chat-on-primary, #ffffff);
 }
 
+/* 对齐 app toolbarTransparent：容器透明、内容色保持 onPrimary 语义 */
+.app-top-bar.is-transparent {
+  background: transparent;
+}
+
 .app-top-bar-nav {
   display: inline-flex;
   align-items: center;

@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import type { CSSProperties } from 'react';
 import type { ReactNode } from 'react';
 import type { WebThemeSnapshot } from '../util/chatTypes';
 import { buildChatFontFaceCss, buildChatThemeStyle } from '../util/chatTheme';
@@ -50,6 +51,22 @@ export function AppShell({
   const fontFaceCss = buildChatFontFaceCss(theme);
   const canGoBack = screen.name !== 'chat';
 
+  // body 在 .app-shell 之外，body { background: var(--chat-root-background) }
+  // 只能解析到 :root 的固定暗色默认；把变量同步到 documentElement，
+  // 让 body（以及未来任何根级元素）跟随真实主题，消除黑底暴露面
+  useEffect(() => {
+    const rootStyle = document.documentElement.style;
+    const entries = Object.entries(chatThemeStyle);
+    for (const [key, value] of entries) {
+      rootStyle.setProperty(key, String(value));
+    }
+    return () => {
+      for (const [key] of entries) {
+        rootStyle.removeProperty(key);
+      }
+    };
+  }, [chatThemeStyle]);
+
   const context: ShellScreenContext = useMemo(
     () => ({
       screen,
@@ -61,12 +78,13 @@ export function AppShell({
   );
 
   return (
-    <div className="app-shell" style={chatThemeStyle as React.CSSProperties}>
+    <div className="app-shell" style={chatThemeStyle as CSSProperties}>
       {fontFaceCss ? <style>{fontFaceCss}</style> : null}
       <AppTopBar
         canGoBack={canGoBack}
         chatTitle={chatTitle}
         isChat={screen.name === 'chat'}
+        isTransparent={Boolean(theme?.header.transparent)}
         onBack={() => onScreenChange({ name: 'chat' })}
         onMenu={() => setDrawerOpen(true)}
         title={screenTitleOf(screen, settingsTitles)}

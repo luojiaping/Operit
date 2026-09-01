@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { WebThemeSnapshot } from '../ui/features/chat/util/chatTypes';
+import { deriveCustomPalette } from '../ui/features/chat/util/chatTheme';
 
 // 主题工作室：左侧调参，右侧手机壳实时渲染。
 // 基线 palette 只保留必填字段，用户改色后派生项（容器色、对比文本、
@@ -184,10 +185,13 @@ const DEFAULT_DRAFT: ThemeDraft = {
 
 function buildTheme(draft: ThemeDraft): WebThemeSnapshot {
   const base = CLEAN_BASE[draft.mode];
+  const isLight = draft.mode === 'light';
+  // 用户自定义色走 app 同款派生（暗色提亮 0.2、容器与对比文本同步），
+  // 快照携带的即 app 解析后的最终色
+  const customPalette = deriveCustomPalette(draft.primary, draft.secondary, isLight);
   const palette: WebThemeSnapshot['palette'] = {
     ...base.palette,
-    primary_color: draft.primary,
-    secondary_color: draft.secondary
+    ...customPalette
   };
   if (draft.backgroundKind === 'color') {
     palette.background_color = draft.backgroundColor;

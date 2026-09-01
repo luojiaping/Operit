@@ -465,6 +465,38 @@ function backgroundOpacity(theme: WebThemeSnapshot) {
   return clampOpacity(theme.background.opacity);
 }
 
+// 自定义颜色的快照派生，对齐 app ThemeColorSchemeResolver.generateResolvedDark/LightColorScheme。
+// 供 mock 主题构造端使用（外层调色器 / 主题设置页选色）：
+// 快照里的 primary 应是 app 提亮后的最终值，容器色与对比文本同步派生
+export function deriveCustomPalette(
+  primary: string,
+  secondary: string,
+  isLight: boolean
+): Pick<
+  WebThemeSnapshot['palette'],
+  | 'primary_color'
+  | 'secondary_color'
+  | 'primary_container_color'
+  | 'on_primary_container_color'
+> {
+  if (isLight) {
+    const primaryContainer = lightenColor(primary, 0.7);
+    return {
+      primary_color: primary,
+      secondary_color: secondary,
+      primary_container_color: primaryContainer,
+      on_primary_container_color: contrastingText(primaryContainer)
+    };
+  }
+  // 暗色：主辅色提亮 0.2，容器色压暗 0.3，容器文本恒白（forceLight）
+  return {
+    primary_color: lightenColor(primary, 0.2),
+    secondary_color: lightenColor(secondary, 0.2),
+    primary_container_color: darkenColor(primary, 0.3),
+    on_primary_container_color: '#ffffff'
+  };
+}
+
 export function buildChatFontFaceCss(theme: WebThemeSnapshot | null) {
   const globalFace = theme?.font.custom_font_asset_url
     ? `@font-face {

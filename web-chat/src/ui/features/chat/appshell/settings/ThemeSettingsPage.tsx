@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { WebThemeSnapshot } from '../../util/chatTypes';
+import { deriveCustomPalette } from '../../util/chatTheme';
 import {
   InfoBanner,
   OptionCards,
@@ -114,7 +115,13 @@ export function ThemeSettingsPage({
                       <span>主色</span>
                       <input
                         onChange={(event) =>
-                          patchPalette({ primary_color: event.target.value })
+                          patchPalette(
+                            deriveCustomPalette(
+                              event.target.value,
+                              snapshot.palette.secondary_color,
+                              snapshot.theme_mode === 'light'
+                            )
+                          )
                         }
                         type="color"
                         value={snapshot.palette.primary_color}
@@ -125,7 +132,13 @@ export function ThemeSettingsPage({
                       <span>次色</span>
                       <input
                         onChange={(event) =>
-                          patchPalette({ secondary_color: event.target.value })
+                          patchPalette(
+                            deriveCustomPalette(
+                              snapshot.palette.primary_color,
+                              event.target.value,
+                              snapshot.theme_mode === 'light'
+                            )
+                          )
                         }
                         type="color"
                         value={snapshot.palette.secondary_color}

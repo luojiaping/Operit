@@ -13,6 +13,7 @@ export function AppTopBar({
   chatTitle,
   isChat,
   canGoBack,
+  isTransparent,
   onBack,
   onMenu
 }: {
@@ -20,11 +21,13 @@ export function AppTopBar({
   chatTitle: string;
   isChat: boolean;
   canGoBack: boolean;
+  // 对齐 app AppContent：toolbarTransparent 时容器透明
+  isTransparent: boolean;
   onBack: () => void;
   onMenu: () => void;
 }) {
   return (
-    <header className="app-top-bar">
+    <header className={`app-top-bar ${isTransparent ? 'is-transparent' : ''}`}>
       <button
         aria-label={canGoBack ? '返回' : '菜单'}
         className="app-top-bar-nav"
