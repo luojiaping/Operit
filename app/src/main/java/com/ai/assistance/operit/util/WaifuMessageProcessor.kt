@@ -294,7 +294,9 @@ object WaifuMessageProcessor {
                         .forEach { emit(it) }
                 }
             }
-            com.ai.assistance.operit.util.AppLogger.d(
+            // 块级日志降为 verbose：每 chunk 一条量偏大，仅碎片化问题复现需要
+            // 排查 native 分块序列时再开启；stable/emit 保持 debug 级供常规观测
+            com.ai.assistance.operit.util.AppLogger.v(
                 "WaifuStreamDiag",
                 "block type=$blockType pieces=$diagPieces bufferLen=${renderableBuffer.length}"
             )
