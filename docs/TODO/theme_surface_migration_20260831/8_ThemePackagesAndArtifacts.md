@@ -20,6 +20,8 @@
 
 [DONE] `input.focused` 与 `input.error` 已是生产交互 state。archive validator 拒绝不完整的 direct input skin，linker 拒绝继承链合并后不完整的 input skin；默认与赛博主题源的 package script 同步检查两者。
 
+[DONE] Input interaction-state preview 已发布：[`operit.default`](https://github.com/luojiaping/operit-theme-default/releases/tag/input-preview-20260901-48ecba0) 的 `operit-default-2.1.0.otheme` SHA-256 为 `3ada292d108f11efaaa78e029db307229e2fada18ed15b4bd09a75b8323c8f13`；[`operit.cyber_grid`](https://github.com/luojiaping/operit-theme-cyber-grid/releases/tag/input-preview-20260901-312e6a4) 的 `operit-cyber-grid-2.1.0.otheme` SHA-256 为 `e60316ce282ffd7b035645217647ad28a67b9a575ad975841e5b59d6a17b0b1e`。两者均为 prerelease，坐标保持 `2.1.0`。
+
 当后续新增复杂 scene、资源或 token 时，再以新 package version 发布默认包与赛博包，并按顺序更新：
 
 1. 默认主题 archive 和 SHA-256
