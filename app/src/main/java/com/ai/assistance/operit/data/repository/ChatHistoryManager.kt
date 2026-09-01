@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import androidx.room.withTransaction
 import com.ai.assistance.operit.R
 import com.ai.assistance.operit.data.backup.OperitBackupDirs
 import com.ai.assistance.operit.data.db.AppDatabase
@@ -111,6 +112,15 @@ class ChatHistoryManager private constructor(private val context: Context) {
     private val messageDao = database.messageDao()
     private val messageVariantDao = database.messageVariantDao()
     private val chatContentDao = database.chatContentDao()
+
+    // 性能修复：SELECT MAX(orderIndex) 无 (chatId, orderIndex) 索引，SQLite 只能沿 chatId 索引
+    // 回表读取该会话全部消息行（含 content 大字段）求最大值，成本 O(会话消息数)。
+    // waifu 模式把一条回复拆成 K 个分段逐条落库，长会话下每段插入都触发一次全量扫描，
+    // K 段回复即 O(K·n) 次行读取，这正是"消息条数累积后回复延迟极高、新开对话正常"的来源。
+    // orderIndex 只在 chatMutex 保护下的插入路径增长，因此用内存缓存消除重复扫描；
+    // 删除、重写、归档导入、批量清理等会改变消息集的路径统一失效缓存。
+    private val chatMaxOrderIndexCache = ConcurrentHashMap<String, Int>()
+
     private val operitArchiveJson =
         Json {
             prettyPrint = true
@@ -598,6 +608,8 @@ class ChatHistoryManager private constructor(private val context: Context) {
                         )
                     }
                 messageDao.insertMessages(messageEntities)
+                // 全量重写后 orderIndex 布局已变化（按列表下标重排），失效缓存
+                chatMaxOrderIndexCache.remove(chatEntity.id)
 
                 val variantEntities =
                     history.messages.flatMap { message ->
@@ -657,8 +669,32 @@ class ChatHistoryManager private constructor(private val context: Context) {
         }
     }
 
+    /**
+     * 整库恢复/替换数据库文件后调用：清空 orderIndex 缓存。
+     * 恢复流程绕过本类的 DAO 写路径直接替换 DB 文件，缓存值对应的是恢复前的数据，
+     * 若不清空，恢复后同会话续聊会基于旧的 max 生成重复 orderIndex。
+     */
+    fun invalidateOrderIndexCache() {
+        chatMaxOrderIndexCache.clear()
+    }
+
+    /**
+     * 获取下一个 orderIndex。调用方必须已持有目标会话的 chatMutex。
+     * 首次访问某会话时查询一次数据库并写入缓存，后续插入直接递增，
+     * 避免每次插入都执行 O(会话消息数) 的 MAX(orderIndex) 回表扫描。
+     */
+    private suspend fun nextOrderIndexLocked(chatId: String): Int {
+        val cached = chatMaxOrderIndexCache[chatId]
+        if (cached != null) {
+            return cached + 1
+        }
+        val maxIndex = messageDao.getMaxOrderIndex(chatId) ?: -1
+        chatMaxOrderIndexCache[chatId] = maxIndex
+        return maxIndex + 1
+    }
+
     private suspend fun persistMessageLocked(chatId: String, messageToPersist: ChatMessage): ChatMessage {
-        val nextOrderIndex = (messageDao.getMaxOrderIndex(chatId) ?: -1) + 1
+        val nextOrderIndex = nextOrderIndexLocked(chatId)
         val messageEntity =
             MessageEntity.fromChatMessage(
                 chatId = chatId,
@@ -666,6 +702,7 @@ class ChatHistoryManager private constructor(private val context: Context) {
                 orderIndex = nextOrderIndex,
             )
         messageDao.insertMessage(messageEntity)
+        chatMaxOrderIndexCache[chatId] = nextOrderIndex
 
         chatDao.getChatById(chatId)?.let { chat ->
             chatDao.updateChatMetadata(
@@ -915,6 +952,8 @@ class ChatHistoryManager private constructor(private val context: Context) {
                     // 只删除指定角色卡下的分组（使用 SQL 批量操作）
                     if (deleteChats) {
                         chatDao.deleteChatsInGroupForCharacter(groupName, characterCardName)
+                        // 批量删除无法枚举被删会话 id，整体失效
+                        chatMaxOrderIndexCache.clear()
                         // 保留被锁定的聊天：仅清除锁定聊天的分组
                         chatDao.removeGroupFromLockedChatsForCharacter(groupName, characterCardName)
                     } else {
@@ -924,6 +963,8 @@ class ChatHistoryManager private constructor(private val context: Context) {
                     // 删除所有同名分组
                     if (deleteChats) {
                         chatDao.deleteChatsInGroup(groupName)
+                        // 批量删除无法枚举被删会话 id，整体失效
+                        chatMaxOrderIndexCache.clear()
                         // 保留被锁定的聊天：仅清除锁定聊天的分组
                         chatDao.removeGroupFromLockedChats(groupName)
                     } else {
@@ -952,6 +993,7 @@ class ChatHistoryManager private constructor(private val context: Context) {
                 AppLogger.d(TAG, "正在从数据库删除消息. ChatId: $chatId, Timestamp: $timestamp")
                 messageVariantDao.deleteVariantsForMessage(chatId, timestamp)
                 messageDao.deleteMessageByTimestamp(chatId, timestamp)
+                chatMaxOrderIndexCache.remove(chatId)
                 AppLogger.d(TAG, "消息从数据库删除成功.")
 
                 // Update chat metadata
@@ -1154,13 +1196,14 @@ class ChatHistoryManager private constructor(private val context: Context) {
                     }
                 } else {
                     // 如果找不到现有消息，则插入新消息（避免在同一互斥锁下递归调用 addMessage）
-                    val nextOrderIndex = (messageDao.getMaxOrderIndex(chatId) ?: -1) + 1
+                    val nextOrderIndex = nextOrderIndexLocked(chatId)
                     val messageEntity = MessageEntity.fromChatMessage(
                         chatId = chatId,
                         message = message,
                         orderIndex = nextOrderIndex,
                     )
                     messageDao.insertMessage(messageEntity)
+                    chatMaxOrderIndexCache[chatId] = nextOrderIndex
 
                     // 更新聊天元数据
                     val chat = chatDao.getChatById(chatId)
@@ -1176,6 +1219,67 @@ class ChatHistoryManager private constructor(private val context: Context) {
                     }
                 }
             } catch (e: Exception) {
+                throw e
+            }
+        }
+    }
+
+    /**
+     * 批量按时间戳更新已存在的消息（waifu 回合收尾把统计指标同步到全部分段消息时使用）。
+     * 逐条调用 updateMessage 会产生 K 轮"查询+更新+元数据刷新"串行 SQL；这里合并为
+     * 一个事务，元数据只刷新一次。更新语义与 updateMessage 的非变体路径一致。
+     */
+    suspend fun updateMessages(chatId: String, messages: List<ChatMessage>) {
+        if (messages.isEmpty()) return
+        chatMutex(chatId).withLock {
+            try {
+                database.withTransaction {
+                    messages.forEach { message ->
+                        val existingMessage =
+                            chatContentDao.getMessageByTimestamp(chatId, message.timestamp)
+
+                        if (existingMessage != null) {
+                            val updatedMessageEntity =
+                                MessageEntity.fromChatMessage(
+                                    chatId = chatId,
+                                    message = message,
+                                    orderIndex = existingMessage.orderIndex,
+                                    messageId = existingMessage.messageId
+                                )
+                            messageDao.updateMessage(updatedMessageEntity)
+                        } else {
+                            // 与 updateMessage 保持一致的 upsert 语义：不存在则插入
+                            val nextOrderIndex = nextOrderIndexLocked(chatId)
+                            messageDao.insertMessage(
+                                MessageEntity.fromChatMessage(
+                                    chatId = chatId,
+                                    message = message,
+                                    orderIndex = nextOrderIndex,
+                                )
+                            )
+                            chatMaxOrderIndexCache[chatId] = nextOrderIndex
+                        }
+                    }
+                }
+
+                // 更新聊天元数据时间戳（批量只刷新一次）
+                val chat = chatDao.getChatById(chatId)
+                if (chat != null) {
+                    chatDao.updateChatMetadata(
+                        chatId = chatId,
+                        title = chat.title,
+                        timestamp = System.currentTimeMillis(),
+                        inputTokens = chat.inputTokens,
+                        outputTokens = chat.outputTokens,
+                        currentWindowSize = chat.currentWindowSize
+                    )
+                }
+            } catch (e: Exception) {
+                AppLogger.e(
+                    TAG,
+                    "Failed to batch update ${messages.size} messages for chat $chatId",
+                    e
+                )
                 throw e
             }
         }
@@ -1271,6 +1375,7 @@ class ChatHistoryManager private constructor(private val context: Context) {
                 AppLogger.d(TAG, "正在从数据库删除消息. ChatId: $chatId, Timestamp >=: $timestamp")
                 messageVariantDao.deleteVariantsFrom(chatId, timestamp)
                 messageDao.deleteMessagesFrom(chatId, timestamp)
+                chatMaxOrderIndexCache.remove(chatId)
                 AppLogger.d(TAG, "后续消息从数据库删除成功.")
                 // 更新聊天元数据时间戳
                 chatDao.getChatById(chatId)?.let { chat ->
@@ -1304,6 +1409,7 @@ class ChatHistoryManager private constructor(private val context: Context) {
             try {
                 messageVariantDao.deleteAllVariantsForChat(chatId)
                 messageDao.deleteAllMessagesForChat(chatId)
+                chatMaxOrderIndexCache.remove(chatId)
                 // 更新聊天元数据
                 chatDao.getChatById(chatId)?.let { chat ->
                     chatDao.updateChatMetadata(
@@ -1424,6 +1530,7 @@ class ChatHistoryManager private constructor(private val context: Context) {
                 }
                 // 删除聊天实体（级联删除所有消息）
                 chatDao.deleteChat(chatId)
+                chatMaxOrderIndexCache.remove(chatId)
 
                 // 如果删除的是当前聊天，清除当前聊天ID
                 val currentChatId = currentChatIdFlow.first()
@@ -1731,6 +1838,8 @@ class ChatHistoryManager private constructor(private val context: Context) {
                         targetChatId = branchEntity.id,
                         upToTimestampInclusive = upToMessageTimestamp,
                     )
+                    // 分支会话的消息集由 SQL 直接复制生成，未经过插入路径推进缓存
+                    chatMaxOrderIndexCache.remove(branchEntity.id)
                     messageVariantDao.copyVariantsToChat(
                         sourceChatId = parentChatId,
                         targetChatId = branchEntity.id,
@@ -2686,6 +2795,8 @@ class ChatHistoryManager private constructor(private val context: Context) {
                 } else {
                     chatDao.deleteUnlockedChatsByCharacterCardName(sourceCharacterCardName)
                 }
+                // 批量删除无法枚举被删会话 id，整体失效
+                chatMaxOrderIndexCache.clear()
 
                 val currentChatShouldBeCleared =
                     currentChat != null &&

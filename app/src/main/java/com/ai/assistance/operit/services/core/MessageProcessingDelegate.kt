@@ -59,6 +59,7 @@ class MessageProcessingDelegate(
         private val getRuntimeChatHistory: suspend (String) -> List<ChatMessage>,
         private val hasUserMessage: suspend (String) -> Boolean,
         private val addMessageToChat: suspend (String, ChatMessage) -> Unit,
+        private val updateExistingMessagesInChat: suspend (String, List<ChatMessage>) -> Unit,
         private val saveCurrentChat: suspend () -> Unit,
         private val showErrorMessage: (String) -> Unit,
         private val updateChatTitle: (chatId: String, title: String) -> Unit,
@@ -1176,8 +1177,11 @@ class MessageProcessingDelegate(
                     if (!effectivePersistTurn || chatId == null || waifuEmittedMessages.isEmpty()) return
 
                     withContext(Dispatchers.Main) {
+                        // 性能修复：原实现逐条 addMessageToChat，每条都重复加锁、
+                        // 全列表拷贝并执行多轮串行 SQL，分段数多时回合收尾被显著拖慢；
+                        // 改为一次内存替换 + 单事务批量落库，hook 语义保持逐条派发
                         waifuEmittedMessages.indices.forEach { index ->
-                            val updatedMessage =
+                            waifuEmittedMessages[index] =
                                 waifuEmittedMessages[index].copy(
                                     inputTokens = sourceMessage.inputTokens,
                                     outputTokens = sourceMessage.outputTokens,
@@ -1187,9 +1191,8 @@ class MessageProcessingDelegate(
                                     waitDurationMs = sourceMessage.waitDurationMs,
                                     completedAt = sourceMessage.completedAt,
                                 )
-                            waifuEmittedMessages[index] = updatedMessage
-                            addMessageToChat(chatId, updatedMessage)
                         }
+                        updateExistingMessagesInChat(chatId, waifuEmittedMessages.toList())
                     }
                 }
                 syncWaifuMessageMetricsHandler = { sourceMessage ->

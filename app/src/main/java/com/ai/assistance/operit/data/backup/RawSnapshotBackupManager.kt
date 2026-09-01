@@ -7,6 +7,7 @@ import android.os.Looper
 import android.util.AtomicFile
 import com.ai.assistance.operit.data.db.AppDatabase
 import com.ai.assistance.operit.data.db.ObjectBoxManager
+import com.ai.assistance.operit.data.repository.ChatHistoryManager
 import com.ai.assistance.operit.data.stats.TokenUsageRepository
 import com.ai.assistance.operit.util.AppLogger
 import com.ai.assistance.operit.util.OperitPaths
@@ -326,6 +327,9 @@ object RawSnapshotBackupManager {
                 replaceDirContents(File(payloadDir, "datastore"), File(context.dataDir, "datastore"))
                 withContext(Dispatchers.Main) { onProgress?.invoke(RestoreProgress.REPLACING_DATABASES) }
                 replaceDirContents(File(payloadDir, "databases"), File(context.dataDir, "databases"))
+                // databases 目录已被快照整体替换，消息行集与恢复前完全不同，必须失效
+                // ChatHistoryManager 的 orderIndex 缓存，否则恢复后同会话续聊会生成重复 orderIndex
+                ChatHistoryManager.getInstance(context).invalidateOrderIndexCache()
 
                 withContext(Dispatchers.Main) { onProgress?.invoke(RestoreProgress.FINALIZING) }
                 AppLogger.i(TAG, "restore done: ${manifest.packageName}")

@@ -1462,6 +1462,42 @@ class ChatHistoryDelegate(
     }
 
     /**
+     * 批量更新当前已存在的消息并持久化（waifu 回合收尾把统计指标同步到全部分段消息时使用）。
+     * 性能修复：逐条走 addMessageToChat 时每条消息都要抢一次 historyUpdateMutex、
+     * 做一次全列表拷贝并触发多轮串行 SQL；这里一次锁、一次内存替换、单事务落库，
+     * 避免分段数多时回合收尾被拖慢。
+     */
+    suspend fun updateExistingMessagesInChat(chatId: String, messages: List<ChatMessage>) {
+        if (messages.isEmpty()) return
+        historyUpdateMutex.withLock {
+            val isCurrentChat = (chatId == _currentChatId.value)
+
+            // 与 addMessageToChat 保持一致：会话正在切换时跳过内存刷新，仅持久化
+            if (isCurrentChat && !allowAddMessage.get()) {
+                chatHistoryManager.updateMessages(chatId, messages)
+                messages.forEach { ToolPkgChatMessageHookBridge.dispatchMessagePersisted(chatId, it) }
+                return@withLock
+            }
+
+            if (isCurrentChat) {
+                // 与旧逐条路径的分歧点：若分段消息因显示窗口裁剪已不在 _chatHistory 中，
+                // 这里不把旧时间戳消息补回列表（旧路径经 append 分支可能补到列表尾部，
+                // 破坏时间序）。本方法只服务回合收尾的统计指标同步，被裁剪分段的指标
+                // 仍会经下方批量持久化写入数据库，内存不补是正确的。
+                val replacements = messages.associateBy { it.timestamp }
+                setCurrentChatMessagesInMemory(
+                    _chatHistory.value.map { existing ->
+                        replacements[existing.timestamp] ?: existing
+                    }
+                )
+            }
+
+            chatHistoryManager.updateMessages(chatId, messages)
+            messages.forEach { ToolPkgChatMessageHookBridge.dispatchMessagePersisted(chatId, it) }
+        }
+    }
+
+    /**
      * 异步向聊天历史添加或更新消息（供不需要等待完成的场景使用）
      */
     fun addMessageToChatAsync(message: ChatMessage, chatIdOverride: String? = null) {

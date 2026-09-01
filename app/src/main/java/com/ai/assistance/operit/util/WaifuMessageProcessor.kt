@@ -36,8 +36,37 @@ object WaifuMessageProcessor {
     private val EMAIL_ADDRESS_REGEX = Regex("""[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}""")
     private val DOMAIN_URL_REGEX =
         Regex("""(?<![@\w])(?:www\.)?(?:[A-Za-z0-9-]+\.)+[A-Za-z]{2,}(?::\d+)?(?:[/?#]$URL_CHARS*)?""")
+    // (\d+) 捕获组是占位符恢复路径（groupValues[1].toInt()）的必需结构，
+    // 不得去掉；isUrlOrEmailLine 的 containsMatchIn 用法对捕获组不敏感
     private val ENTITY_PLACEHOLDER_REGEX =
-        Regex("${Regex.escape(ENTITY_PLACEHOLDER_PREFIX)}\\d+${Regex.escape(ENTITY_PLACEHOLDER_SUFFIX)}")
+        Regex("${Regex.escape(ENTITY_PLACEHOLDER_PREFIX)}(\\d+)${Regex.escape(ENTITY_PLACEHOLDER_SUFFIX)}")
+
+    // 性能修复：以下正则原先散落在各方法内部、每次调用都 toRegex 重新编译。
+    // 流式分句会对每个 chunk 的累积全文重算（见 collectStableSegments），这些正则随之
+    // 被高频重复编译，长回复下开销可观；pattern 均为静态字面量，统一预编译为对象级常量。
+    private val MD_LINK_OR_IMAGE_INLINE_REGEX = Regex("!?\\[(.*?)\\]\\(.*?\\)")
+    private val MD_HEADER_PREFIX_REGEX = Regex("^#+\\s*", RegexOption.MULTILINE)
+    private val MD_BLOCK_QUOTE_PREFIX_REGEX = Regex("^>\\s*", RegexOption.MULTILINE)
+    private val MD_UNORDERED_LIST_PREFIX_REGEX = Regex("^[\\*\\-\\+]\\s+", RegexOption.MULTILINE)
+    private val MD_ORDERED_LIST_PREFIX_REGEX = Regex("^\\d+\\.\\s+", RegexOption.MULTILINE)
+    private val MD_CODE_FENCE_INLINE_REGEX = Regex("```[a-zA-Z]*\\n?|\\n?```")
+    private val MD_BOLD_ITALIC_INLINE_REGEX = Regex("(\\*\\*\\*|___)(.+?)\\1")
+    private val MD_BOLD_INLINE_REGEX = Regex("(\\*\\*|__(?!MD_ENTITY__))(.+?)\\1")
+    private val MD_ITALIC_INLINE_REGEX = Regex("(\\*|_)(.+?)\\1")
+    private val MD_STRIKETHROUGH_INLINE_REGEX = Regex("~~(.+?)~~")
+    private val MD_INLINE_CODE_REGEX = Regex("`(.+?)`")
+    private val MD_HORIZONTAL_LINE_INLINE_REGEX = Regex("^[-_*]{3,}\\s*$", RegexOption.MULTILINE)
+    private val COLLAPSED_WHITESPACE_REGEX = Regex("\\s+")
+    private val TRAILING_SENTENCE_PUNCTUATION_REGEX = Regex("[。！？.!?]+$")
+    private val PUNCTUATION_ONLY_SEGMENT_REGEX = Regex("^[。！？~～.!?…]+$")
+    private val STRUCTURED_HEADER_PREFIX_REGEX = Regex("^#+\\s*")
+    private val STRUCTURED_QUOTE_PREFIX_REGEX = Regex("^>\\s*")
+    private val STRUCTURED_LIST_PREFIX_REGEX = Regex("^(?:[\\-*+]\\s+|\\d+\\.\\s+)")
+    private val STRUCTURED_BOLD_WRAP_REGEX = Regex("^\\*\\*(.+)\\*\\*$")
+    private val STRUCTURED_UNDERLINE_WRAP_REGEX = Regex("^__(.+)__$")
+    private val STRUCTURED_STRIKE_WRAP_REGEX = Regex("^~~(.+)~~$")
+    private val BLOCK_PREFIX_LIKE_REGEX = Regex("^(?:#+\\s*|>\\s*|[-*+]\\s+|\\d+\\.\\s+)")
+    private val EMOTION_TAG_REGEX = Regex("<emotion>([^<]+)</emotion>")
     
     private var customEmojiRepository: CustomEmojiRepository? = null
     private var activePromptManager: ActivePromptManager? = null
@@ -246,7 +275,7 @@ object WaifuMessageProcessor {
         return if (trimmed.endsWith("...")) {
             trimmed
         } else {
-            trimmed.replace(Regex("[。！？.!?]+$"), "").trim()
+            trimmed.replace(TRAILING_SENTENCE_PUNCTUATION_REGEX, "").trim()
         }
     }
     
@@ -401,14 +430,11 @@ object WaifuMessageProcessor {
         // 4. 将占位符恢复为原始的Markdown实体
         val finalResult = mergedResultWithPlaceholders.map { sentence ->
             var currentSentence = sentence
-            val placeholderRegex =
-                Regex(
-                    "${Regex.escape(ENTITY_PLACEHOLDER_PREFIX)}(\\d+)${Regex.escape(ENTITY_PLACEHOLDER_SUFFIX)}"
-                )
-            
+
             // 循环替换，以处理一个句子中可能存在的多个占位符
-            while (placeholderRegex.containsMatchIn(currentSentence)) {
-                currentSentence = placeholderRegex.replace(currentSentence) { matchResult ->
+            // （复用对象级 ENTITY_PLACEHOLDER_REGEX，避免原实现每个句子都重新 toRegex 编译）
+            while (ENTITY_PLACEHOLDER_REGEX.containsMatchIn(currentSentence)) {
+                currentSentence = ENTITY_PLACEHOLDER_REGEX.replace(currentSentence) { matchResult ->
                     val index = matchResult.groupValues[1].toInt()
                     
                     if (index < entities.size) {
@@ -457,7 +483,7 @@ object WaifuMessageProcessor {
                         if (sentence.endsWith("...")) {
                             sentence.trim()
                         } else {
-                            sentence.replace(Regex("[。！？.!?]+$"), "").trim()
+                            sentence.replace(TRAILING_SENTENCE_PUNCTUATION_REGEX, "").trim()
                         }
                     }
                     .filter { it.isNotBlank() }
@@ -476,7 +502,7 @@ object WaifuMessageProcessor {
         for (i in 1 until segments.size) {
             val currentSentence = segments[i]
             val trimmedSentence = currentSentence.trim()
-            if (trimmedSentence.isNotEmpty() && trimmedSentence.matches(Regex("^[。！？~～.!?…]+$"))) {
+            if (trimmedSentence.isNotEmpty() && trimmedSentence.matches(PUNCTUATION_ONLY_SEGMENT_REGEX)) {
                 val lastIndex = mergedSegments.size - 1
                 val lastSentence = mergedSegments[lastIndex]
                 if (!lastSentence.contains('\n') && !lastSentence.contains('\r')) {
@@ -542,12 +568,12 @@ object WaifuMessageProcessor {
     private fun cleanStructuredMarkdownLine(line: String): String =
         line
             .trim()
-            .replace(Regex("^#+\\s*"), "")
-            .replace(Regex("^>\\s*"), "")
-            .replace(Regex("^(?:[\\-*+]\\s+|\\d+\\.\\s+)"), "")
-            .replace(Regex("^\\*\\*(.+)\\*\\*$"), "$1")
-            .replace(Regex("^__(.+)__$"), "$1")
-            .replace(Regex("^~~(.+)~~$"), "$1")
+            .replace(STRUCTURED_HEADER_PREFIX_REGEX, "")
+            .replace(STRUCTURED_QUOTE_PREFIX_REGEX, "")
+            .replace(STRUCTURED_LIST_PREFIX_REGEX, "")
+            .replace(STRUCTURED_BOLD_WRAP_REGEX, "$1")
+            .replace(STRUCTURED_UNDERLINE_WRAP_REGEX, "$1")
+            .replace(STRUCTURED_STRIKE_WRAP_REGEX, "$1")
             .trim()
 
     private fun getLastVisibleLine(content: String): String =
@@ -567,7 +593,7 @@ object WaifuMessageProcessor {
             trimmedLine.startsWith("```") ||
             trimmedLine.startsWith("|") ||
             trimmedLine.startsWith("$$") ||
-            Regex("^(?:#+\\s*|>\\s*|[-*+]\\s+|\\d+\\.\\s+)").containsMatchIn(trimmedLine)
+            BLOCK_PREFIX_LIKE_REGEX.containsMatchIn(trimmedLine)
         ) {
             return true
         }
@@ -749,31 +775,31 @@ object WaifuMessageProcessor {
             
             // --- 新增：移除Markdown相关标记 ---
             // 1. 移除图片和链接，保留替代文本或链接文本
-            .replace(Regex("!?\\[(.*?)\\]\\(.*?\\)"), "$1")
+            .replace(MD_LINK_OR_IMAGE_INLINE_REGEX, "$1")
             // 2. 移除标题标记
-            .replace(Regex("^#+\\s*", RegexOption.MULTILINE), "")
+            .replace(MD_HEADER_PREFIX_REGEX, "")
             // 3. 移除引用标记
-            .replace(Regex("^>\\s*", RegexOption.MULTILINE), "")
+            .replace(MD_BLOCK_QUOTE_PREFIX_REGEX, "")
             // 4. 移除列表标记
-            .replace(Regex("^[\\*\\-\\+]\\s+", RegexOption.MULTILINE), "")
-            .replace(Regex("^\\d+\\.\\s+", RegexOption.MULTILINE), "")
+            .replace(MD_UNORDERED_LIST_PREFIX_REGEX, "")
+            .replace(MD_ORDERED_LIST_PREFIX_REGEX, "")
             // 5. 移除代码块标记
-            .replace(Regex("```[a-zA-Z]*\\n?|\\n?```"), "")
+            .replace(MD_CODE_FENCE_INLINE_REGEX, "")
             // 6. 移除加粗、斜体、删除线 (注意顺序和互斥)
-            .replace(Regex("(\\*\\*\\*|___)(.+?)\\1"), "$2") // 加粗斜体
-            .replace(Regex("(\\*\\*|__(?!MD_ENTITY__))(.+?)\\1"), "$2") // 加粗 (避免匹配占位符)
-            .replace(Regex("(\\*|_)(.+?)\\1"), "$2")        // 斜体
-            .replace(Regex("~~(.+?)~~"), "$1")              // 删除线
+            .replace(MD_BOLD_ITALIC_INLINE_REGEX, "$2") // 加粗斜体
+            .replace(MD_BOLD_INLINE_REGEX, "$2") // 加粗 (避免匹配占位符)
+            .replace(MD_ITALIC_INLINE_REGEX, "$2")        // 斜体
+            .replace(MD_STRIKETHROUGH_INLINE_REGEX, "$1")              // 删除线
             // 7. 移除行内代码
-            .replace(Regex("`(.+?)`"), "$1")
+            .replace(MD_INLINE_CODE_REGEX, "$1")
             // 8. 移除水平线
-            .replace(Regex("^[-_*]{3,}\\s*$", RegexOption.MULTILINE), "")
+            .replace(MD_HORIZONTAL_LINE_INLINE_REGEX, "")
             // --- Markdown移除结束 ---
             
             // 移除其他常见的XML标签
             .replace(ChatMarkupRegex.anyXmlTag, "")
             // 清理多余的空白
-            .replace(Regex("\\s+"), " ")
+            .replace(COLLAPSED_WHITESPACE_REGEX, " ")
             .trim()
     }
     
@@ -866,11 +892,8 @@ object WaifuMessageProcessor {
      */
     fun processEmotionTags(content: String): String {
         if (content.isBlank()) return content
-        
-        // 匹配<emotion>标签的正则表达式
-        val emotionRegex = Regex("<emotion>([^<]+)</emotion>")
-        
-        return emotionRegex.replace(content) { matchResult ->
+
+        return EMOTION_TAG_REGEX.replace(content) { matchResult ->
             val emotion = matchResult.groupValues[1].trim()
             val emojiPath = getRandomEmojiPath(emotion)
             
@@ -902,10 +925,9 @@ object WaifuMessageProcessor {
         if (content.isBlank()) return listOf(content)
         
         val result = mutableListOf<String>()
-        val emotionRegex = Regex("<emotion>([^<]+)</emotion>")
-        
+
         // 找到所有emotion标签的位置
-        val matches = emotionRegex.findAll(content)
+        val matches = EMOTION_TAG_REGEX.findAll(content)
         var lastEnd = 0
         
         for (match in matches) {

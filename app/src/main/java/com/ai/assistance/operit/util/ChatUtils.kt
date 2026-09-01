@@ -5,6 +5,15 @@ import com.ai.assistance.operit.core.chat.hooks.withContent
 
 /** Utility functions for chat message handling */
 object ChatUtils {
+    // 性能修复：pattern 是静态字面量，原实现每次调用都 toRegex 重新编译。
+    // 该函数在流式分句（每个 chunk 多次）与每回合全量历史清洗（每条消息一次）中高频执行，
+    // 反复编译的开销随消息条数线性放大，直接拖慢长会话的首字延迟。
+    private val THINKING_CONTENT_PATTERN =
+        "<think(?:ing)?>.*?(</think(?:ing)?>|\\z)".toRegex(RegexOption.DOT_MATCHES_ALL)
+
+    private val SEARCH_CONTENT_PATTERN =
+        "<search>.*?(</search>|\\z)".toRegex(RegexOption.DOT_MATCHES_ALL)
+
     fun stripGeminiThoughtSignatureMeta(content: String): String {
         return ChatMarkupRegex.removeGeminiThoughtSignatureMeta(content)
     }
@@ -45,8 +54,7 @@ object ChatUtils {
 
     /** 过滤掉内容中的思考部分和搜索来源 移除<think></think>、<thinking></thinking>和<search></search>标签及其中的内容，并处理未闭合的情况 */
     fun removeThinkingContent(content: String): String {
-        // 使用正则表达式匹配<think>、<thinking>和<search>标签及其内容
-        // 这个正则表达式会匹配以下情况：
+        // 正则匹配以下情况（已预编译为对象级常量）：
         // 1. <think>...</think> (正常闭合的标签)
         // 2. <think>... (未闭合，直到字符串末尾)
         // 3. <thinking>...</thinking> (正常闭合的标签)
@@ -54,9 +62,7 @@ object ChatUtils {
         // 5. <search>...</search> (正常闭合的标签)
         // 6. <search>... (未闭合，直到字符串末尾)
         // \\z 匹配字符串的绝对末尾
-        val thinkPattern = "<think(?:ing)?>.*?(</think(?:ing)?>|\\z)".toRegex(RegexOption.DOT_MATCHES_ALL)
-        val searchPattern = "<search>.*?(</search>|\\z)".toRegex(RegexOption.DOT_MATCHES_ALL)
-        return content.replace(thinkPattern, "").replace(searchPattern, "").trim()
+        return content.replace(THINKING_CONTENT_PATTERN, "").replace(SEARCH_CONTENT_PATTERN, "").trim()
     }
 
     /**

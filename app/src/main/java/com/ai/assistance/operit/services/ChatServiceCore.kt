@@ -168,6 +168,9 @@ class ChatServiceCore(
             addMessageToChat = { chatId, message ->
                 chatHistoryDelegate.addMessageToChat(message, chatId)
             },
+            updateExistingMessagesInChat = { chatId, messages ->
+                chatHistoryDelegate.updateExistingMessagesInChat(chatId, messages)
+            },
             saveCurrentChat = {
                 val (inputTokens, outputTokens) = tokenStatisticsDelegate.getCumulativeTokenCounts()
                 val windowSize = tokenStatisticsDelegate.getLastCurrentWindowSize()

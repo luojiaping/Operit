@@ -3,6 +3,7 @@ package com.ai.assistance.operit.data.backup
 import android.content.Context
 import android.net.Uri
 import com.ai.assistance.operit.data.db.AppDatabase
+import com.ai.assistance.operit.data.repository.ChatHistoryManager
 import com.ai.assistance.operit.data.stats.TokenUsageRepository
 import com.ai.assistance.operit.util.AppLogger
 import java.io.BufferedInputStream
@@ -165,6 +166,10 @@ object RoomDatabaseRestoreManager {
             if (extractedShm) {
                 atomicallyReplace(tmpShm, targetShm)
             }
+
+            // 库文件已被备份整体替换，消息行集与恢复前完全不同，必须失效
+            // ChatHistoryManager 的 orderIndex 缓存，否则恢复后同会话续聊会生成重复 orderIndex
+            ChatHistoryManager.getInstance(context).invalidateOrderIndexCache()
         } catch (e: Exception) {
             tmpDb.delete()
             tmpWal.delete()
