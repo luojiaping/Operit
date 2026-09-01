@@ -123,10 +123,14 @@ class ThemePackageRuntimeLinkerV2Test {
                     componentSkins =
                         ThemeComponentCatalogV2.requiredComponents.associate { component ->
                             component.value to
-                                if (component == ThemeComponentCatalogV2.INPUT) {
-                                    inputComponentSkin("color.${component.value}")
-                                } else {
-                                    componentSkin("color.${component.value}")
+                                when (component) {
+                                    ThemeComponentCatalogV2.INPUT ->
+                                        inputComponentSkin("color.${component.value}")
+
+                                    ThemeComponentCatalogV2.STATUS ->
+                                        statusComponentSkin("color.${component.value}")
+
+                                    else -> componentSkin("color.${component.value}")
                                 }
                         },
                 ),
@@ -167,6 +171,22 @@ class ThemePackageRuntimeLinkerV2Test {
                     frame = ThemeComponentFrameSpecV2.RoundRect(cornerRadiusDp = 0f),
                 ),
             focused =
+                ThemeComponentStateSkinV2(
+                    containerToken = containerToken,
+                    contentToken = "color.background",
+                    frame = ThemeComponentFrameSpecV2.RoundRect(cornerRadiusDp = 0f),
+                ),
+            error =
+                ThemeComponentStateSkinV2(
+                    containerToken = containerToken,
+                    contentToken = "color.background",
+                    frame = ThemeComponentFrameSpecV2.RoundRect(cornerRadiusDp = 0f),
+                ),
+        )
+
+    private fun statusComponentSkin(containerToken: String): ThemeComponentSkinV2 =
+        ThemeComponentSkinV2(
+            normal =
                 ThemeComponentStateSkinV2(
                     containerToken = containerToken,
                     contentToken = "color.background",
@@ -289,6 +309,63 @@ class ThemePackageRuntimeLinkerV2Test {
             }
 
         assertTrue(error.message!!.contains(ThemeComponentCatalogV2.INPUT.value))
+    }
+
+    @Test
+    fun statusWithoutErrorStateIsRejected() {
+        val manifest =
+            completeManifest().copy(
+                presentation =
+                    completeManifest().presentation.copy(
+                        componentSkins =
+                            completeManifest().presentation.componentSkins +
+                                (
+                                    ThemeComponentCatalogV2.STATUS.value to
+                                        componentSkin("color.${ThemeComponentCatalogV2.STATUS.value}")
+                                ),
+                    ),
+            )
+        val installation = installation(manifest, tmp.newFolder("missing-status-error"))
+
+        val error =
+            assertThrows(ThemePackageLinkExceptionV2::class.java) {
+                ThemePackageRuntimeLinkerV2.link(
+                    installation,
+                    PublishedThemeCatalogV2(listOf(installation), emptyList()),
+                )
+            }
+
+        assertTrue(error.message!!.contains(ThemeComponentCatalogV2.STATUS.value))
+    }
+
+    @Test
+    fun childStatusOverrideWithoutErrorStateIsRejected() {
+        val base = installation(completeManifest("author.status_base"), tmp.newFolder("status-base"))
+        val childManifest =
+            completeManifest("author.status_child").copy(
+                basis = base.coordinate,
+                scenes = emptyList(),
+                surfaces = emptyList(),
+                presentation =
+                    ThemePackagePresentationPatchV2(
+                        componentSkins =
+                            mapOf(
+                                ThemeComponentCatalogV2.STATUS.value to componentSkin("color.status"),
+                            ),
+                    ),
+                parameters = emptyList(),
+            )
+        val child = installation(childManifest, tmp.newFolder("status-child"))
+
+        val error =
+            assertThrows(ThemePackageLinkExceptionV2::class.java) {
+                ThemePackageRuntimeLinkerV2.link(
+                    child,
+                    PublishedThemeCatalogV2(listOf(base, child), emptyList()),
+                )
+            }
+
+        assertTrue(error.message!!.contains(ThemeComponentCatalogV2.STATUS.value))
     }
 
     @Test

@@ -391,7 +391,7 @@ internal object ThemePackageArchiveValidatorV2 {
             val missingStates = ThemeComponentCatalogV2.missingRequiredStateNames(component, skin)
             if (missingStates.isNotEmpty()) {
                 throw ThemePackageArchiveValidationExceptionV2(
-                    "Component $componentId must declare interaction states: ${missingStates.joinToString()}.",
+                    "Component $componentId must declare required states: ${missingStates.joinToString()}.",
                 )
             }
         }

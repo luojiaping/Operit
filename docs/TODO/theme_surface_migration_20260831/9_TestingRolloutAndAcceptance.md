@@ -54,4 +54,6 @@
 
 [DONE] 构建服务已同步 `ed980b5f` 并完成 release 编译：`operit-release-feat_plugin-interface-ed980b5f.apk`，SHA-256 `7eef2a88ab0bb75c4d37730de791789c86b7bf0f9749a9d6ccf4b6f930902e19`。本次未执行 JVM/Android test。
 
+[DONE] Operation status 与共享 overlay 试点已新增 menu/snackbar surface-to-component unit/Compose test、status archive/linker contract test、继承链覆盖拒绝 test，以及 status normal/error 像素 test；尚未执行测试命令。本批只重新打包主题 archive，未构建 APK。
+
 [TODO] 第一批 device acceptance。

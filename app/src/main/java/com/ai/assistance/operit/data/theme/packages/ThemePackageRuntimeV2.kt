@@ -187,7 +187,7 @@ private data class LinkedThemeAccumulatorV2(
             val missingStates = ThemeComponentCatalogV2.missingRequiredStateNames(component, skin)
             if (missingStates.isNotEmpty()) {
                 throw ThemePackageLinkExceptionV2(
-                    "Theme package component ${component.value} is missing required interaction states: " +
+                    "Theme package component ${component.value} is missing required states: " +
                         missingStates.joinToString(),
                 )
             }

@@ -324,6 +324,34 @@ class ThemePackageArchiveAndPublicationV2Test {
     }
 
     @Test
+    fun directStatusSkinWithoutErrorStateIsRejected() {
+        val statusSkin =
+            ThemeComponentSkinV2(
+                normal =
+                    ThemeComponentStateSkinV2(
+                        containerToken = "color.background",
+                        contentToken = "color.background",
+                        frame = ThemeComponentFrameSpecV2.RoundRect(cornerRadiusDp = 0f),
+                    ),
+            )
+        val manifest =
+            minimalManifest().copy(
+                presentation =
+                    ThemePackagePresentationPatchV2(
+                        componentSkins = mapOf(ThemeComponentCatalogV2.STATUS.value to statusSkin),
+                    ),
+            )
+        val archive = writeArchive(manifest)
+
+        val error =
+            assertThrows(ThemePackageArchiveValidationExceptionV2::class.java) {
+                ThemePackageArchiveValidatorV2.validate(archive)
+            }
+
+        assertTrue(error.message!!.contains(ThemeComponentCatalogV2.STATUS.value))
+    }
+
+    @Test
     fun sceneSurfaceReferencingAnotherRegisteredSceneIsRejected() {
         val appShell =
             com.ai.assistance.operit.ui.theme.scene.ThemeSceneDefinitionV1(

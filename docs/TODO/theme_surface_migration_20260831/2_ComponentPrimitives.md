@@ -46,12 +46,12 @@
 
 [DONE] `NativeThemeActionButtonV1` 的 standard emphasis 已改由 `button` normal/disabled skin 绘制，保留 button role 与点击语义。caution/destructive 继续使用明确的 tertiary/error Material 容器，等待主题包提供语义化状态 skin。
 
-[PARTIAL] `status` 已用于 AppContent 全局 loading。当前 `2.1.0` 包未声明 `status.error`，shared success/error renderer 保留 Material semantic container，待主题归档批次同步补齐状态 skin 后迁移。
+[DONE] `status` 已用于 AppContent 全局 loading；`NativeThemeOperationStatusV1` 的 success/error 现分别消费 `status.normal`/`status.error`。direct `status` skin 缺少 error state 会被 archive validator、linker 与两个主题 package script 拒绝。
 
 [DONE] `section` 与 `list_item` 的 supporting text 已从 package `contentToken` 派生，避免次级文本绕过 skin 内容色。
 
-[DONE] `ThemeOverlaySurfaceHostV2` 已将 `overlay.dialog`、`overlay.sheet`、`overlay.toast` 分别连接到 `dialog`、`sheet`、`snackbar` skin；WebSession 手写 dialog/sheet 与 `ChatToastHost` 已成为生产消费者，窗口、dismiss、IME、动画和队列仍由原调用方控制。
+[DONE] `ThemeOverlaySurfaceHostV2` 已将 `overlay.dialog`、`overlay.sheet`、`overlay.menu`、`overlay.snackbar`、`overlay.toast` 分别连接到匹配 skin；WebSession 手写 dialog/sheet、ChatToastHost、Package Manager snackbar 与 Repo Market category menu 已成为生产消费者，窗口、dismiss、IME、动画和队列仍由原调用方控制。
 
 [DONE] `ThemeOutlinedTextFieldV2` 已将无 floating label 的 `String`-backed Material field 接入 input skin，WebSession prompt、Memory search 与 File Manager search 已成为生产消费者。focused/error input skin 现为 archive/linker 强制交互状态，默认和 Cyber Grid `2.1.0` 已满足。
 
-[TODO] 其余 list item 家族、input、dialog、sheet、menu、snackbar 仍待后续 batch。
+[TODO] 其余 list item 家族、input、dialog、sheet、menu、snackbar consumer 仍待后续 batch。

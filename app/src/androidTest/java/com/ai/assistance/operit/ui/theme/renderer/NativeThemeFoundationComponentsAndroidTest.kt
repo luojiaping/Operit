@@ -1,12 +1,21 @@
 package com.ai.assistance.operit.ui.theme.renderer
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
@@ -20,6 +29,7 @@ import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -244,6 +254,44 @@ class NativeThemeFoundationComponentsAndroidTest {
     }
 
     @Test
+    fun resultStatusUsesNormalAndErrorStatusSkins() {
+        var kind by mutableStateOf(NativeThemeOperationStatusKindV1.SUCCESS)
+
+        composeTestRule.setContent {
+            ThemePackageTestHost {
+                NativeThemeOperationStatusV1(
+                    message = "Operation result",
+                    kind = kind,
+                    modifier = Modifier.size(96.dp).testTag("operation-status"),
+                    leading = { modifier ->
+                        Box(
+                            modifier = modifier,
+                        ) {
+                            Box(
+                                modifier =
+                                    Modifier
+                                        .size(16.dp)
+                                        .background(LocalContentColor.current)
+                                        .testTag("operation-status-content"),
+                            )
+                        }
+                    },
+                )
+            }
+        }
+
+        assertEquals(Color(0xFF102030).toArgb(), operationStatusPixelArgb(80f, 80f))
+        assertEquals(Color(0xFFE5F6FF).toArgb(), operationStatusContentArgb())
+
+        composeTestRule.runOnUiThread { kind = NativeThemeOperationStatusKindV1.ERROR }
+        composeTestRule.waitForIdle()
+
+        assertEquals(Color(0xFF5D1C2B).toArgb(), operationStatusPixelArgb(80f, 80f))
+        assertEquals(Color(0xFFFF4D6D).toArgb(), operationStatusPixelArgb(48f, 1f))
+        assertEquals(Color(0xFFFFF0C7).toArgb(), operationStatusContentArgb())
+    }
+
+    @Test
     fun statMergesLabelValueAndLeadingSlotIntoOneDescription() {
         composeTestRule.setContent {
             NativeThemeStatTestHost {
@@ -270,6 +318,21 @@ class NativeThemeFoundationComponentsAndroidTest {
             packageRuntime = themePackageRuntimeForAndroidTest(),
             content = content,
         )
+    }
+
+    private fun operationStatusPixelArgb(
+        xDp: Float,
+        yDp: Float,
+    ): Int {
+        val image = composeTestRule.onNodeWithTag("operation-status").captureToImage()
+        val x = (xDp * composeTestRule.density.density).toInt().coerceIn(0, image.width - 1)
+        val y = (yDp * composeTestRule.density.density).toInt().coerceIn(0, image.height - 1)
+        return image.toPixelMap()[x, y].toArgb()
+    }
+
+    private fun operationStatusContentArgb(): Int {
+        val image = composeTestRule.onNodeWithTag("operation-status-content", useUnmergedTree = true).captureToImage()
+        return image.toPixelMap()[image.width / 4, image.height / 2].toArgb()
     }
 
     @Composable

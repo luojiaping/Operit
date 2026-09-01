@@ -3,6 +3,7 @@ package com.ai.assistance.operit.ui.theme
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.ui.Modifier
@@ -68,6 +69,83 @@ class ThemeOverlaySurfaceHostV2AndroidTest {
 
         val childImage = composeTestRule.onNodeWithTag("overlay-child").captureToImage()
         assertEquals(Color(0xFFFFF0C7).toArgb(), pixelAtDp(childImage, 8f, 8f))
+    }
+
+    @Test
+    fun overlayHostAppliesMenuAndSnackbarSkins() {
+        composeTestRule.setContent {
+            NativeThemeOffscreenHost(
+                presentation = GlobalPresentationSnapshot.default(),
+                packageRuntime = themePackageRuntimeForAndroidTest(),
+            ) {
+                Column {
+                    ThemeOverlaySurfaceHostV2(
+                        surface = ThemeSurfaceCatalogV2.OVERLAY_MENU,
+                        modifier = Modifier.size(48.dp).testTag("menu-host"),
+                        applyContentPadding = false,
+                    ) {
+                        Box(
+                            modifier =
+                                Modifier
+                                    .size(16.dp)
+                                    .background(LocalContentColor.current)
+                                    .testTag("menu-content"),
+                        )
+                    }
+                    ThemeOverlaySurfaceHostV2(
+                        surface = ThemeSurfaceCatalogV2.OVERLAY_SNACKBAR,
+                        modifier = Modifier.size(48.dp).testTag("snackbar-host"),
+                        applyContentPadding = false,
+                    ) {
+                        Box(
+                            modifier =
+                                Modifier
+                                    .size(16.dp)
+                                    .background(LocalContentColor.current)
+                                    .testTag("snackbar-content"),
+                        )
+                    }
+                }
+            }
+        }
+
+        val expectedContainer = Color(0xFF102030).toArgb()
+        val expectedContent = Color(0xFFE5F6FF).toArgb()
+        assertEquals(expectedContainer, pixelAtDp(composeTestRule.onNodeWithTag("menu-host").captureToImage(), 24f, 24f))
+        assertEquals(expectedContent, pixelAtDp(composeTestRule.onNodeWithTag("menu-content").captureToImage(), 8f, 8f))
+        assertEquals(expectedContainer, pixelAtDp(composeTestRule.onNodeWithTag("snackbar-host").captureToImage(), 24f, 24f))
+        assertEquals(expectedContent, pixelAtDp(composeTestRule.onNodeWithTag("snackbar-content").captureToImage(), 8f, 8f))
+    }
+
+    @Test
+    fun dropdownMenuUsesTheMenuSkinForItsCompletePopupContainer() {
+        composeTestRule.setContent {
+            NativeThemeOffscreenHost(
+                presentation = GlobalPresentationSnapshot.default(),
+                packageRuntime = themePackageRuntimeForAndroidTest(),
+            ) {
+                ThemeDropdownMenuV2(
+                    expanded = true,
+                    onDismissRequest = {},
+                    modifier = Modifier.testTag("themed-menu"),
+                ) {
+                    Box(
+                        modifier =
+                            Modifier
+                                .size(24.dp)
+                                .background(LocalContentColor.current)
+                                .testTag("themed-menu-content"),
+                    )
+                }
+            }
+        }
+
+        val menuImage = composeTestRule.onNodeWithTag("themed-menu").captureToImage()
+        assertEquals(Color(0xFF102030).toArgb(), pixelAtDp(menuImage, 12f, 1f))
+        assertEquals(
+            Color(0xFFE5F6FF).toArgb(),
+            pixelAtDp(composeTestRule.onNodeWithTag("themed-menu-content").captureToImage(), 12f, 12f),
+        )
     }
 
     private fun pixelAtDp(

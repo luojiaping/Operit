@@ -43,4 +43,4 @@
 
 [PARTIAL] Phone drawer 与 collapsed tablet drawer 已接入 `app.navigation` surface；文本和 icon 导航项均消费 `navigation` skin。drawer 信息卡和 shortcut card 仍待改用 V2 primitive。
 
-[PARTIAL] `ChatToastHost` 已通过 `overlay.toast` 使用 `snackbar` skin；shared snackbar、其余 toast、empty/error 与 drawer shortcut/info card 待迁移。
+[PARTIAL] `ChatToastHost` 已通过 `overlay.toast` 使用 `snackbar` skin，Package Manager snackbar 也已通过 `overlay.snackbar` 试点接入；其余 toast/snackbar、empty/error 与 drawer shortcut/info card 待迁移。

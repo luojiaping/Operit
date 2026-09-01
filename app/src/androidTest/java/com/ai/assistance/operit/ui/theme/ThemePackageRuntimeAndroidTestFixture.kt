@@ -31,6 +31,8 @@ internal fun themePackageRuntimeForAndroidTest(
     val selected = Color(0xFF16435A)
     val disabled = Color(0xFF24313B)
     val error = Color(0xFF5D1C2B)
+    val statusErrorContent = Color(0xFFFFF0C7)
+    val statusErrorBorder = Color(0xFFFF4D6D)
     val overlayDialogContainer = Color(0xFF3E2D56)
     val overlayDialogContent = Color(0xFFFFF0C7)
     val overlayDialogBorder = Color(0xFF00E5FF)
@@ -46,6 +48,8 @@ internal fun themePackageRuntimeForAndroidTest(
                     "test.selected" to colorToken(selected),
                     "test.disabled" to colorToken(disabled),
                     "test.error" to colorToken(error),
+                    "test.status_error_content" to colorToken(statusErrorContent),
+                    "test.status_error_border" to colorToken(statusErrorBorder),
                     "test.overlay_dialog_container" to colorToken(overlayDialogContainer),
                     "test.overlay_dialog_content" to colorToken(overlayDialogContent),
                     "test.overlay_dialog_border" to colorToken(overlayDialogBorder),
@@ -143,6 +147,26 @@ internal fun themePackageRuntimeForAndroidTest(
                                     ),
                             ),
                     )
+            ) +
+            (
+                ThemeComponentCatalogV2.STATUS to
+                    ThemeComponentSkinV2(
+                        normal = componentState("test.container", "test.content"),
+                        error =
+                            componentState(
+                                containerToken = "test.error",
+                                contentToken = "test.status_error_content",
+                                frame =
+                                    ThemeComponentFrameSpecV2.RoundRect(
+                                        cornerRadiusDp = 0f,
+                                        border =
+                                            ThemeComponentFrameStrokeV2(
+                                                token = "test.status_error_border",
+                                                widthDp = 2f,
+                                            ),
+                                    ),
+                            ),
+                    )
             )
     val linked =
         LinkedThemeRuntimeV2(
@@ -165,6 +189,16 @@ internal fun themePackageRuntimeForAndroidTest(
                     ThemeSurfaceCatalogV2.OVERLAY_SHEET to
                         ThemeSurfaceImplementationV2(
                             surfaceId = ThemeSurfaceCatalogV2.OVERLAY_SHEET.value,
+                            kind = ThemeSurfaceImplementationKindV2.TEMPLATE,
+                        ),
+                    ThemeSurfaceCatalogV2.OVERLAY_MENU to
+                        ThemeSurfaceImplementationV2(
+                            surfaceId = ThemeSurfaceCatalogV2.OVERLAY_MENU.value,
+                            kind = ThemeSurfaceImplementationKindV2.TEMPLATE,
+                        ),
+                    ThemeSurfaceCatalogV2.OVERLAY_SNACKBAR to
+                        ThemeSurfaceImplementationV2(
+                            surfaceId = ThemeSurfaceCatalogV2.OVERLAY_SNACKBAR.value,
                             kind = ThemeSurfaceImplementationKindV2.TEMPLATE,
                         ),
                     ThemeSurfaceCatalogV2.OVERLAY_TOAST to

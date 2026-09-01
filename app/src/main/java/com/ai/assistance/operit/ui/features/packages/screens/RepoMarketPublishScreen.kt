@@ -22,11 +22,11 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -52,6 +52,7 @@ import com.ai.assistance.operit.data.api.MarketV2Entry
 import com.ai.assistance.operit.data.api.MarketV2ManifestCategory
 import com.ai.assistance.operit.ui.features.packages.market.MarketStatsType
 import com.ai.assistance.operit.ui.features.packages.screens.market.viewmodel.RepoMarketPublishViewModel
+import com.ai.assistance.operit.ui.theme.ThemeDropdownMenuV2
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -464,17 +465,23 @@ private fun RepoCategoryDropdown(
             },
             isError = enabled && selectedCategory.isBlank()
         )
-        DropdownMenu(
+        ThemeDropdownMenuV2(
             expanded = expanded,
-            onDismissRequest = { expanded = false }
+            onDismissRequest = { expanded = false },
         ) {
+            val menuContentColor = LocalContentColor.current
             categories.forEach { category ->
                 DropdownMenuItem(
-                    text = { Text(marketCategoryLabel(category.id)) },
+                    text = {
+                        Text(
+                            text = marketCategoryLabel(category.id),
+                            color = menuContentColor,
+                        )
+                    },
                     onClick = {
                         onCategorySelected(category.id)
                         expanded = false
-                    }
+                    },
                 )
             }
         }

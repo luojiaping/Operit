@@ -229,9 +229,17 @@ internal object ThemeComponentCatalogV2 {
         skin: ThemeComponentSkinV2,
     ): List<String> =
         buildList {
-            if (component == INPUT) {
-                if (skin.focused == null) add("focused")
-                if (skin.error == null) add("error")
+            when (component) {
+                INPUT -> {
+                    if (skin.focused == null) add("focused")
+                    if (skin.error == null) add("error")
+                }
+
+                STATUS -> {
+                    if (skin.error == null) add("error")
+                }
+
+                else -> Unit
             }
         }
 }

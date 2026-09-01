@@ -18,9 +18,11 @@
 
 [DONE] 默认与赛博主题源的 `scripts/package.sh` 已校验 direct surface 的 host kind、同名 scene ID、未知 ID 与 skin ID。无 basis 的默认包还必须完整覆盖 37 个 surface 和 16 个 component skin，防止生成应用 runtime 会隔离的 archive。
 
-[DONE] `input.focused` 与 `input.error` 已是生产交互 state。archive validator 拒绝不完整的 direct input skin，linker 拒绝继承链合并后不完整的 input skin；默认与赛博主题源的 package script 同步检查两者。
+[DONE] `input.focused`、`input.error` 与 `status.error` 都已是生产 required state。archive validator 拒绝不完整的 direct input/status skin，linker 拒绝继承链合并后不完整的 skin；默认与赛博主题源的 package script 同步检查这些状态。
 
-[DONE] Input interaction-state preview 已发布：[`operit.default`](https://github.com/luojiaping/operit-theme-default/releases/tag/input-preview-20260901-48ecba0) 的 `operit-default-2.1.0.otheme` SHA-256 为 `3ada292d108f11efaaa78e029db307229e2fada18ed15b4bd09a75b8323c8f13`；[`operit.cyber_grid`](https://github.com/luojiaping/operit-theme-cyber-grid/releases/tag/input-preview-20260901-312e6a4) 的 `operit-cyber-grid-2.1.0.otheme` SHA-256 为 `e60316ce282ffd7b035645217647ad28a67b9a575ad975841e5b59d6a17b0b1e`。两者均为 prerelease，坐标保持 `2.1.0`。
+[SUPERSEDED] Input interaction-state preview 已发布：[`operit.default`](https://github.com/luojiaping/operit-theme-default/releases/tag/input-preview-20260901-48ecba0) 的 SHA-256 为 `3ada292d108f11efaaa78e029db307229e2fada18ed15b4bd09a75b8323c8f13`；[`operit.cyber_grid`](https://github.com/luojiaping/operit-theme-cyber-grid/releases/tag/input-preview-20260901-312e6a4) 的 SHA-256 为 `e60316ce282ffd7b035645217647ad28a67b9a575ad975841e5b59d6a17b0b1e`。该 preview 未声明 `status.error`，不再是当前开发基线。
+
+[DONE] 当前本地开发 archive：`operit.default@2.1.0` SHA-256 为 `686bc48d09752de21a25a8abf6bf35246371816849da4ef33534f96bc1c9c964`，已同步 APK asset 与 runtime lock；`operit.cyber_grid@2.1.0` SHA-256 为 `36e9180ead6b2d10225819a5b1774189f025a753fe945d8490d347e2e2161488`，basis 精确指向新的 default archive。两者尚未发布为新的 GitHub preview。
 
 当后续新增复杂 scene、资源或 token 时，再以新 package version 发布默认包与赛博包，并按顺序更新：
 

@@ -18,6 +18,14 @@ class ThemeOverlaySurfaceHostV2Test {
             ThemeSurfaceCatalogV2.OVERLAY_SHEET.overlayComponent(),
         )
         assertEquals(
+            ThemeComponentCatalogV2.MENU,
+            ThemeSurfaceCatalogV2.OVERLAY_MENU.overlayComponent(),
+        )
+        assertEquals(
+            ThemeComponentCatalogV2.SNACKBAR,
+            ThemeSurfaceCatalogV2.OVERLAY_SNACKBAR.overlayComponent(),
+        )
+        assertEquals(
             ThemeComponentCatalogV2.SNACKBAR,
             ThemeSurfaceCatalogV2.OVERLAY_TOAST.overlayComponent(),
         )

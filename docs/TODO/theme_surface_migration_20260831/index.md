@@ -32,7 +32,8 @@ V2 主题包已经声明 37 个日常 surface 和 16 个组件 skin，但运行�
 - `app.shell`：已由 `AppShellSceneHost` 实际渲染。
 - `chat.main`：已由 `ChatMainSceneHost` 实际渲染。
 - 聊天 header、消息、composer 与 input：已消费 `ThemeComponentSurfaceV2`。
-- 其余 surface：已经被 linker 覆盖校验，但多数只停留在 manifest 层。
+- 其余原生 route 已由 `ThemeSurfaceHostV2` 消费对应 page 或 host-shell skin；导航、loading、WebSession dialog/sheet、chat toast、Package Manager snackbar 与 Repo Market category menu 也已有 production consumer。
+- `chat.floating`、`chat.permission_overlay`、`browser.shell`、`web_chat.main`、`media.shell`、`state.empty` 与 `state.error` 仍只有 manifest/policy 覆盖，待后续 batch 接入。
 
 ## 迁移原则
 
@@ -56,6 +57,7 @@ V2 主题包已经声明 37 个日常 surface 和 16 个组件 skin，但运行�
 10. [测试、发布与验收](9_TestingRolloutAndAcceptance.md)
 11. [Overlay Primitive 试点](10_OverlayPrimitivesPilot.md)
 12. [Input Primitive 试点](11_InputPrimitivePilot.md)
+13. [Operation Status 与共享 Overlay 试点](12_OperationStatusAndSharedOverlayPilot.md)
 
 ## 依赖
 
@@ -78,5 +80,7 @@ V2 主题包已经声明 37 个日常 surface 和 16 个组件 skin，但运行�
 [DONE] Overlay primitive 试点已完成 release 编译；产物记录见 [测试、发布与验收](9_TestingRolloutAndAcceptance.md)。JVM/Android test 尚未执行。
 
 [DONE] Input primitive 试点已完成 release 编译；产物记录见 [测试、发布与验收](9_TestingRolloutAndAcceptance.md)。JVM/Android test 尚未执行。
+
+[DONE] 第三批共享反馈与 overlay 最小生产试点：Package Manager snackbar、Repo Market category menu 与 operation status success/error 已接入 V2 skin；focused tests 已新增但尚未执行。
 
 [TODO] 后续页面家族、独立宿主、主题归档与设备验收按各步骤文档推进。

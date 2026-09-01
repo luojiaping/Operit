@@ -7,14 +7,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -24,6 +20,9 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.ai.assistance.operit.data.theme.packages.ThemeComponentCatalogV2
+import com.ai.assistance.operit.ui.theme.ThemeComponentStateV2
+import com.ai.assistance.operit.ui.theme.ThemeComponentSurfaceV2
 import com.ai.assistance.operit.ui.theme.renderer.catalog.NativeThemeComponentCatalogV1
 import com.ai.assistance.operit.ui.theme.renderer.catalog.NativeThemeComponentRendererV1
 
@@ -81,38 +80,33 @@ internal object NativeThemeOperationStatusRendererV1 :
         slots: NativeThemeOperationStatusSlotsV1,
         modifier: Modifier,
     ) {
-        val isError = state.kind == NativeThemeOperationStatusKindV1.ERROR
-        val containerColor =
-            if (isError) {
-                MaterialTheme.colorScheme.errorContainer
+        val componentState =
+            if (state.kind == NativeThemeOperationStatusKindV1.ERROR) {
+                ThemeComponentStateV2.ERROR
             } else {
-                MaterialTheme.colorScheme.primaryContainer
+                ThemeComponentStateV2.NORMAL
             }
-        val contentColor =
-            if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
-
-        Card(
+        ThemeComponentSurfaceV2(
+            component = ThemeComponentCatalogV2.STATUS,
+            state = componentState,
             modifier =
                 modifier.fillMaxWidth().semantics(mergeDescendants = true) {
                     liveRegion = LiveRegionMode.Polite
                 },
-            colors = CardDefaults.cardColors(containerColor = containerColor.copy(alpha = 0.2f)),
+            applyContentPadding = false,
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                CompositionLocalProvider(LocalContentColor provides contentColor) {
-                    slots.leading?.invoke(
-                        Modifier.padding(end = 16.dp).clearAndSetSemantics {},
-                    )
-                }
+                slots.leading?.invoke(
+                    Modifier.padding(end = 16.dp).clearAndSetSemantics {},
+                )
                 Column {
                     state.title?.let { title ->
                         Text(
                             text = title,
                             style = MaterialTheme.typography.titleMedium,
-                            color = contentColor,
                             modifier = Modifier.padding(bottom = 4.dp),
                         )
                     }

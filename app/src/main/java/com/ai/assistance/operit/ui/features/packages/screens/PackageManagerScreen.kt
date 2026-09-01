@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RectangleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Cloud
@@ -66,6 +67,8 @@ import com.ai.assistance.operit.ui.features.packages.dialogs.ScriptExecutionDial
 import com.ai.assistance.operit.ui.features.packages.lists.PackagesList
 import com.ai.assistance.operit.ui.features.packages.market.BindMarketSearchToTopBar
 import com.ai.assistance.operit.ui.features.packages.market.PluginCreationIntent
+import com.ai.assistance.operit.data.theme.packages.ThemeSurfaceCatalogV2
+import com.ai.assistance.operit.ui.theme.ThemeOverlaySurfaceHostV2
 import java.io.File
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
@@ -527,12 +530,20 @@ fun PackageManagerScreen(
     CustomScaffold(
         snackbarHost = {
             SnackbarHost(snackbarHostState) { data ->
-                Snackbar(
+                ThemeOverlaySurfaceHostV2(
+                    surface = ThemeSurfaceCatalogV2.OVERLAY_SNACKBAR,
                     modifier = Modifier.padding(16.dp),
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    snackbarData = data
-                )
+                    applyContentPadding = false,
+                ) {
+                    Snackbar(
+                        snackbarData = data,
+                        shape = RectangleShape,
+                        containerColor = Color.Transparent,
+                        contentColor = LocalContentColor.current,
+                        actionContentColor = LocalContentColor.current,
+                        dismissActionContentColor = LocalContentColor.current,
+                    )
+                }
             }
         },
         floatingActionButton = {
