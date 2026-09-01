@@ -759,17 +759,28 @@ object WaifuMessageProcessor {
             .lastOrNull()
             ?: ""
 
-    private fun lineAllowsStableWithoutSentenceEnding(line: String): Boolean {
+    // allowBlockPrefixExemption=false 用于流式截断缓冲的开放尾段：尾行即使带有
+    // 块前缀（如 "1. 今"、"## 标"）该行也尚未完结，块前缀不能作为"无句尾也可
+    // 发射"的稳定依据——否则编号/列表/标题行会被逐 chunk 切成 1-2 字碎片段
+    // （真机 WaifuStreamDiag 实测：buffer="1. 今天" 即发射 [今天]，随后 [天气]
+    // [真][不错][。]，每个词一条消息入库）。URL/邮箱行豁免不受此开关影响。
+    internal fun lineAllowsStableWithoutSentenceEnding(
+        line: String,
+        allowBlockPrefixExemption: Boolean = true,
+    ): Boolean {
         val trimmedLine = line.trim()
         if (trimmedLine.isEmpty()) {
             return false
         }
 
         if (
-            trimmedLine.startsWith("```") ||
-            trimmedLine.startsWith("|") ||
-            trimmedLine.startsWith("$$") ||
-            BLOCK_PREFIX_LIKE_REGEX.containsMatchIn(trimmedLine)
+            allowBlockPrefixExemption &&
+            (
+                trimmedLine.startsWith("```") ||
+                    trimmedLine.startsWith("|") ||
+                    trimmedLine.startsWith("$$") ||
+                    BLOCK_PREFIX_LIKE_REGEX.containsMatchIn(trimmedLine)
+            )
         ) {
             return true
         }
@@ -836,8 +847,19 @@ object WaifuMessageProcessor {
         hasFollowingStableBoundarySegment: Boolean,
         allowOwnBlockTypeExemption: Boolean = true,
     ): Boolean {
+        // 行前缀豁免与块边界豁免同门控（hasFollowingStableBoundarySegment 或
+        // allowOwnBlockTypeExemption 任一成立即该段所在块已闭合）：开放尾段的
+        // 前缀行仍在流式增长，不是完整行。此前仅块边界豁免受
+        // allowTailSegmentBlockExemption 门控，行前缀豁免旁路了它——这就是
+        // 编号行回复逐词碎片化的根因（前缀 "1. " 一出现，其后每个增量 chunk
+        // 都被判为可无句尾发射的稳定段）
+        val allowBlockPrefixLineExemption =
+            hasFollowingStableBoundarySegment || allowOwnBlockTypeExemption
         return !hasStableSentenceEnding(cleanedContent) &&
-            !lineAllowsStableWithoutSentenceEnding(getLastVisibleLine(rawContent)) &&
+            !lineAllowsStableWithoutSentenceEnding(
+                line = getLastVisibleLine(rawContent),
+                allowBlockPrefixExemption = allowBlockPrefixLineExemption
+            ) &&
             !segment.canUseBlockBoundaryAsStableEnding(
                 hasFollowingStableBoundarySegment = hasFollowingStableBoundarySegment,
                 allowOwnBlockTypeExemption = allowOwnBlockTypeExemption

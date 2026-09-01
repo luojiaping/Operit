@@ -76,16 +76,22 @@ function getLastVisibleLine(content) {
   return lines.length > 0 ? lines[lines.length - 1] : '';
 }
 
-function lineAllowsStableWithoutSentenceEnding(line) {
+// allowBlockPrefixExemption=false 对应 Kotlin 开放尾段（尾部块未闭合）：
+// 尾行即使带有块前缀（"1. 今"、"## 标"）该行也尚未完结，块前缀不能作为
+// "无句尾也可发射"的稳定依据，否则编号/列表/标题行被逐 chunk 切成 1-2 字碎片。
+// URL/邮箱行豁免不受此开关影响。
+function lineAllowsStableWithoutSentenceEnding(line, allowBlockPrefixExemption) {
   const trimmed = String(line || '').trim();
   if (!trimmed) {
     return false;
   }
-  if (/^(?:```|\|)/.test(trimmed) || /^\$\$/.test(trimmed)) {
-    return true;
-  }
-  if (/^(?:#+\s*|>\s*|[-*+]\s+|\d+\.\s+)/.test(trimmed)) {
-    return true;
+  if (allowBlockPrefixExemption === undefined || allowBlockPrefixExemption) {
+    if (/^(?:```|\|)/.test(trimmed) || /^\$\$/.test(trimmed)) {
+      return true;
+    }
+    if (/^(?:#+\s*|>\s*|[-*+]\s+|\d+\.\s+)/.test(trimmed)) {
+      return true;
+    }
   }
 
   const cleaned = trimmed
@@ -276,8 +282,10 @@ class JsPrototypeStreamingSession {
 
   collectStableSegments(content, tailSegmentOpen) {
     // 与 Kotlin StreamingSession 的 tailSegmentOpen 语义保持一致：
-    // 尾部块未闭合时，最后一段若无稳定句尾（且非 URL/邮件行）则扣留，
-    // 防止流式标题行被逐 chunk 切成单字/单标点碎片段；
+    // 尾部块未闭合时，最后一段若无稳定句尾则扣留（URL/邮件行除外），
+    // 防止流式标题行被逐 chunk 切成单字/单标点碎片段；块前缀行（"1. 今"、
+    // "## 标"）同样扣留——行仍在增长不是完整行，此前仅凭前缀即判稳定，
+    // 编号行回复被逐词切成 1-2 字碎片段；
     // 另对"数字."悬空形态扣留——句点后无字符时可能是句尾也可能是
     // 正在形成的有序列表前缀（后随空白即被 clean 删除），先发射后删除
     // 会触发前缀回滚
@@ -287,7 +295,7 @@ class JsPrototypeStreamingSession {
       const hasStableEnding = SENTENCE_END_RE.test(last);
       const stableWithoutEnding =
         !hasStableEnding &&
-        lineAllowsStableWithoutSentenceEnding(getLastVisibleLine(content));
+        lineAllowsStableWithoutSentenceEnding(getLastVisibleLine(content), false);
       const danglingOrderedListMarker = /^\d+\.$/.test(last);
       if ((!hasStableEnding && !stableWithoutEnding) || danglingOrderedListMarker) {
         segments = segments.slice(0, -1);
@@ -586,6 +594,63 @@ function buildTests(adapter) {
         false,
         'dangling marker must not be emitted'
       );
+    }),
+    test('streaming session: open-tail prefixed lines emit whole lines, not per-word fragments', () => {
+      // 回归用例：复现编号行回复被逐词切成 1-2 字消息的碎片化问题（真机
+      // WaifuStreamDiag：buffer="1. 今天" 即发射 [今天]，随后 [天气][真][不错][。]，
+      // 每个词一条消息入库、污染会话历史）。
+      // 根因：尾部块未闭合时行前缀（^\d+\.\s+ 等）仍被当作"无句尾也可发射"
+      // 的稳定依据——前缀 "1. " 一出现，其后每个增量 chunk 都被判稳定发射。
+      // 修复后：开放尾段的前缀行被扣留，句尾（。）到达或块闭合时整行发射。
+      const input =
+        '1. 今天天气真不错。\n' +
+        '2. 我们出去散步吧。\n' +
+        '3. 路边的花都开了。\n' +
+        '4. 空气里有青草味。\n' +
+        '5. 你最近过得好吗。\n' +
+        '6. 我昨天看了场电影。\n' +
+        '7. 结局特别让人意外。\n' +
+        '8. 下次一起去看吧。\n' +
+        '9. 我请你喝奶茶哦。\n' +
+        '10. 就这么说定啦。';
+      const finalSegments = adapter.splitMessageBySentences(input, false);
+      const expectedText = finalSegments.join('');
+
+      // 真机 delta 序列还原：每行 piece 边界与 WaifuStreamDiag 日志一致
+      // （"1"|"."|" "|1-2 字分词|…|"。\n"）
+      const pieces = [];
+      input.split('\n').forEach((line) => {
+        const markerMatch = line.match(/^(\d+)(\.)(\s)([\s\S]*)$/);
+        pieces.push(markerMatch[1], markerMatch[2], markerMatch[3]);
+        const words = markerMatch[4].match(/.{1,2}/g) || [];
+        words.forEach((word, index) => {
+          pieces.push(index === words.length - 1 ? word + '\n' : word);
+        });
+      });
+
+      const session = adapter.createStreamingSession(false);
+      const emitted = [];
+      let buffer = '';
+      for (const piece of pieces) {
+        buffer += piece;
+        // 块内 piece 到达：尾部块未闭合
+        session.collectStableSegments(buffer, true).forEach((segment) => emitted.push(segment));
+        // 换行即该块闭合（与 nativeMarkdownSplitByBlock 的 flush 时机一致）
+        if (piece.endsWith('\n')) {
+          session.collectStableSegments(buffer, false).forEach((segment) => emitted.push(segment));
+        }
+      }
+      session.collectFinalSegments(input).forEach((segment) => emitted.push(segment));
+
+      assertEq(
+        emitted.join('').replace(/\s+/g, ''),
+        expectedText.replace(/\s+/g, ''),
+        'ordered-list piece replay emitted text mismatch'
+      );
+      const fragments = emitted.filter((segment) => segment.replace(/\s/g, '').length <= 2);
+      assertEq(fragments.length, 0, 'unexpected tiny fragments: ' + JSON.stringify(fragments));
+      // 每行恰一个整行段：发射序列与最终分段完全一致（无逐词增量）
+      assertListEq(emitted, finalSegments);
     }),
     test('streaming session: markdown document replay never drops incremental text', () => {
       // 回归用例：复现 Markdown 长文档流式回复被截断的问题。
