@@ -52,4 +52,6 @@
 
 [DONE] Input primitive 试点已新增 state priority、archive/linker interaction-state contract、input frame/content/disabled semantics、Memory IME search callback、WebSession prompt 与 File Manager search confirm callback test；尚未执行测试命令。
 
+[DONE] 构建服务已同步 `ed980b5f` 并完成 release 编译：`operit-release-feat_plugin-interface-ed980b5f.apk`，SHA-256 `7eef2a88ab0bb75c4d37730de791789c86b7bf0f9749a9d6ccf4b6f930902e19`。本次未执行 JVM/Android test。
+
 [TODO] 第一批 device acceptance。
