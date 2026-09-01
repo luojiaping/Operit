@@ -121,12 +121,23 @@
   pointer-events: none;
   background: rgba(0, 0, 0, 0.32);
   opacity: 0;
-  transition: opacity 300ms ease;
+  /* visibility 隐藏让整棵子树（含 backdrop-filter 玻璃卡）彻底退出绘制树：
+     仅靠 opacity:0 时 Chromium 会为 backdrop-filter 后代保留合成层，
+     半透明黑 scrim 的合成残留会盖在顶栏等亮色区域上 */
+  visibility: hidden;
+  transition:
+    opacity 300ms ease,
+    visibility 0s linear 300ms;
 }
 
 .app-drawer-root.is-open {
   pointer-events: auto;
   opacity: 1;
+  visibility: visible;
+  /* 打开时无延迟恢复可见，关闭动画 300ms 播完后再隐藏 */
+  transition:
+    opacity 300ms ease,
+    visibility 0s;
 }
 
 .app-drawer {
