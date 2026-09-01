@@ -101,27 +101,48 @@ object WaifuMessageProcessor {
                 return emptyList()
             }
 
-            if (segments.size < emittedSegments.size) {
+            val emittedText = emittedSegments.joinToString("")
+            val currentText = segments.joinToString("")
+
+            // 正确性修复：原实现按"分段列表逐项全等"判定前缀，但流式重算会因
+            // 标点合并（mergePunctuationOnlySegments）、未闭合行内标记的暂扣/释放而重新分组——
+            // 拼接字符完全一致时列表却不等，一旦误判即从该 chunk 起永久吞掉后续全部增量
+            // （表现为 Markdown 长回复中段截断、仅剩流末 collectFinalSegments 兜出的碎片）。
+            // 这里改为字符级前缀对齐：只要当前拼接文本仍以已发射文本为前缀，就对齐到
+            // 分段边界并继续发射增量；真正的内容回滚（前缀字符被改写）仍然整体丢弃。
+            if (!currentText.startsWith(emittedText)) {
                 AppLogger.w(
                     "WaifuMessageProcessor",
-                    "流式分句结果短于已输出结果，忽略本次快照: emitted=${emittedSegments.size}, current=${segments.size}"
+                    "流式分句前缀发生内容回滚，忽略本次增量: " +
+                        "emittedChars=${emittedText.length}, currentChars=${currentText.length}"
                 )
                 return emptyList()
             }
 
-            val prefixMatches =
-                emittedSegments.indices.all { index ->
-                    emittedSegments[index] == segments[index]
+            // 在分段边界上重新对齐：丢弃与已发射字符重叠的分段，只发射其后的新分段。
+            // 分段在字符级前缀上单调追加（重算只会在尾部扩展或重新分组），因此一旦某个
+            // 分段的起点 >= 已发射字符数，其后所有分段都是纯新增；跨越边界的分段说明
+            // 发生了重新分组（如标点被并入前一段），其超出边界的尾部仍属新增内容。
+            var consumedChars = 0
+            var segmentIndex = 0
+            while (segmentIndex < segments.size) {
+                val segment = segments[segmentIndex]
+                if (consumedChars + segment.length > emittedText.length) {
+                    if (consumedChars < emittedText.length) {
+                        // 分段跨越已发射边界：超出部分与后续分段一并发射
+                        val remainder = segment.substring(emittedText.length - consumedChars)
+                        emittedSegments.add(remainder)
+                        val following = segments.drop(segmentIndex + 1)
+                        emittedSegments.addAll(following)
+                        return listOf(remainder) + following
+                    }
+                    break
                 }
-            if (!prefixMatches) {
-                AppLogger.w(
-                    "WaifuMessageProcessor",
-                    "流式分句前缀发生变化，忽略不可回滚的增量输出"
-                )
-                return emptyList()
+                consumedChars += segment.length
+                segmentIndex += 1
             }
 
-            val newSegments = segments.drop(emittedSegments.size)
+            val newSegments = segments.drop(segmentIndex)
             emittedSegments.addAll(newSegments)
             return newSegments
         }

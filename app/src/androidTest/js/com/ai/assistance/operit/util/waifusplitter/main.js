@@ -186,15 +186,31 @@ class JsPrototypeStreamingSession {
     if (segments.length === 0) {
       return [];
     }
-    if (segments.length < this.emittedSegments.length) {
+    // 与 Kotlin StreamingSession.collectSegments 保持一致的字符级前缀对齐：
+    // 拼接文本仍以已发射文本为前缀时按边界继续发射增量，只有真正的内容回滚才丢弃。
+    const emittedText = this.emittedSegments.join('');
+    const currentText = segments.join('');
+    if (!currentText.startsWith(emittedText)) {
       return [];
     }
-    for (let i = 0; i < this.emittedSegments.length; i += 1) {
-      if (this.emittedSegments[i] !== segments[i]) {
-        return [];
+    let consumedChars = 0;
+    let segmentIndex = 0;
+    while (segmentIndex < segments.length) {
+      const segment = segments[segmentIndex];
+      if (consumedChars + segment.length > emittedText.length) {
+        if (consumedChars < emittedText.length) {
+          const remainder = segment.substring(emittedText.length - consumedChars);
+          this.emittedSegments.push(remainder);
+          const following = segments.slice(segmentIndex + 1);
+          this.emittedSegments.push(...following);
+          return [remainder].concat(following);
+        }
+        break;
       }
+      consumedChars += segment.length;
+      segmentIndex += 1;
     }
-    const next = segments.slice(this.emittedSegments.length);
+    const next = segments.slice(segmentIndex);
     this.emittedSegments.push(...next);
     return next;
   }
@@ -412,6 +428,36 @@ function buildTests(adapter) {
       assertListEq(firstSentence, ['放心，这次只收到 1条"?" 了，没有重复！']);
       assertListEq(fullStable, []);
       assertListEq(finalPart, ['✅ 看来软件今天表现正常了😊']);
+    }),
+    test('streaming session: markdown document replay never drops incremental text', () => {
+      // 回归用例：复现 Markdown 长文档流式回复被截断的问题。
+      // 旧实现按"分段列表逐项全等"判定前缀，流式重算因标点合并/未闭合标记暂扣而
+      // 重新分组时误判"前缀变化"，从该 chunk 起永久吞掉全部增量。
+      // 修复后按字符级前缀对齐，任意 chunk 粒度下发射总拼接必须等于全文最终分段拼接。
+      const input =
+        '好的，这是为你生成的说明文档：\n' +
+        '---\n' +
+        '## 幸福者退让原则\n' +
+        '**一、什么是幸福者退让**\n' +
+        '"幸福者退让"是一种生活哲学，核心是主动退让。这一原则的出发点并非软弱！\n' +
+        '**二、核心理念**\n' +
+        '幸福的人面对争执会选择退让一步，避免事态升级，不值得用意气去冒险。\n' +
+        '---\n' +
+        '全文约480字，随时告诉我！';
+      const finalSegments = adapter.splitMessageBySentences(input, false);
+      const expectedText = finalSegments.join('');
+      // 覆盖 1/3/7/32 字符步长：粗粒度触发暂扣/释放重组，细粒度触发逐字符追加
+      [1, 3, 7, 32].forEach((step) => {
+        const session = adapter.createStreamingSession(false);
+        const emitted = [];
+        for (let offset = 0; offset < input.length; offset += step) {
+          // 逐步扩大前缀重放（与 renderableBuffer 语义一致）
+          session.collectStableSegments(input.substring(0, Math.min(offset + step, input.length)))
+            .forEach((segment) => emitted.push(segment));
+        }
+        session.collectFinalSegments(input).forEach((segment) => emitted.push(segment));
+        assertEq(emitted.join(''), expectedText, 'chunk step=' + step + ' emitted text mismatch');
+      });
     }),
     test('markdown split: inline bold count keeps screenshot sentence boundaries', () => {
       const out = adapter.splitMessageBySentences(buildInlineBoldScreenshotInput(), false);
