@@ -277,14 +277,19 @@ class JsPrototypeStreamingSession {
   collectStableSegments(content, tailSegmentOpen) {
     // 与 Kotlin StreamingSession 的 tailSegmentOpen 语义保持一致：
     // 尾部块未闭合时，最后一段若无稳定句尾（且非 URL/邮件行）则扣留，
-    // 防止流式标题行被逐 chunk 切成单字/单标点碎片段
+    // 防止流式标题行被逐 chunk 切成单字/单标点碎片段；
+    // 另对"数字."悬空形态扣留——句点后无字符时可能是句尾也可能是
+    // 正在形成的有序列表前缀（后随空白即被 clean 删除），先发射后删除
+    // 会触发前缀回滚
     let segments = this.adapter.splitStableMessageSegments(content, this.removePunctuation);
     if (tailSegmentOpen && segments.length > 0) {
       const last = segments[segments.length - 1];
-      if (
-        !SENTENCE_END_RE.test(last) &&
-        !lineAllowsStableWithoutSentenceEnding(getLastVisibleLine(content))
-      ) {
+      const hasStableEnding = SENTENCE_END_RE.test(last);
+      const stableWithoutEnding =
+        !hasStableEnding &&
+        lineAllowsStableWithoutSentenceEnding(getLastVisibleLine(content));
+      const danglingOrderedListMarker = /^\d+\.$/.test(last);
+      if ((!hasStableEnding && !stableWithoutEnding) || danglingOrderedListMarker) {
         segments = segments.slice(0, -1);
       }
     }
@@ -536,6 +541,51 @@ function buildTests(adapter) {
       );
       const fragments = emitted.filter((segment) => segment.replace(/\s/g, '').length <= 2);
       assertEq(fragments.length, 0, 'unexpected tiny fragments: ' + JSON.stringify(fragments));
+    }),
+    test('streaming session: dangling ordered list marker is withheld until disambiguated', () => {
+      // 回归用例：复现编号行回复整条只剩 "1." 的截断问题。
+      // 流式缓冲以 "1." 结尾时句点被当作稳定句尾发射；下一字符为空白后
+      // clean 的有序列表前缀规则（^\d+\.\s+）把 "1. " 删除，已发射内容被改写，
+      // 触发前缀回滚并丢弃其后全部增量。修复后悬空 "数字." 被扣留到下一字符定性。
+      const input =
+        '1. 今天天气真不错。\n' +
+        '2. 我们出去散步吧。\n' +
+        '3. 路边的花都开了。\n' +
+        '4. 空气里有青草味。\n' +
+        '5. 就这么说定啦。';
+      const finalSegments = adapter.splitMessageBySentences(input, false);
+      const expectedText = finalSegments.join('');
+
+      const session = adapter.createStreamingSession(false);
+      const emitted = [];
+      const originalCollect = session.collectStableSegments.bind(session);
+      for (let i = 0; i < input.length; i += 1) {
+        const prefix = input.substring(0, i + 1);
+        // 块内字符增量：尾部块未闭合（悬空标记在此被扣留）
+        originalCollect(prefix, true).forEach((segment) => emitted.push(segment));
+        if (input[i] === '\n') {
+          originalCollect(prefix, false).forEach((segment) => emitted.push(segment));
+        }
+      }
+      session.collectFinalSegments(input).forEach((segment) => emitted.push(segment));
+
+      // 最终分句不含悬空 "数字."（完整文本中列表前缀被 clean 删除）
+      assertEq(
+        finalSegments.some((segment) => /^\d+\.$/.test(segment)),
+        false,
+        'final segments should not contain dangling markers'
+      );
+      assertEq(
+        emitted.join('').replace(/\s+/g, ''),
+        expectedText.replace(/\s+/g, ''),
+        'ordered-list replay emitted text mismatch'
+      );
+      // 悬空标记从未被发射（否则 "1." 会作为碎片段出现在输出中）
+      assertEq(
+        emitted.some((segment) => /^\d+\.$/.test(segment)),
+        false,
+        'dangling marker must not be emitted'
+      );
     }),
     test('streaming session: markdown document replay never drops incremental text', () => {
       // 回归用例：复现 Markdown 长文档流式回复被截断的问题。

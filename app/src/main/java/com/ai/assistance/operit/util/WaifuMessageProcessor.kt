@@ -41,6 +41,12 @@ object WaifuMessageProcessor {
     private val ENTITY_PLACEHOLDER_REGEX =
         Regex("${Regex.escape(ENTITY_PLACEHOLDER_PREFIX)}(\\d+)${Regex.escape(ENTITY_PLACEHOLDER_SUFFIX)}")
 
+    // 整句恰为"数字."（如 "1."）——流式中有序列表标记的悬空形态：
+    // 句点后尚无字符时 clean 不会将其按列表前缀删除（需要后随空白），而句点本身
+    // 是稳定句尾会被立即发射；下一字符若是空白则语义翻转为列表前缀并被删除，
+    // 造成已发射内容被改写（详见 splitMessageBySentencesInternal 内的 hold 注释）
+    private val DANGLING_ORDERED_LIST_MARKER_REGEX = Regex("\\d+\\.")
+
     // 性能修复：以下正则原先散落在各方法内部、每次调用都 toRegex 重新编译。
     // 流式分句会对每个 chunk 的累积全文重算（见 collectStableSegments），这些正则随之
     // 被高频重复编译，长回复下开销可观；pattern 均为静态字面量，统一预编译为对象级常量。
@@ -529,6 +535,21 @@ object WaifuMessageProcessor {
                                 allowTailSegmentBlockExemption[segmentIndex]
                         )
                     ) {
+                        sentences = sentences.dropLast(1)
+                    } else if (
+                        tailSegmentOpen &&
+                        sentences.last().matches(DANGLING_ORDERED_LIST_MARKER_REGEX)
+                    ) {
+                        // 悬空有序列表标记 hold（正确性修复）：流式缓冲以"数字."结尾且其后
+                        // 尚无字符时，该句点既可能是句尾（当下 clean 保留、被判稳定而发射），
+                        // 也可能是正在形成的有序列表前缀（下一字符为空白时 clean 的
+                        // ^\d+\.\s+ 会将其删除）。先按句尾发射、后续又按列表前缀删除，
+                        // 已发射内容即被改写，触发前缀回滚并丢弃其后全部增量——表现为
+                        // 编号行回复整条只剩 "1."。悬空时扣留该句，待下一字符定性：
+                        // 后随空白则作为列表标记被删除（从未发射，无回滚）；后随非空白
+                        // （如 "3.14"）则不构成列表前缀，保留为正文句尾发射。
+                        // 仅在尾部块未闭合（tailSegmentOpen）时应用，非流式入口对完整
+                        // 文本的拆分行为不受影响。
                         sentences = sentences.dropLast(1)
                     }
                 }
