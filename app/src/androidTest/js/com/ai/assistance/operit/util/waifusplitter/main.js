@@ -46,8 +46,8 @@ function createKotlinAdapter() {
     createStreamingSession(removePunctuation) {
       const session = new StreamingSession(!!removePunctuation);
       return {
-        collectStableSegments(content) {
-          return normalizeList(session.collectStableSegments(content));
+        collectStableSegments(content, tailSegmentOpen) {
+          return normalizeList(session.collectStableSegments(content, !!tailSegmentOpen));
         },
         collectFinalSegments(content) {
           return normalizeList(session.collectFinalSegments(content));
@@ -179,46 +179,116 @@ class JsPrototypeStreamingSession {
   constructor(adapter, removePunctuation) {
     this.adapter = adapter;
     this.removePunctuation = !!removePunctuation;
-    this.emittedSegments = [];
+    // 已发射内容的非空白字符视图（与 Kotlin StreamingSession.emittedCompact 一致）
+    this.emittedCompact = '';
   }
 
   collectSegments(segments) {
     if (segments.length === 0) {
       return [];
     }
-    // 与 Kotlin StreamingSession.collectSegments 保持一致的字符级前缀对齐：
-    // 拼接文本仍以已发射文本为前缀时按边界继续发射增量，只有真正的内容回滚才丢弃。
-    const emittedText = this.emittedSegments.join('');
+    // 与 Kotlin StreamingSession.collectSegments 保持一致的空白弹性前缀对齐：
+    // clean 的空白折叠与段级 trim 会改变空白归属，空白不属于用户内容，按非空白
+    // 字符序列对齐；非空白字符被改写才视为内容回滚并整体丢弃。
     const currentText = segments.join('');
-    if (!currentText.startsWith(emittedText)) {
+    let cursor = 0;
+    let emittedIndex = 0;
+    let prefixMatches = true;
+    while (emittedIndex < this.emittedCompact.length) {
+      while (cursor < currentText.length && /\s/.test(currentText[cursor])) {
+        cursor += 1;
+      }
+      if (cursor >= currentText.length || currentText[cursor] !== this.emittedCompact[emittedIndex]) {
+        prefixMatches = false;
+        break;
+      }
+      cursor += 1;
+      emittedIndex += 1;
+    }
+    if (!prefixMatches) {
       return [];
     }
-    let consumedChars = 0;
+
+    const countNonWhitespace = (text) => {
+      let count = 0;
+      for (const ch of text) {
+        if (!/\s/.test(ch)) {
+          count += 1;
+        }
+      }
+      return count;
+    };
+    const appendNonWhitespace = (text) => {
+      for (const ch of text) {
+        if (!/\s/.test(ch)) {
+          this.emittedCompact += ch;
+        }
+      }
+    };
+
+    const newSegments = [];
+    let compactSeen = 0;
     let segmentIndex = 0;
     while (segmentIndex < segments.length) {
       const segment = segments[segmentIndex];
-      if (consumedChars + segment.length > emittedText.length) {
-        if (consumedChars < emittedText.length) {
-          const remainder = segment.substring(emittedText.length - consumedChars);
-          this.emittedSegments.push(remainder);
+      const nonWhitespaceInSegment = countNonWhitespace(segment);
+      if (compactSeen + nonWhitespaceInSegment > this.emittedCompact.length) {
+        if (compactSeen < this.emittedCompact.length) {
+          let remaining = this.emittedCompact.length - compactSeen;
+          let cut = 0;
+          while (cut < segment.length && remaining > 0) {
+            if (!/\s/.test(segment[cut])) {
+              remaining -= 1;
+            }
+            cut += 1;
+          }
+          const remainder = segment.substring(cut).trim();
+          if (remainder.length > 0) {
+            newSegments.push(remainder);
+            appendNonWhitespace(remainder);
+          }
           const following = segments.slice(segmentIndex + 1);
-          this.emittedSegments.push(...following);
-          return [remainder].concat(following);
+          for (const next of following) {
+            const trimmed = next.trim();
+            if (trimmed.length > 0) {
+              newSegments.push(trimmed);
+              appendNonWhitespace(trimmed);
+            }
+          }
+        } else {
+          // 发射点与分段边界对齐（含首次发射）：当前段起全部为新增
+          const following = segments.slice(segmentIndex);
+          for (const next of following) {
+            const trimmed = next.trim();
+            if (trimmed.length > 0) {
+              newSegments.push(trimmed);
+              appendNonWhitespace(trimmed);
+            }
+          }
         }
-        break;
+        return newSegments;
       }
-      consumedChars += segment.length;
+      compactSeen += nonWhitespaceInSegment;
       segmentIndex += 1;
     }
-    const next = segments.slice(segmentIndex);
-    this.emittedSegments.push(...next);
-    return next;
+    return newSegments;
   }
 
-  collectStableSegments(content) {
-    return this.collectSegments(
-      this.adapter.splitStableMessageSegments(content, this.removePunctuation)
-    );
+  collectStableSegments(content, tailSegmentOpen) {
+    // 与 Kotlin StreamingSession 的 tailSegmentOpen 语义保持一致：
+    // 尾部块未闭合时，最后一段若无稳定句尾（且非 URL/邮件行）则扣留，
+    // 防止流式标题行被逐 chunk 切成单字/单标点碎片段
+    let segments = this.adapter.splitStableMessageSegments(content, this.removePunctuation);
+    if (tailSegmentOpen && segments.length > 0) {
+      const last = segments[segments.length - 1];
+      if (
+        !SENTENCE_END_RE.test(last) &&
+        !lineAllowsStableWithoutSentenceEnding(getLastVisibleLine(content))
+      ) {
+        segments = segments.slice(0, -1);
+      }
+    }
+    return this.collectSegments(segments);
   }
 
   collectFinalSegments(content) {
@@ -429,6 +499,44 @@ function buildTests(adapter) {
       assertListEq(fullStable, []);
       assertListEq(finalPart, ['✅ 看来软件今天表现正常了😊']);
     }),
+    test('streaming session: unclosed header line is withheld instead of emitted per character', () => {
+      // 回归用例：复现流式标题行被逐 chunk 切成单字/单标点碎片段的问题。
+      // 旧实现中尾部未闭合块的类型（HEADER 等）被当作"无句尾也可发射"的稳定依据，
+      // 导致 `## "雍正与乔引娣"故事简介` 在流式过程中发射为 "、雍、正、与、乔… 碎片。
+      // 修复后：块内增量以 tailSegmentOpen=true 重算（扣留无句尾尾段），
+      // 换行（块闭合）后以 tailSegmentOpen=false 重算（整行发射）。
+      const input =
+        '让我为你梳理一下这个故事：\n' +
+        '## "雍正与乔引娣"故事简介\n' +
+        '### 📖 人物背景\n' +
+        '乔引娣是二月河小说中虚构的民间女子，被皇十四子救下。\n' +
+        '### 🌹 故事脉络\n' +
+        '太后乌雅氏病逝归葬景陵时，身份低微的她为雍正奉茶。\n' +
+        '这剧情确实离谱。';
+      const finalSegments = adapter.splitMessageBySentences(input, false);
+      const expectedText = finalSegments.join('');
+
+      const session = adapter.createStreamingSession(false);
+      const emitted = [];
+      for (let i = 0; i < input.length; i += 1) {
+        const prefix = input.substring(0, i + 1);
+        // 块内字符增量：尾部块未闭合
+        session.collectStableSegments(prefix, true).forEach((segment) => emitted.push(segment));
+        // 换行到达即该块闭合（与 nativeMarkdownSplitByBlock 的 flush 时机一致）
+        if (input[i] === '\n') {
+          session.collectStableSegments(prefix, false).forEach((segment) => emitted.push(segment));
+        }
+      }
+      session.collectFinalSegments(input).forEach((segment) => emitted.push(segment));
+
+      assertEq(
+        emitted.join('').replace(/\s+/g, ''),
+        expectedText.replace(/\s+/g, ''),
+        'header streaming emitted text mismatch'
+      );
+      const fragments = emitted.filter((segment) => segment.replace(/\s/g, '').length <= 2);
+      assertEq(fragments.length, 0, 'unexpected tiny fragments: ' + JSON.stringify(fragments));
+    }),
     test('streaming session: markdown document replay never drops incremental text', () => {
       // 回归用例：复现 Markdown 长文档流式回复被截断的问题。
       // 旧实现按"分段列表逐项全等"判定前缀，流式重算因标点合并/未闭合标记暂扣而
@@ -456,7 +564,12 @@ function buildTests(adapter) {
             .forEach((segment) => emitted.push(segment));
         }
         session.collectFinalSegments(input).forEach((segment) => emitted.push(segment));
-        assertEq(emitted.join(''), expectedText, 'chunk step=' + step + ' emitted text mismatch');
+        // 段级 trim 会在段边界丢弃空白，按非空白字符比较内容完整性
+        assertEq(
+          emitted.join('').replace(/\s+/g, ''),
+          expectedText.replace(/\s+/g, ''),
+          'chunk step=' + step + ' emitted text mismatch'
+        );
       });
     }),
     test('markdown split: inline bold count keeps screenshot sentence boundaries', () => {

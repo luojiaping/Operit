@@ -74,14 +74,16 @@ object WaifuMessageProcessor {
     class StreamingSession(
         private val removePunctuation: Boolean = false
     ) {
-        private val emittedSegments = mutableListOf<String>()
-
-        fun collectStableSegments(content: String): List<String> {
+        fun collectStableSegments(
+            content: String,
+            tailSegmentOpen: Boolean = false,
+        ): List<String> {
             return collectSegments(
                 splitMessageBySentencesInternal(
                     content = buildRenderableContentForWaifu(content),
                     removePunctuation = removePunctuation,
                     includeTrailingIncomplete = false,
+                    tailSegmentOpen = tailSegmentOpen,
                 )
             )
         }
@@ -96,54 +98,115 @@ object WaifuMessageProcessor {
             )
         }
 
+        // 已发射内容的非空白字符视图：cleanContentForWaifu 的空白折叠与段级 trim 会改变
+        // 空白在段边界处的归属（如跨行合并句的行间空格被段 trim 吃掉），空白不属于用户
+        // 内容，前缀对齐与增量切分均按非空白字符序列进行
+        private val emittedCompact = StringBuilder()
+
+        private fun appendNonWhitespace(target: StringBuilder, source: String) {
+            for (c in source) {
+                if (!c.isWhitespace()) {
+                    target.append(c)
+                }
+            }
+        }
+
         private fun collectSegments(segments: List<String>): List<String> {
             if (segments.isEmpty()) {
                 return emptyList()
             }
 
-            val emittedText = emittedSegments.joinToString("")
             val currentText = segments.joinToString("")
 
             // 正确性修复：原实现按"分段列表逐项全等"判定前缀，但流式重算会因
             // 标点合并（mergePunctuationOnlySegments）、未闭合行内标记的暂扣/释放而重新分组——
             // 拼接字符完全一致时列表却不等，一旦误判即从该 chunk 起永久吞掉后续全部增量
             // （表现为 Markdown 长回复中段截断、仅剩流末 collectFinalSegments 兜出的碎片）。
-            // 这里改为字符级前缀对齐：只要当前拼接文本仍以已发射文本为前缀，就对齐到
-            // 分段边界并继续发射增量；真正的内容回滚（前缀字符被改写）仍然整体丢弃。
-            if (!currentText.startsWith(emittedText)) {
+            // 这里按非空白字符做前缀对齐：只要当前拼接文本的非空白序列仍以已发射非空白
+            // 序列为前缀，就对齐到分段边界并继续发射增量；非空白字符被改写才是真正的
+            // 内容回滚，仍然整体丢弃。
+            var cursor = 0
+            var emittedIndex = 0
+            var prefixMatches = true
+            while (emittedIndex < emittedCompact.length) {
+                while (cursor < currentText.length && currentText[cursor].isWhitespace()) {
+                    cursor++
+                }
+                if (cursor >= currentText.length || currentText[cursor] != emittedCompact[emittedIndex]) {
+                    prefixMatches = false
+                    break
+                }
+                cursor++
+                emittedIndex++
+            }
+            if (!prefixMatches) {
                 AppLogger.w(
                     "WaifuMessageProcessor",
                     "流式分句前缀发生内容回滚，忽略本次增量: " +
-                        "emittedChars=${emittedText.length}, currentChars=${currentText.length}"
+                        "emittedChars=${emittedCompact.length}, currentChars=${currentText.length}"
                 )
                 return emptyList()
             }
 
-            // 在分段边界上重新对齐：丢弃与已发射字符重叠的分段，只发射其后的新分段。
-            // 分段在字符级前缀上单调追加（重算只会在尾部扩展或重新分组），因此一旦某个
-            // 分段的起点 >= 已发射字符数，其后所有分段都是纯新增；跨越边界的分段说明
-            // 发生了重新分组（如标点被并入前一段），其超出边界的尾部仍属新增内容。
-            var consumedChars = 0
+            // 在分段边界上重新对齐：按非空白字符数游走，丢弃与已发射部分重叠的分段，
+            // 只发射其后的新分段；跨越边界的分段发射其未发射尾部
+            val newSegments = mutableListOf<String>()
+            var compactSeen = 0
             var segmentIndex = 0
             while (segmentIndex < segments.size) {
                 val segment = segments[segmentIndex]
-                if (consumedChars + segment.length > emittedText.length) {
-                    if (consumedChars < emittedText.length) {
-                        // 分段跨越已发射边界：超出部分与后续分段一并发射
-                        val remainder = segment.substring(emittedText.length - consumedChars)
-                        emittedSegments.add(remainder)
-                        val following = segments.drop(segmentIndex + 1)
-                        emittedSegments.addAll(following)
-                        return listOf(remainder) + following
+                var nonWhitespaceInSegment = 0
+                for (c in segment) {
+                    if (!c.isWhitespace()) {
+                        nonWhitespaceInSegment++
                     }
-                    break
                 }
-                consumedChars += segment.length
+
+                if (compactSeen + nonWhitespaceInSegment > emittedCompact.length) {
+                    if (compactSeen < emittedCompact.length) {
+                        // 分段跨越已发射边界：段内定位第 (emittedCompact.length - compactSeen)
+                        // 个非空白字符之后的位置，余下部分作为新分段发射
+                        var remaining = emittedCompact.length - compactSeen
+                        var cut = 0
+                        while (cut < segment.length && remaining > 0) {
+                            if (!segment[cut].isWhitespace()) {
+                                remaining--
+                            }
+                            cut++
+                        }
+                        val remainder = segment.substring(cut).trim()
+                        if (remainder.isNotEmpty()) {
+                            newSegments.add(remainder)
+                            appendNonWhitespace(emittedCompact, remainder)
+                        }
+                        val following = segments.drop(segmentIndex + 1)
+                        for (next in following) {
+                            val trimmed = next.trim()
+                            if (trimmed.isNotEmpty()) {
+                                newSegments.add(trimmed)
+                                appendNonWhitespace(emittedCompact, trimmed)
+                            }
+                        }
+                    } else {
+                        // 发射点与分段边界对齐（含首次发射）：当前段起全部为新增
+                        val following = segments.drop(segmentIndex)
+                        for (next in following) {
+                            val trimmed = next.trim()
+                            if (trimmed.isNotEmpty()) {
+                                newSegments.add(trimmed)
+                                appendNonWhitespace(emittedCompact, trimmed)
+                            }
+                        }
+                    }
+                    return newSegments
+                }
+
+                compactSeen += nonWhitespaceInSegment
                 segmentIndex += 1
             }
 
-            val newSegments = segments.drop(segmentIndex)
-            emittedSegments.addAll(newSegments)
+            // 所有分段的非空白字符均已被发射过（compactSeen == emittedCompact.length），
+            // 本次快照无增量
             return newSegments
         }
     }
@@ -155,12 +218,13 @@ object WaifuMessageProcessor {
         val session = StreamingSession(removePunctuation = removePunctuation)
         val renderableBuffer = StringBuilder()
 
-        suspend fun appendRenderableText(text: String) {
+        suspend fun appendRenderableText(text: String, blockOpen: Boolean = false) {
             if (text.isEmpty()) {
                 return
             }
             renderableBuffer.append(text)
-            session.collectStableSegments(renderableBuffer.toString()).forEach { emit(it) }
+            session.collectStableSegments(renderableBuffer.toString(), tailSegmentOpen = blockOpen)
+                .forEach { emit(it) }
         }
 
         sourceStream.nativeMarkdownSplitByBlock().collect { blockGroup ->
@@ -180,9 +244,16 @@ object WaifuMessageProcessor {
                 }
 
                 else -> {
+                    // 块内 piece 到达时尾部块尚未闭合：以 tailSegmentOpen=true 重算，
+                    // 未闭合块的类型（如 HEADER）不作为"无句尾也可发射"的稳定依据，
+                    // 避免流式标题行被逐 chunk 切成单字/单标点碎片段
                     blockGroup.stream.collect { piece ->
-                        appendRenderableText(piece)
+                        appendRenderableText(piece, blockOpen = true)
                     }
+                    // 块流结束即该块已闭合：以闭合语义重算一次，
+                    // 让刚完成的标题/引用/列表行整条发射（无新字符时为幂等空发射）
+                    session.collectStableSegments(renderableBuffer.toString(), tailSegmentOpen = false)
+                        .forEach { emit(it) }
                 }
             }
         }
@@ -334,6 +405,7 @@ object WaifuMessageProcessor {
         content: String,
         removePunctuation: Boolean,
         includeTrailingIncomplete: Boolean,
+        tailSegmentOpen: Boolean = false,
     ): List<String> {
         if (content.isBlank()) return emptyList()
 
@@ -379,6 +451,18 @@ object WaifuMessageProcessor {
                     }
                 }
             }
+        // 流式截断缓冲（tailSegmentOpen=true）时，只有"其后还有产生输出分段"的分段
+        // 才允许沿用自身块类型的稳定豁免——其块必然已闭合；缓冲最尾部的分段块尚未
+        // 闭合（后续 chunk 还会追加），提前按块类型豁免发射会把标题行切成单字碎片
+        val allowTailSegmentBlockExemption = BooleanArray(segments.size).also { flags ->
+            var seenOutputSegment = false
+            for (index in segments.indices.reversed()) {
+                flags[index] = !tailSegmentOpen || seenOutputSegment
+                if (segmentProducesOutput(segments[index])) {
+                    seenOutputSegment = true
+                }
+            }
+        }
 
         val resultWithPlaceholders = mutableListOf<String>()
 
@@ -426,7 +510,9 @@ object WaifuMessageProcessor {
                                 removePunctuation = removePunctuation,
                                 segment = segment,
                                 hasFollowingStableBoundarySegment =
-                                    hasFollowingStableBoundarySegment[segmentIndex]
+                                    hasFollowingStableBoundarySegment[segmentIndex],
+                                allowOwnBlockTypeExemption =
+                                    allowTailSegmentBlockExemption[segmentIndex]
                             )
                     } else if (
                         shouldHoldLastStableSentence(
@@ -434,7 +520,9 @@ object WaifuMessageProcessor {
                             cleanedContent = cleanedContent,
                             segment = segment,
                             hasFollowingStableBoundarySegment =
-                                hasFollowingStableBoundarySegment[segmentIndex]
+                                hasFollowingStableBoundarySegment[segmentIndex],
+                            allowOwnBlockTypeExemption =
+                                allowTailSegmentBlockExemption[segmentIndex]
                         )
                     ) {
                         sentences = sentences.dropLast(1)
@@ -644,6 +732,7 @@ object WaifuMessageProcessor {
         removePunctuation: Boolean,
         segment: Segment,
         hasFollowingStableBoundarySegment: Boolean,
+        allowOwnBlockTypeExemption: Boolean = true,
     ): List<String> {
         if (cleanedContent.isBlank()) {
             return emptyList()
@@ -663,7 +752,8 @@ object WaifuMessageProcessor {
                 rawContent = rawContent,
                 cleanedContent = cleanedContent,
                 segment = segment,
-                hasFollowingStableBoundarySegment = hasFollowingStableBoundarySegment
+                hasFollowingStableBoundarySegment = hasFollowingStableBoundarySegment,
+                allowOwnBlockTypeExemption = allowOwnBlockTypeExemption
             )
         ) {
             stableSentences = stableSentences.dropLast(1)
@@ -677,11 +767,13 @@ object WaifuMessageProcessor {
         cleanedContent: String,
         segment: Segment,
         hasFollowingStableBoundarySegment: Boolean,
+        allowOwnBlockTypeExemption: Boolean = true,
     ): Boolean {
         return !hasStableSentenceEnding(cleanedContent) &&
             !lineAllowsStableWithoutSentenceEnding(getLastVisibleLine(rawContent)) &&
             !segment.canUseBlockBoundaryAsStableEnding(
-                hasFollowingStableBoundarySegment = hasFollowingStableBoundarySegment
+                hasFollowingStableBoundarySegment = hasFollowingStableBoundarySegment,
+                allowOwnBlockTypeExemption = allowOwnBlockTypeExemption
             )
     }
 
@@ -831,8 +923,15 @@ object WaifuMessageProcessor {
         val isProtected: Boolean,
         val blockType: MarkdownProcessorType,
     ) {
-        fun canUseBlockBoundaryAsStableEnding(hasFollowingStableBoundarySegment: Boolean): Boolean {
-            return hasFollowingStableBoundarySegment || blockType.canCloseStableTextAtBlockBoundary()
+        fun canUseBlockBoundaryAsStableEnding(
+            hasFollowingStableBoundarySegment: Boolean,
+            allowOwnBlockTypeExemption: Boolean = true,
+        ): Boolean {
+            // allowOwnBlockTypeExemption=false 用于流式截断缓冲：尾部块尚未闭合时，
+            // 其块类型（如 HEADER）不能作为"无句尾也可发射"的稳定依据——否则标题行
+            // 会被逐 chunk 切成单字/单标点碎片段发射
+            if (hasFollowingStableBoundarySegment) return true
+            return allowOwnBlockTypeExemption && blockType.canCloseStableTextAtBlockBoundary()
         }
     }
 
