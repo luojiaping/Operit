@@ -169,7 +169,9 @@ pre {
 }
 
 .chat-glass-backdrop-source {
-  position: fixed;
+  /* 背景层必须约束在聊天页内部：fixed 会铺满整个手机视口，
+     在壳层顶栏与页内头部（static 定位）之上叠加近黑底色 */
+  position: absolute;
   inset: 0;
   z-index: 0;
   overflow: hidden;
