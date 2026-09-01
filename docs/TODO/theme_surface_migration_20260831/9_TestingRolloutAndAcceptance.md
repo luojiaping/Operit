@@ -56,4 +56,6 @@
 
 [DONE] Operation status 与共享 overlay 试点已新增 menu/snackbar surface-to-component unit/Compose test、status archive/linker contract test、继承链覆盖拒绝 test，以及 status normal/error 像素 test；尚未执行测试命令。本批只重新打包主题 archive，未构建 APK。
 
+[DONE] 构建服务已同步 `8754b52c` 并完成 release 编译与旋转签名：`operit-release-feat_plugin-interface-8754b52c.apk`，SHA-256 `4a630461fc91c9ff9c1140fe7f05fb9fc6ea72fee870e44a1ba6cccf8d36475c`。首次 `927fcdff` 编译因 `PackageManagerScreen` 错误导入 `RectangleShape` 而失败；`8754b52c` 将其改为 `androidx.compose.ui.graphics.RectangleShape` 后构建成功。本次未执行 JVM/Android test。
+
 [TODO] 第一批 device acceptance。
