@@ -20,4 +20,6 @@
 
 [DONE] 静态 artifact 验证：两个 `package.sh` 均通过 shell/JQ、确定性 ZIP、ZIP comment 和 `sha256sum -c`；APK 内置 default archive 的 ZIP、schema、参数清单和 runtime lock 均与 default source archive 相同；Cyber manifest 与 archive basis 均精确指向该 default SHA-256。未执行 Gradle、JVM 或 Android test。
 
-[TODO] 3. 用户明确要求后执行 theme archive、release build、设备验收和 preview release。
+[DONE] 3. 构建服务已同步 `172905cb` 并完成 release 编译与旋转签名：`operit-release-feat_plugin-interface-172905cb.apk`，SHA-256 `246e1d1fbe6a70527798f396796b6ed2bf24669468a4743e5bc9b3cdace4034b`，大小 403,117,896 bytes。未执行 JVM/Android test。
+
+[TODO] 4. 设备验收和新的 GitHub preview release。

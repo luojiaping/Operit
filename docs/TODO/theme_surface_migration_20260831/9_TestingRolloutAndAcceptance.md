@@ -58,4 +58,6 @@
 
 [DONE] 构建服务已同步 `8754b52c` 并完成 release 编译与旋转签名：`operit-release-feat_plugin-interface-8754b52c.apk`，SHA-256 `4a630461fc91c9ff9c1140fe7f05fb9fc6ea72fee870e44a1ba6cccf8d36475c`。首次 `927fcdff` 编译因 `PackageManagerScreen` 错误导入 `RectangleShape` 而失败；`8754b52c` 将其改为 `androidx.compose.ui.graphics.RectangleShape` 后构建成功。本次未执行 JVM/Android test。
 
+[DONE] Theme package customization 已新增 schema migration、parameter owner、bundled archive/linker projection、设置内容与窄屏布局覆盖，并在 `172905cb` 完成 release 编译与旋转签名：`operit-release-feat_plugin-interface-172905cb.apk`，SHA-256 `246e1d1fbe6a70527798f396796b6ed2bf24669468a4743e5bc9b3cdace4034b`，大小 403,117,896 bytes。本次未执行 JVM/Android test。
+
 [TODO] 第一批 device acceptance。
