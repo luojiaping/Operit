@@ -1068,7 +1068,14 @@ class MessageProcessingDelegate(
                 chatRuntime.firstResponseElapsed = null
                 if (userMessageAdded && chatId != null) {
                     userMessage = userMessage.copy(sentAt = requestSentAt)
-                    addMessageToChat(chatId, userMessage)
+                    // sentAt 回填只应更新已落会的用户消息，不得走"找不到则追加"：
+                    // 长会话中该消息可能已被 50 条显示窗口裁出 _chatHistory（waifu
+                    // 分段消息把窗口填满时必然发生），此时 addMessageToChat 会把
+                    // 同一 timestamp 的用户消息二次追加进内存与数据库，记忆提取
+                    // 历史中出现两条连续重复的 user 记录。updateExistingMessagesInChat
+                    // 是"存在才替换"语义，与回填意图一致，被裁出窗口时仍经
+                    // updateMessages 落库不丢失
+                    updateExistingMessagesInChat(chatId, listOf(userMessage))
                 }
 
                 val prepareResponseStreamStartTime = messageTimingNow()
@@ -1443,7 +1450,10 @@ class MessageProcessingDelegate(
                                 outputDurationMs = outputDurationMs,
                                 waitDurationMs = waitDurationMs
                             )
-                        addMessageToChat(chatId, userMessage)
+                        // 同上：turn 指标回填只更新已存在消息；流结束时 waifu 分段
+                        // 常已把窗口填满裁掉头部用户消息，addMessageToChat 的追加
+                        // 分支会把用户消息重复入库
+                        updateExistingMessagesInChat(chatId, listOf(userMessage))
                     }
 
                     aiMessage =

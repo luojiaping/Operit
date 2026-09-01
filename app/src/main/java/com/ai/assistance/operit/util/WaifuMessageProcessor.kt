@@ -84,25 +84,49 @@ object WaifuMessageProcessor {
             content: String,
             tailSegmentOpen: Boolean = false,
         ): List<String> {
-            return collectSegments(
-                splitMessageBySentencesInternal(
-                    content = buildRenderableContentForWaifu(content),
-                    removePunctuation = removePunctuation,
-                    includeTrailingIncomplete = false,
-                    tailSegmentOpen = tailSegmentOpen,
+            // 诊断日志（碎片化定位）：记录流式重算的关键输入与产出。
+            // 依据：编号行极速流下分段碎成 1-2 字（记忆提取历史证实），但
+            // hold 链静态推演均为整句发射，盲区在 native 分块器的真实块序列，
+            // 需真机数据对齐 blockType/piece 与每次重算的产出段
+            val stableSegments =
+                collectSegments(
+                    splitMessageBySentencesInternal(
+                        content = buildRenderableContentForWaifu(content),
+                        removePunctuation = removePunctuation,
+                        includeTrailingIncomplete = false,
+                        tailSegmentOpen = tailSegmentOpen,
+                    )
                 )
-            )
+            if (stableSegments.isNotEmpty()) {
+                com.ai.assistance.operit.util.AppLogger.d(
+                    "WaifuStreamDiag",
+                    "stable open=$tailSegmentOpen bufferLen=${content.length} " +
+                        "segments=${stableSegments.map { preview(it) }}"
+                )
+            }
+            return stableSegments
         }
 
         fun collectFinalSegments(content: String): List<String> {
-            return collectSegments(
-                splitMessageBySentencesInternal(
-                    content = buildRenderableContentForWaifu(content),
-                    removePunctuation = removePunctuation,
-                    includeTrailingIncomplete = true,
+            val finalSegments =
+                collectSegments(
+                    splitMessageBySentencesInternal(
+                        content = buildRenderableContentForWaifu(content),
+                        removePunctuation = removePunctuation,
+                        includeTrailingIncomplete = true,
+                    )
                 )
-            )
+            if (finalSegments.isNotEmpty()) {
+                com.ai.assistance.operit.util.AppLogger.d(
+                    "WaifuStreamDiag",
+                    "final bufferLen=${content.length} segments=${finalSegments.map { preview(it) }}"
+                )
+            }
+            return finalSegments
         }
+
+        private fun preview(text: String): String =
+            if (text.length <= 12) text else "${text.take(12)}…(${text.length})"
 
         // 已发射内容的非空白字符视图：cleanContentForWaifu 的空白折叠与段级 trim 会改变
         // 空白在段边界处的归属（如跨行合并句的行间空格被段 trim 吃掉），空白不属于用户
@@ -217,6 +241,9 @@ object WaifuMessageProcessor {
         }
     }
 
+    private fun previewForDiag(text: String): String =
+        if (text.length <= 8) text.replace("\n", "\\n") else "${text.take(8)}…(${text.length})"
+
     fun streamSegments(
         sourceStream: Stream<String>,
         removePunctuation: Boolean = false,
@@ -235,9 +262,12 @@ object WaifuMessageProcessor {
 
         sourceStream.nativeMarkdownSplitByBlock().collect { blockGroup ->
             val blockType = blockGroup.tag ?: MarkdownProcessorType.PLAIN_TEXT
+            // 诊断日志（碎片化定位）：记录 native 分块器输出的块组类型与 piece，
+            // 与 WaifuStreamDiag 的重算/发射日志对照，还原真实的通道开闭节奏
+            val diagPieces = StringBuilder()
             when (blockType) {
                 MarkdownProcessorType.XML_BLOCK -> {
-                    blockGroup.stream.collect { }
+                    blockGroup.stream.collect { diagPieces.append(it.length).append(',') }
                 }
 
                 MarkdownProcessorType.CODE_BLOCK,
@@ -246,6 +276,7 @@ object WaifuMessageProcessor {
                 MarkdownProcessorType.IMAGE -> {
                     val blockBuilder = StringBuilder()
                     blockGroup.stream.collect { blockBuilder.append(it) }
+                    diagPieces.append("len=").append(blockBuilder.length)
                     appendRenderableText(blockBuilder.toString())
                 }
 
@@ -254,6 +285,7 @@ object WaifuMessageProcessor {
                     // 未闭合块的类型（如 HEADER）不作为"无句尾也可发射"的稳定依据，
                     // 避免流式标题行被逐 chunk 切成单字/单标点碎片段
                     blockGroup.stream.collect { piece ->
+                        diagPieces.append(previewForDiag(piece)).append('|')
                         appendRenderableText(piece, blockOpen = true)
                     }
                     // 块流结束即该块已闭合：以闭合语义重算一次，
@@ -262,6 +294,10 @@ object WaifuMessageProcessor {
                         .forEach { emit(it) }
                 }
             }
+            com.ai.assistance.operit.util.AppLogger.d(
+                "WaifuStreamDiag",
+                "block type=$blockType pieces=$diagPieces bufferLen=${renderableBuffer.length}"
+            )
         }
 
         session.collectFinalSegments(renderableBuffer.toString()).forEach { emit(it) }
@@ -323,6 +359,12 @@ object WaifuMessageProcessor {
                     delay(waitMs)
                 }
 
+                // 诊断日志（碎片化定位）：记录打字队列实际出队的段，用于区分
+                // "producer 产出即碎片"与"队列/消费侧再拆分"
+                com.ai.assistance.operit.util.AppLogger.d(
+                    "WaifuStreamDiag",
+                    "emit len=${segment.length} delay=$waitMs text=${previewForDiag(segment)}"
+                )
                 emit(segment)
                 isFirstSegment = false
             }
