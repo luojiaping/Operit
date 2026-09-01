@@ -472,7 +472,8 @@ export interface ChatViewModelState {
 }
 
 export interface ChatViewModelActions {
-  reloadCurrentConversation: () => Promise<void>;
+  reloadCurrentConversation: (mode?: 'merge-latest' | 'replace') => Promise<void>;
+  ensureChats: () => void;
   createConversation: (options?: { group?: string | null }) => Promise<void>;
   renameConversation: (chat: WebChatSummary, title: string) => Promise<void>;
   deleteConversation: (chat: WebChatSummary) => Promise<void>;
@@ -705,6 +706,16 @@ export function useChatViewModel(): ChatViewModel {
     } finally {
       setHistoryLoading(false);
     }
+  }
+
+  // 壳层顶栏标题等场景需要会话列表；embed 挂载后调用一次
+  function ensureChats() {
+    if (!token || historyLoading || historyLoaded) {
+      return;
+    }
+    void ensureChatsLoaded(token).catch((loadError: unknown) => {
+      handleApiFailure(loadError);
+    });
   }
 
   async function loadBootstrap(currentToken: string, preferredChatId?: string | null) {
@@ -1062,13 +1073,17 @@ export function useChatViewModel(): ChatViewModel {
 
   // 预览站的会话重载入口：主题被外部覆盖（previewControls.patchTheme）后
   // 由 SimulatorShell 调用，重新拉取当前会话的主题与消息
-  async function reloadCurrentConversation() {
+  async function reloadCurrentConversation(
+    // replace 用于消息删除/回滚后的整页替换；merge-latest 会保留
+    // 比最新页更早的本地消息，无法反映删除
+    mode: 'merge-latest' | 'replace' = 'merge-latest'
+  ) {
     const chatId = selectedChatIdRef.current;
     if (!token || !chatId) {
       return;
     }
     try {
-      await loadConversation(token, chatId, 'merge-latest');
+      await loadConversation(token, chatId, mode);
     } catch (actionError: unknown) {
       console.error('reloadCurrentConversation failed', actionError);
       handleApiFailure(actionError);
@@ -1696,6 +1711,7 @@ export function useChatViewModel(): ChatViewModel {
     inputSettings,
     memorySelector,
     reloadCurrentConversation,
+    ensureChats,
     createConversation,
     renameConversation,
     deleteConversation,

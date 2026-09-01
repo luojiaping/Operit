@@ -11,9 +11,17 @@ import { ThemeStudioPanel } from './ThemeStudioPanel';
 import { CodePreviewPanel } from './CodePreviewPanel';
 import { isPreviewBridgeMessage } from './previewBridge';
 import type { PreviewBridgeMessage } from './previewBridge';
+import { AppShell } from '../ui/features/chat/appshell/AppShell';
+import type { ShellScreen } from '../ui/features/chat/appshell/AppShell';
+import { SettingsHome } from '../ui/features/chat/appshell/settings/SettingsHome';
+import { SETTINGS_ITEM_TITLES } from '../ui/features/chat/appshell/settings/settingsItems';
+import { ThemeSettingsPage } from '../ui/features/chat/appshell/settings/ThemeSettingsPage';
+import { GenericSettingsPage } from '../ui/features/chat/appshell/settings/genericSettingsPages';
 // 聊天界面全套样式（foundation/messages/composer/dialogs/history/structured/dsl），
 // 与真机入口 src/main.tsx 同一份；缺失它 iframe 内就是裸 DOM
 import '../ui/features/chat/util/chat-screen.css';
+import '../ui/features/chat/appshell/appShell.css';
+import '../ui/features/chat/appshell/settings/settings.css';
 import './preview.css';
 import './deviceFrame.css';
 
@@ -76,11 +84,18 @@ function isEmbedMode() {
 
 // --- iframe 侧：手机视口内的模拟器 ---
 
-// embed 模式：无壳无面板，AIChatScreen 占满 iframe（独立 viewport，
-// 100dvh 与媒体查询都按手机尺寸计算），主题与插槽由外层消息驱动
+// embed 模式：手机视口内的完整 App（壳层 + 聊天 + 设置），
+// 主题与插槽由外层消息驱动
 function EmbeddedPreviewApp() {
   const viewModel = useChatViewModel();
   const [slotContents, setSlotContents] = useState<InputSlotContentMap>({});
+  const [screen, setScreen] = useState<ShellScreen>({ name: 'chat' });
+
+  // 主题设置页的即时补丁：patch 后重载会话刷新界面
+  function patchThemeLive(patch: Partial<WebThemeSnapshot>) {
+    previewControls.patchTheme(patch);
+    void viewModel.reloadCurrentConversation();
+  }
 
   useEffect(() => {
     function handleMessage(event: MessageEvent) {
@@ -102,6 +117,8 @@ function EmbeddedPreviewApp() {
     }
     window.addEventListener('message', handleMessage);
     window.parent.postMessage({ type: 'preview-ready' }, '*');
+    // 壳层顶栏显示"- 会话标题"需要会话列表
+    viewModel.ensureChats();
     return () => window.removeEventListener('message', handleMessage);
     // viewModel 引用稳定（同一 hook 实例）
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -127,9 +144,31 @@ function EmbeddedPreviewApp() {
   }, [runtimeState]);
 
   return (
-    <PreviewSlotProvider contents={slotContents}>
-      <AIChatScreenView viewModel={viewModel} />
-    </PreviewSlotProvider>
+    <AppShell
+      chatTitle={viewModel.selectedChat?.title ?? ''}
+      onScreenChange={setScreen}
+      screen={screen}
+      settingsTitles={SETTINGS_ITEM_TITLES}
+      theme={viewModel.theme}
+    >
+      {(context) =>
+        context.screen.name === 'chat' ? (
+          <PreviewSlotProvider contents={slotContents}>
+            <AIChatScreenView viewModel={viewModel} />
+          </PreviewSlotProvider>
+        ) : context.screen.name === 'settings' ? (
+          <SettingsHome
+            onOpenItem={(item) =>
+              setScreen({ name: 'settings-sub', page: item.id === 'github-login' ? 'github-account' : item.id })
+            }
+          />
+        ) : context.screen.page === 'theme' ? (
+          <ThemeSettingsPage onPatchTheme={patchThemeLive} theme={viewModel.theme} />
+        ) : (
+          <GenericSettingsPage page={context.screen.page} />
+        )
+      }
+    </AppShell>
   );
 }
 

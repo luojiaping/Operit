@@ -1,8 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChatArea } from './ChatArea';
 import { CharacterSelectorPanel } from './CharacterSelectorPanel';
 import { ChatHistorySelector } from './ChatHistorySelector';
 import { ChatScreenHeader } from './ChatScreenHeader';
+import { MessageContextMenu } from './MessageContextMenu';
+import { MessageActionsContext } from './MessageActionsContext';
+import type { MessageActions } from './MessageActionsContext';
 import { AgentChatInputSection } from './style/input/agent/AgentChatInputSection';
 import { ClassicChatInputSection } from './style/input/classic/ClassicChatInputSection';
 import { ClassicChatSettingsBar } from './style/input/classic/ClassicChatSettingsBar';
@@ -11,6 +14,9 @@ import {
   getIsFloatingMode,
   toggleFloatingWindow
 } from '../viewmodel/FloatingWindowDelegate';
+import { isMockMode } from '../util/chatTransport';
+import { previewControls } from '../util/mock/mockTransport';
+import type { WebChatMessage } from '../util/chatTypes';
 
 export function ChatScreenContent({
   viewModel
@@ -24,10 +30,56 @@ export function ChatScreenContent({
   const [bottomBarHeight, setBottomBarHeight] = useState(0);
   const [isFloatingMode, setIsFloatingMode] = useState(getIsFloatingMode());
   const [classicSettingsOpen, setClassicSettingsOpen] = useState(false);
+  const [contextMenu, setContextMenu] = useState<{
+    messageId: string;
+    message: WebChatMessage;
+    x: number;
+    y: number;
+  } | null>(null);
   const overlayMode = Boolean(viewModel.theme?.header.overlay);
   const showInputProcessingStatus =
     viewModel.theme?.show_input_processing_status ?? viewModel.boot?.show_input_processing_status ?? true;
   const classicSettingsBottomOffset = bottomBarHeight > 36 ? bottomBarHeight - 6 : 18;
+
+  // 消息级操作（mock 模式专属）：真机 web 协议无对应端点，
+  // 操作直接改 mock 内存状态后重载会话
+  const messageActions = useMemo<MessageActions | null>(() => {
+    if (!isMockMode()) {
+      return null;
+    }
+    return {
+      selectVariant: (message, variantIndex) => {
+        previewControls.switchMessageVariant(message.id, variantIndex);
+        void viewModel.reloadCurrentConversation('replace');
+      }
+    };
+  }, [viewModel]);
+
+  function deleteMessageForPreview(message: WebChatMessage) {
+    // debug: 定位 mock 删除链路（确认 previewControls 与 viewModel 共享同一 mock 单例）
+    previewControls.deleteMessages([message.id]);
+    void viewModel.reloadCurrentConversation('replace');
+  }
+
+  function rollbackMessageForPreview(message: WebChatMessage) {
+    previewControls.rollbackToTimestamp(message.timestamp);
+    void viewModel.reloadCurrentConversation('replace');
+  }
+
+  function regenerateMessageForPreview(message: WebChatMessage) {
+    previewControls.regenerateAfter(message.timestamp);
+    void viewModel.reloadCurrentConversation('replace');
+  }
+
+  function editResendForPreview(message: WebChatMessage) {
+    const draft =
+      message.display_content ??
+      message.content_blocks?.find((block) => block.kind === 'text')?.content ??
+      message.content_raw;
+    viewModel.setMessageInput(draft);
+    previewControls.deleteMessages([message.id]);
+    void viewModel.reloadCurrentConversation('replace');
+  }
 
   useEffect(() => {
     const element = headerRef.current;
@@ -182,7 +234,8 @@ export function ChatScreenContent({
   );
 
   return (
-    <div className="chat-screen-content">
+    <MessageActionsContext.Provider value={messageActions}>
+      <div className="chat-screen-content">
       <CharacterSelectorPanel
         activePrompt={viewModel.characterSelector?.active_prompt ?? null}
         loading={viewModel.characterSelectorLoading}
@@ -261,6 +314,12 @@ export function ChatScreenContent({
             onLoadOlder={viewModel.loadOlderMessages}
             onLoadMessageLocatorEntries={viewModel.loadMessageLocatorEntries}
             onAutoScrollToBottomChange={viewModel.setAutoScrollToBottom}
+            onMessageContextMenu={
+              isMockMode()
+                ? (message, x, y) =>
+                    setContextMenu({ messageId: message.id, message, x, y })
+                : undefined
+            }
             onRevealMessageForLocator={viewModel.revealMessageForCurrentChat}
             onToggleFavoriteMessage={viewModel.toggleMessageFavorite}
             theme={viewModel.theme}
@@ -319,6 +378,20 @@ export function ChatScreenContent({
           {viewModel.error ? <div className="chat-inline-error">{viewModel.error}</div> : null}
         </div>
       </div>
-    </div>
+      {contextMenu ? (
+        <MessageContextMenu
+          message={contextMenu.message}
+          messageId={contextMenu.messageId}
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onDelete={deleteMessageForPreview}
+          onEditResend={editResendForPreview}
+          onRegenerate={regenerateMessageForPreview}
+          onRollback={rollbackMessageForPreview}
+          onClose={() => setContextMenu(null)}
+        />
+      ) : null}
+      </div>
+    </MessageActionsContext.Provider>
   );
 }

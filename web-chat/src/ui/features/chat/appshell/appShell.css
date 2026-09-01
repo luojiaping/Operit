@@ -1,0 +1,307 @@
+/* App 壳层：全局顶栏 + 屏幕内容 + 导航抽屉（对齐 app AppContent/PhoneLayout） */
+
+.app-shell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--chat-root-background);
+}
+
+.app-top-bar {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+  height: 64px;
+  padding: 0 6px;
+  background: var(--chat-primary);
+  color: var(--chat-on-primary, #ffffff);
+}
+
+.app-top-bar-nav {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.app-top-bar-nav:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.app-top-bar-title {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0 4px;
+}
+
+.app-top-bar-title strong {
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-top-bar-title span {
+  overflow: hidden;
+  font-size: 12px;
+  opacity: 0.8;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-top-bar-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.app-top-bar-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.app-top-bar-action:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.app-shell-content {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  transition:
+    border-radius 300ms ease,
+    box-shadow 300ms ease,
+    transform 300ms ease;
+}
+
+.app-shell-content.is-drawer-open {
+  border-radius: 24px;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.45);
+  transform: scale(0.92) rotateY(-2deg);
+  transform-origin: left center;
+  overflow: hidden;
+}
+
+/* --- 导航抽屉 --- */
+
+.app-drawer-root {
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+  background: rgba(0, 0, 0, 0.32);
+  opacity: 0;
+  transition: opacity 300ms ease;
+}
+
+.app-drawer-root.is-open {
+  pointer-events: auto;
+  opacity: 1;
+}
+
+.app-drawer {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  width: 75%;
+  border-radius: 0 16px 16px 0;
+  background: var(--chat-surface-color);
+  box-shadow: 8px 0 28px rgba(0, 0, 0, 0.35);
+  transform: translateX(-100%);
+  transition: transform 300ms ease;
+}
+
+.app-drawer-root.is-open .app-drawer {
+  transform: translateX(0);
+}
+
+.app-drawer-scroll {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 14px;
+  padding: 24px 8px 8px 12px;
+  overflow-y: auto;
+}
+
+.app-drawer-info-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0 12px;
+}
+
+.app-drawer-brand {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--chat-text-main);
+}
+
+.app-drawer-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(76, 175, 80, 0.12);
+  color: var(--chat-text-soft);
+  font-size: 12px;
+}
+
+.app-drawer-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: #4caf50;
+}
+
+.app-drawer-quick-row {
+  display: flex;
+  gap: 6px;
+  padding: 0 12px;
+}
+
+.app-drawer-quick-card {
+  position: relative;
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 76px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  /* 液态玻璃近似：blur 16 + 微阴影（app 端 borderWidth 0.5dp / blur 16dp） */
+  background: color-mix(in srgb, var(--chat-surface-color) 72%, transparent);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  color: var(--chat-text-soft);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.app-drawer-quick-badge {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--chat-primary);
+  color: var(--chat-on-primary, #fff);
+  font-size: 10px;
+  line-height: 1;
+}
+
+.app-drawer-group-title {
+  margin: 0;
+  padding: 0 4px 0 16px;
+  color: var(--chat-text-main);
+  font-size: 14px;
+  font-weight: 600;
+  opacity: 0.82;
+}
+
+.app-drawer-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.app-drawer-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 40px;
+  padding: 4px 12px 4px 16px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--chat-text-soft);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.app-drawer-nav-item:hover {
+  background: color-mix(in srgb, var(--chat-primary-container) 18%, transparent);
+}
+
+.app-drawer-nav-item.is-selected {
+  border-color: rgba(255, 255, 255, 0.06);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--chat-primary-container) 18%, transparent);
+  color: var(--chat-primary);
+  font-weight: 500;
+}
+
+.app-drawer-bottom {
+  display: flex;
+  gap: 8px;
+  padding: 8px 12px 12px;
+}
+
+.app-drawer-bottom::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 20px;
+  right: 20px;
+  height: 0.5px;
+  background: color-mix(in srgb, var(--chat-primary) 42%, transparent);
+}
+
+.app-drawer-bottom {
+  position: relative;
+}
+
+.app-drawer-bottom-card {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 68px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--chat-surface-color) 72%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: var(--chat-text-soft);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.app-drawer-bottom-card:active {
+  background: color-mix(in srgb, var(--chat-primary-container) 18%, transparent);
+}

@@ -1,4 +1,5 @@
 import type { WebChatMessage, WebThemeSnapshot } from '../util/chatTypes';
+import { useMessageActions } from './MessageActionsContext';
 
 // A20：对齐 app ChatArea 的 MessageFooterBar——变体切换器与
 // token、耗时、时间戳三行 labelSmall 统计（onSurfaceVariant 0.68）
@@ -52,6 +53,7 @@ export function MessageFooterBar({
   theme: WebThemeSnapshot | null;
   onSelectVariant?: (index: number) => void;
 }) {
+  const messageActions = useMessageActions();
   const display = theme?.display;
   const inputTokens = message.input_tokens ?? 0;
   const cachedInputTokens = message.cached_input_tokens ?? 0;
@@ -85,7 +87,13 @@ export function MessageFooterBar({
             aria-label="上一个变体"
             className={`message-footer-variant-button ${hasPrevious ? '' : 'is-disabled'}`}
             disabled={!hasPrevious}
-            onClick={() => onSelectVariant?.(selectedVariantIndex - 1)}
+            onClick={() => {
+              if (onSelectVariant) {
+                onSelectVariant(selectedVariantIndex - 1);
+                return;
+              }
+              messageActions?.selectVariant(message, selectedVariantIndex - 1);
+            }}
             type="button"
           >
             ‹
@@ -97,7 +105,13 @@ export function MessageFooterBar({
             aria-label="下一个变体"
             className={`message-footer-variant-button ${hasNext ? '' : 'is-disabled'}`}
             disabled={!hasNext}
-            onClick={() => onSelectVariant?.(selectedVariantIndex + 1)}
+            onClick={() => {
+              if (onSelectVariant) {
+                onSelectVariant(selectedVariantIndex + 1);
+                return;
+              }
+              messageActions?.selectVariant(message, selectedVariantIndex + 1);
+            }}
             type="button"
           >
             ›

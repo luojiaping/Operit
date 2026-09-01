@@ -44,7 +44,8 @@ export function ChatArea({
   autoScrollToBottom,
   onAutoScrollToBottomChange,
   topPadding,
-  bottomPadding
+  bottomPadding,
+  onMessageContextMenu
 }: {
   chatHistory: WebChatMessage[];
   currentChatId: string | null;
@@ -69,6 +70,12 @@ export function ChatArea({
   onAutoScrollToBottomChange: (value: boolean) => void;
   topPadding: number;
   bottomPadding: number;
+  // 预览站消息上下文菜单；真机入口不传，右键保持浏览器默认
+  onMessageContextMenu?: (
+    message: WebChatMessage,
+    x: number,
+    y: number
+  ) => void;
 }) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const threadRef = useRef<HTMLDivElement | null>(null);
@@ -254,6 +261,14 @@ export function ChatArea({
                   }
                   data-message-timestamp={message.timestamp}
                   key={message.id}
+                  onContextMenu={
+                    onMessageContextMenu
+                      ? (event) => {
+                          event.preventDefault();
+                          onMessageContextMenu(message, event.clientX, event.clientY);
+                        }
+                      : undefined
+                  }
                 >
                   {chatStyle === 'bubble' ? (
                     <BubbleStyleChatMessage message={message} theme={theme} />

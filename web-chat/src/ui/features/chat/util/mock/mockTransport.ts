@@ -78,8 +78,110 @@ export const previewControls = {
     for (const [chatId, theme] of Object.entries(MOCK_THEMES)) {
       state.themesByChat.set(chatId, JSON.parse(JSON.stringify(theme)) as WebThemeSnapshot);
     }
+  },
+
+  // --- 消息级操作（预览站专属，真机 web 协议无对应端点） ---
+
+  deleteMessages(messageIds: string[]) {
+    const messages = currentMockMessages();
+    const idSet = new Set(messageIds);
+    const remaining = messages.filter((message) => !idSet.has(message.id));
+    messages.length = 0;
+    messages.push(...remaining);
+  },
+
+  rollbackToTimestamp(timestamp: number) {
+    const messages = currentMockMessages();
+    const remaining = messages.filter((message) => message.timestamp <= timestamp);
+    messages.length = 0;
+    messages.push(...remaining);
+  },
+
+  regenerateAfter(timestamp: number) {
+    const messages = currentMockMessages();
+    const remaining = messages.filter((message) => message.timestamp <= timestamp);
+    const now = Date.now();
+    const lastUser = [...remaining].reverse().find((message) => message.sender === 'user');
+    remaining.push({
+      id: `msg-mock-regen-${now}`,
+      sender: 'assistant',
+      content_raw: MOCK_STREAM_REPLY,
+      timestamp: now,
+      role_name: state.characterState.active_prompt.name,
+      input_tokens: lastUser?.input_tokens ?? 20,
+      cached_input_tokens: 0,
+      output_tokens: Math.max(1, Math.round(MOCK_STREAM_REPLY.length / 4)),
+      wait_duration_ms: 300,
+      output_duration_ms: 1200,
+      completed_at: now,
+      content_blocks: [{ kind: 'text', content: MOCK_STREAM_REPLY }],
+      attachments: []
+    });
+    messages.length = 0;
+    messages.push(...remaining);
+  },
+
+  switchMessageVariant(messageId: string, variantIndex: number) {
+    const messages = currentMockMessages();
+    const message = messages.find((item) => item.id === messageId);
+    if (!message) {
+      throw new Error(`mock: message not found: ${messageId}`);
+    }
+    const variants = messageVariantsFor(message);
+    const next = variants[Math.max(0, Math.min(variantIndex, variants.length - 1))];
+    const index = messages.indexOf(message);
+    messages[index] = {
+      ...next,
+      selected_variant_index: variantIndex
+    };
   }
 };
+
+function currentMockMessages() {
+  const chatId = state.currentChatId;
+  if (!chatId) {
+    throw new Error('mock: no current chat');
+  }
+  const list = state.messagesByChat.get(chatId);
+  if (!list) {
+    throw new Error(`mock: chat not found: ${chatId}`);
+  }
+  return list;
+}
+
+// 变体内容注册表：id → 该消息各变体的内容字段（首变体来自 fixtures 本体）
+const VARIANT_REGISTRY: Record<
+  string,
+  { content_raw: string; content_blocks: WebChatMessage['content_blocks'] }[]
+> = {
+  'msg-2': [
+    { content_raw: '', content_blocks: null },
+    {
+      content_raw: '',
+      content_blocks: [
+        {
+          kind: 'text',
+          content:
+            '也可以从另一个角度看：\n\n- 主题管线已经把派生规则收敛到 chatTheme\n- mock 快照可携带全部扩展字段验证亮暗两套\n- 插槽 DSL 在浏览器即可跑通\n\n两条路线可以并行推进。'
+        }
+      ]
+    }
+  ]
+};
+
+function messageVariantsFor(message: WebChatMessage) {
+  const variants = VARIANT_REGISTRY[message.id];
+  if (!variants) {
+    return [message];
+  }
+  return variants.map((variant, index) => ({
+    ...message,
+    ...(index === 0 ? {} : variant),
+    id: message.id,
+    variant_count: variants.length,
+    selected_variant_index: index
+  }));
+}
 
 // 内存状态机：全部端点与 SSE 流的 mock 实现，状态保存在上方模块级单例。
 // token 参数为形状兼容保留，mock 不做鉴权

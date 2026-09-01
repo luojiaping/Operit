@@ -1,6 +1,6 @@
 import type { ReactNode, SVGProps } from 'react';
 
-type IconProps = SVGProps<SVGSVGElement> & {
+export type IconProps = SVGProps<SVGSVGElement> & {
   size?: number;
 };
 
@@ -32,6 +32,302 @@ export function HistoryIcon(props: IconProps) {
       <path d="M3 12a9 9 0 1 0 3-6.7" />
       <path d="M3 4v5h5" />
       <path d="M12 7v5l3 2" />
+    </IconBase>
+  );
+}
+
+// --- App 壳层与设置页图标（Material 风格，延续手绘规范） ---
+
+export function MenuIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M4 6h16" />
+      <path d="M4 12h16" />
+      <path d="M4 18h16" />
+    </IconBase>
+  );
+}
+
+export function ArrowBackIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M19 12H5" />
+      <path d="m12 19-7-7 7-7" />
+    </IconBase>
+  );
+}
+
+export function TerminalIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="m5 8 4 4-4 4" />
+      <path d="M12 16h7" />
+    </IconBase>
+  );
+}
+
+export function CodeIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="m9 8-4 4 4 4" />
+      <path d="m15 8 4 4-4 4" />
+    </IconBase>
+  );
+}
+
+export function CodeOffIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="m10 8-4 4 4 4" />
+      <path d="M3 3l18 18" />
+    </IconBase>
+  );
+}
+
+export function WifiIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M2.5 9.5a15 15 0 0 1 19 0" />
+      <path d="M5.5 13a10 10 0 0 1 13 0" />
+      <path d="M8.5 16.5a5 5 0 0 1 7 0" />
+      <circle cx="12" cy="19.5" r="0.8" fill="currentColor" stroke="none" />
+    </IconBase>
+  );
+}
+
+export function ExtensionIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M10 4a2 2 0 1 1 4 0v1h3a1 1 0 0 1 1 1v3h1a2 2 0 1 1 0 4h-1v3a1 1 0 0 1-1 1h-3v1a2 2 0 1 1-4 0v-1H7a1 1 0 0 1-1-1v-3H5a2 2 0 1 1 0-4h1V6a1 1 0 0 1 1-1h3Z" />
+    </IconBase>
+  );
+}
+
+export function BuildIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M14.5 4.5a4.5 4.5 0 0 1 5.4 6.1L12 18.5a3 3 0 0 1-4.2 0l-2.3-2.3a3 3 0 0 1 0-4.2l7.9-7.9a4.5 4.5 0 0 1 1.1-1.6Z" transform="translate(-1.5 1.2)" />
+      <path d="m15 7 2 2" />
+    </IconBase>
+  );
+}
+
+export function HelpIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M9.5 9.5a2.5 2.5 0 1 1 3.6 2.2c-.7.4-1.1 1-1.1 1.8" />
+      <path d="M12 17h.01" />
+    </IconBase>
+  );
+}
+
+export function SettingsIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M12 8.5A3.5 3.5 0 1 0 12 15.5 3.5 3.5 0 0 0 12 8.5Z" />
+      <path d="M19.4 13.5a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.6-1.1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z" />
+    </IconBase>
+  );
+}
+
+export function EmailIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <rect x="3" y="5" width="18" height="14" rx="2.5" />
+      <path d="m3.5 7.5 8.5 6 8.5-6" />
+    </IconBase>
+  );
+}
+
+export function AppsIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      { [5, 12, 19].map((y) => [5, 12, 19].map((x) => <circle key={`${x}-${y}`} cx={x} cy={y} r="1.6" fill="currentColor" stroke="none" />)) }
+    </IconBase>
+  );
+}
+
+export function ChevronRightIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="m9 6 6 6-6 6" />
+    </IconBase>
+  );
+}
+
+// --- 设置页图标 ---
+
+export function FaceIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M8.5 10h.01" strokeWidth="2.4" />
+      <path d="M15.5 10h.01" strokeWidth="2.4" />
+      <path d="M8.5 15a5 5 0 0 1 7 0" />
+    </IconBase>
+  );
+}
+
+export function LanguageIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M3 12h18" />
+      <path d="M12 3a14 14 0 0 1 0 18 14 14 0 0 1 0-18Z" />
+    </IconBase>
+  );
+}
+
+export function PaletteIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M12 3a9 9 0 1 0 0 18c1.2 0 2-.8 2-2 0-.6-.2-1-.6-1.4-.4-.4-.6-.8-.6-1.4 0-1.2.8-2 2-2h2.2A4 4 0 0 0 21 10c0-3.9-4-7-9-7Z" />
+      <circle cx="7.5" cy="11" r="0.9" fill="currentColor" stroke="none" />
+      <circle cx="10.5" cy="7.5" r="0.9" fill="currentColor" stroke="none" />
+      <circle cx="15" cy="7.5" r="0.9" fill="currentColor" stroke="none" />
+    </IconBase>
+  );
+}
+
+export function VisibilityIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" />
+      <circle cx="12" cy="12" r="3" />
+    </IconBase>
+  );
+}
+
+export function AspectRatioIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <rect x="3" y="6" width="18" height="12" rx="2" />
+      <path d="M7 10v4M5 12h4" />
+      <path d="M15 10h4" />
+    </IconBase>
+  );
+}
+
+export function ApiIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <circle cx="6" cy="12" r="2.2" />
+      <circle cx="18" cy="6" r="2.2" />
+      <circle cx="18" cy="18" r="2.2" />
+      <path d="m8 11 8-4M8 13l8 4" />
+    </IconBase>
+  );
+}
+
+export function RecordVoiceOverIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <ellipse cx="12" cy="8" rx="4" ry="5" />
+      <path d="M5 20a7 7 0 0 1 14 0" />
+      <path d="m17.5 6.5 3-2M20.5 10.5l3-1.5" transform="translate(-2 0)" />
+    </IconBase>
+  );
+}
+
+export function ChatBubbleIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M4 6a2.5 2.5 0 0 1 2.5-2.5h11A2.5 2.5 0 0 1 20 6v8a2.5 2.5 0 0 1-2.5 2.5H9L4.5 20V6Z" />
+    </IconBase>
+  );
+}
+
+export function EmojiEmotionsIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M8 14a4.5 4.5 0 0 0 8 0" />
+      <path d="M8.5 9.5h.01" strokeWidth="2.4" />
+      <path d="M15.5 9.5h.01" strokeWidth="2.4" />
+    </IconBase>
+  );
+}
+
+export function AnalyticsIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />
+    </IconBase>
+  );
+}
+
+export function AdminPanelSettingsIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M12 3 5 5.5v5c0 4.5 3 8.2 7 9.5 4-1.3 7-5 7-9.5v-5L12 3Z" />
+      <circle cx="12" cy="11" r="1.8" />
+      <path d="M12 12.8v2.2" />
+    </IconBase>
+  );
+}
+
+export function CloudUploadIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M7 18a4.5 4.5 0 0 1-.4-9A6 6 0 0 1 18.3 9.6 3.8 3.8 0 0 1 17.5 18H7Z" />
+      <path d="M12 13v6M9.5 15.5 12 13l2.5 2.5" />
+    </IconBase>
+  );
+}
+
+export function ManageHistoryIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M3.5 12a8.5 8.5 0 1 0 3-6.5" />
+      <path d="M3.5 4.5v4h4" />
+      <path d="M12 7.5V12l3.2 1.8" />
+    </IconBase>
+  );
+}
+
+export function DeleteSweepIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M4 7h11" />
+      <path d="M9 7V4h4v3" />
+      <path d="m6 7 .8 13h8.4L16 7" />
+      <path d="M18.5 10.5h3M18.5 14.5h3M18.5 18.5h3" />
+    </IconBase>
+  );
+}
+
+export function SettingsEthernetIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="m7 8-4 4 4 4M17 8l4 4-4 4" />
+      <path d="M10 7 8 17M14 7l-2 10" transform="translate(2 0)" />
+    </IconBase>
+  );
+}
+
+export function SecurityIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M12 3 5 5.5v5c0 4.5 3 8.2 7 9.5 4-1.3 7-5 7-9.5v-5L12 3Z" />
+    </IconBase>
+  );
+}
+
+export function MessageIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M4 5.5h16v11H9L4 20V5.5Z" />
+    </IconBase>
+  );
+}
+
+export function AccountCircleIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <circle cx="12" cy="12" r="9" />
+      <circle cx="12" cy="10" r="3.2" />
+      <path d="M6.3 18.4a6.5 6.5 0 0 1 11.4 0" />
     </IconBase>
   );
 }
@@ -440,8 +736,7 @@ export function LockIcon(props: IconProps) {
   );
 }
 
-export function BranchIcon(props: IconProps) {
-  return (
+export function BranchIcon(props: IconProps) {  return (
     <IconBase {...props}>
       <circle cx="7" cy="6" r="2" />
       <circle cx="17" cy="18" r="2" />
@@ -452,3 +747,6 @@ export function BranchIcon(props: IconProps) {
     </IconBase>
   );
 }
+
+// 工作流快捷卡的树形图标（对齐 Material AccountTree）
+export const AccountTreeIcon = BranchIcon;
