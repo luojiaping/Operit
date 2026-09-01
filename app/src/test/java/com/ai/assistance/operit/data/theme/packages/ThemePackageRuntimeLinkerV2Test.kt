@@ -1,5 +1,7 @@
 package com.ai.assistance.operit.data.theme.packages
 
+import androidx.compose.ui.graphics.toArgb
+import com.ai.assistance.operit.ui.theme.createThemePackageUiRuntimeV2
 import com.ai.assistance.operit.ui.theme.scene.ThemeSceneHostSlotNodeV1
 import com.ai.assistance.operit.ui.theme.scene.ThemeSceneAssetIdV1
 import com.ai.assistance.operit.ui.theme.scene.ThemeSceneDefinitionV1
@@ -101,7 +103,7 @@ class ThemePackageRuntimeLinkerV2Test {
 
     private fun completeManifest(packageId: String = "author.complete"): ThemePackageManifestV2 =
         ThemePackageManifestV2(
-            schemaVersion = THEME_PACKAGE_SCHEMA_VERSION_V2,
+            schemaVersion = THEME_PACKAGE_SCHEMA_VERSION,
             packageId = packageId,
             version = "1.0.0",
             displayName = ThemePackageLocalizedTextV2(values = mapOf("*" to packageId)),
@@ -137,10 +139,21 @@ class ThemePackageRuntimeLinkerV2Test {
             parameters =
                 listOf(
                     ThemeParameterDefinitionV2(
-                        id = "primary_color",
+                        id = "accent_color",
                         type = ThemeParameterTypeV2.COLOR,
                         defaultValue = ThemeParameterDefaultV2.ColorValue(0xFF6750A4),
                         label = ThemePackageLocalizedTextV2(values = mapOf("*" to "Primary")),
+                        control =
+                            ThemeParameterControlV2.ColorPalette(
+                                presetArgb = listOf(0xFF6750A4),
+                                allowCustom = true,
+                            ),
+                        effects =
+                            listOf(
+                                ThemeParameterEffectV2.TokenColor(
+                                    tokenIds = listOf("color.background"),
+                                ),
+                            ),
                     ),
                 ),
         )
@@ -562,6 +575,7 @@ class ThemePackageRuntimeLinkerV2Test {
 
         assertEquals(ThemeSurfaceCatalogV2.requiredDailySurfaces.size, linked.surfaces.size)
         assertEquals(listOf(base.coordinate, child.coordinate), linked.packageChain)
+        assertEquals(base.coordinate, linked.parameterOwners.getValue("accent_color"))
 
         // 子包重复声明基底参数是链接错误：参数语义不允许二义性。
         val conflictingChild =
@@ -592,28 +606,211 @@ class ThemePackageRuntimeLinkerV2Test {
                 ThemeInstanceV2(reference = ThemePackageReferenceV2(installation.coordinate)),
                 linked,
             )
-        assertEquals(0xFF6750A4L, defaults.colorArgb("primary_color"))
+        assertEquals(0xFF6750A4L, defaults.colorArgb("accent_color"))
 
         val overridden =
             ThemePackageRuntimeLinkerV2.resolveParameters(
                 ThemeInstanceV2(
                     reference = ThemePackageReferenceV2(installation.coordinate),
                     parameterValues =
-                        mapOf("primary_color" to ThemeParameterValueV2.ColorValue(0xFF00FF00)),
+                        mapOf("accent_color" to ThemeParameterValueV2.ColorValue(0xFF00FF00)),
                 ),
                 linked,
             )
-        assertEquals(0xFF00FF00L, overridden.colorArgb("primary_color"))
+        assertEquals(0xFF00FF00L, overridden.colorArgb("accent_color"))
+        assertTrue(overridden.isOverridden("accent_color"))
 
         assertThrows(IllegalStateException::class.java) {
             ThemePackageRuntimeLinkerV2.resolveParameters(
                 ThemeInstanceV2(
                     reference = ThemePackageReferenceV2(installation.coordinate),
                     parameterValues =
-                        mapOf("unknown_parameter" to ThemeParameterValueV2.StringValue("x")),
+                        mapOf("unknown_parameter" to ThemeParameterValueV2.ColorValue(0xFF00FF00)),
                 ),
                 linked,
             )
         }
+    }
+
+    @Test
+    fun parameterColorEffectPatchesTheRuntimeTokenProjection() {
+        val installation = installation(completeManifest(), tmp.newFolder("parameter-presentation"))
+        val linked =
+            ThemePackageRuntimeLinkerV2.link(
+                installation,
+                PublishedThemeCatalogV2(listOf(installation), emptyList()),
+            )
+        val parameters =
+            ThemePackageRuntimeLinkerV2.resolveParameters(
+                ThemeInstanceV2(
+                    reference = ThemePackageReferenceV2(installation.coordinate),
+                    parameterValues = mapOf("accent_color" to ThemeParameterValueV2.ColorValue(0xFF00FF00)),
+                ),
+                linked,
+            )
+
+        val runtime =
+            createThemePackageUiRuntimeV2(
+                linked = linked,
+                parameters = parameters,
+                darkTheme = false,
+                userFontScale = 1f,
+            )
+
+        assertEquals(0xFF00FF00.toInt(), runtime.colorScheme.primary.toArgb())
+    }
+
+    @Test
+    fun inheritedParameterEffectsDoNotApplyToTheActiveChildPackage() {
+        val base = installation(completeManifest("author.parameter_base"), tmp.newFolder("parameter-base"))
+        val childManifest =
+            completeManifest("author.parameter_child").copy(
+                basis = base.coordinate,
+                scenes = emptyList(),
+                surfaces = emptyList(),
+                presentation = ThemePackagePresentationPatchV2(),
+                parameters = emptyList(),
+            )
+        val child = installation(childManifest, tmp.newFolder("parameter-child"))
+        val linked =
+            ThemePackageRuntimeLinkerV2.link(
+                child,
+                PublishedThemeCatalogV2(listOf(base, child), emptyList()),
+            )
+        val parameters =
+            ThemePackageRuntimeLinkerV2.resolveParameters(
+                ThemeInstanceV2(
+                    reference = ThemePackageReferenceV2(child.coordinate),
+                    parameterValues = mapOf("accent_color" to ThemeParameterValueV2.ColorValue(0xFF00FF00)),
+                ),
+                linked,
+            )
+
+        val runtime =
+            createThemePackageUiRuntimeV2(
+                linked = linked,
+                parameters = parameters,
+                darkTheme = false,
+                userFontScale = 1f,
+            )
+
+        assertEquals(0xFF111111.toInt(), runtime.colorScheme.primary.toArgb())
+    }
+
+    @Test
+    fun childParameterCannotTargetAnInheritedToken() {
+        val base = installation(completeManifest("author.ownership_base"), tmp.newFolder("ownership-base"))
+        val childParameter =
+            ThemeParameterDefinitionV2(
+                id = "child_color",
+                type = ThemeParameterTypeV2.COLOR,
+                defaultValue = ThemeParameterDefaultV2.ColorValue(0xFF00FF00),
+                label = ThemePackageLocalizedTextV2(values = mapOf("*" to "Child color")),
+                control = ThemeParameterControlV2.ColorPalette(presetArgb = listOf(0xFF00FF00)),
+                effects =
+                    listOf(
+                        ThemeParameterEffectV2.TokenColor(tokenIds = listOf("color.background")),
+                    ),
+            )
+        val childManifest =
+            completeManifest("author.ownership_child").copy(
+                basis = base.coordinate,
+                scenes = emptyList(),
+                surfaces = emptyList(),
+                presentation = ThemePackagePresentationPatchV2(),
+                parameters = listOf(childParameter),
+            )
+        val child = installation(childManifest, tmp.newFolder("ownership-child"))
+
+        val error =
+            assertThrows(ThemePackageLinkExceptionV2::class.java) {
+                ThemePackageRuntimeLinkerV2.link(
+                    child,
+                    PublishedThemeCatalogV2(listOf(base, child), emptyList()),
+                )
+            }
+
+        assertTrue(error.message!!.contains("inherited token color.background"))
+    }
+
+    @Test
+    fun stageImageEffectRejectsTemplateSurface() {
+        val imageParameter =
+            ThemeParameterDefinitionV2(
+                id = "background_image",
+                type = ThemeParameterTypeV2.IMAGE_URI,
+                label = ThemePackageLocalizedTextV2(values = mapOf("*" to "Background")),
+                control = ThemeParameterControlV2.ImagePicker(),
+                effects =
+                    listOf(
+                        ThemeParameterEffectV2.StageImage(
+                            surfaceIds = listOf(ThemeSurfaceCatalogV2.SETTINGS_INDEX.value),
+                        ),
+                    ),
+            )
+        val manifest = completeManifest().copy(parameters = listOf(imageParameter))
+        val installation = installation(manifest, tmp.newFolder("template-stage-image"))
+
+        val error =
+            assertThrows(ThemePackageLinkExceptionV2::class.java) {
+                ThemePackageRuntimeLinkerV2.link(
+                    installation,
+                    PublishedThemeCatalogV2(listOf(installation), emptyList()),
+                )
+            }
+
+        assertTrue(error.message!!.contains(ThemeSurfaceCatalogV2.SETTINGS_INDEX.value))
+    }
+
+    @Test
+    fun stageImageEffectCreatesAnActiveSceneOverlay() {
+        val imageParameter =
+            ThemeParameterDefinitionV2(
+                id = "background_image",
+                type = ThemeParameterTypeV2.IMAGE_URI,
+                label = ThemePackageLocalizedTextV2(values = mapOf("*" to "Background")),
+                control = ThemeParameterControlV2.ImagePicker(),
+                effects =
+                    listOf(
+                        ThemeParameterEffectV2.StageImage(
+                            surfaceIds = listOf(ThemeSurfaceCatalogV2.APP_SHELL.value),
+                        ),
+                    ),
+            )
+        val installation =
+            installation(
+                completeManifest().copy(parameters = listOf(imageParameter)),
+                tmp.newFolder("scene-stage-image"),
+            )
+        val linked =
+            ThemePackageRuntimeLinkerV2.link(
+                installation,
+                PublishedThemeCatalogV2(listOf(installation), emptyList()),
+            )
+        val parameters =
+            ThemePackageRuntimeLinkerV2.resolveParameters(
+                ThemeInstanceV2(
+                    reference = ThemePackageReferenceV2(installation.coordinate),
+                    parameterValues =
+                        mapOf(
+                            "background_image" to
+                                ThemeParameterValueV2.ImageUriValue("content://theme/stage"),
+                        ),
+                ),
+                linked,
+            )
+
+        val runtime =
+            createThemePackageUiRuntimeV2(
+                linked = linked,
+                parameters = parameters,
+                darkTheme = false,
+                userFontScale = 1f,
+            )
+
+        assertEquals(
+            "content://theme/stage",
+            runtime.stageImage(ThemeSurfaceCatalogV2.APP_SHELL)?.uri,
+        )
     }
 }

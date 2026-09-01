@@ -36,7 +36,9 @@
 
 [SUPERSEDED] 初始赛博主题 archive `operit-cyber-grid-2.1.0.otheme` 的 SHA-256 为 `e60316ce282ffd7b035645217647ad28a67b9a575ad975841e5b59d6a17b0b1e`。
 
-[DONE] `status.error` contract 更新后，默认主题 archive 的 SHA-256 为 `686bc48d09752de21a25a8abf6bf35246371816849da4ef33534f96bc1c9c964`，APK 内置归档、锁定坐标与 Cyber Grid basis 均使用该摘要；赛博主题 archive 的 SHA-256 为 `36e9180ead6b2d10225819a5b1774189f025a753fe945d8490d347e2e2161488`。两个归档均通过 package script 的 JSON、资产、确定性 ZIP 与 comment 检查。
+[SUPERSEDED] `status.error` contract 更新后，默认主题 archive 的 SHA-256 为 `686bc48d09752de21a25a8abf6bf35246371816849da4ef33534f96bc1c9c964`，赛博主题 archive 的 SHA-256 为 `36e9180ead6b2d10225819a5b1774189f025a753fe945d8490d347e2e2161488`。
+
+[DONE] schema 3 customization 基线：默认主题 `2.2.0` SHA-256 为 `dba4169c8e1636c5f2d85749f7770b8657d99217764563aac0302137e37ef4fd`，APK 内置归档、锁定坐标与 Cyber Grid basis 均使用该摘要；赛博主题 `2.2.0` SHA-256 为 `afdd126f8a22dd6ce3c78ab566a17225d71dfa8db0704f1a09ee66c7e6a519f2`。两个归档均通过 package script 的 JSON、资产、确定性 ZIP 与 comment 检查。
 
 以下提交与 APK 记录属于此前 component-frame 批次，不代表当前 `status.error` 开发基线已提交、发布或构建。
 
@@ -46,7 +48,7 @@
 
 [DONE] 选择保护版本已由构建服务同步 `32d0f934` 并完成 release 编译和签名：`operit-release-feat_plugin-interface-32d0f934.apk`，SHA-256 `243d3b4a176b5f2bf6aead7e4ad5b8debbe66f77712869a82c6a9a9d52821630`。
 
-[TODO] 在真机导入 `operit-cyber-grid-2.1.0.otheme` 后，提供 Agent/Classic、Cursor/Bubble、角色栏、focused/error input 的整页截图，确认异形 frame 在真实设备尺寸和 IME 状态下对齐。
+[TODO] 在新的 schema 3 preview 发布后，于真机导入 `operit-cyber-grid-2.2.0.otheme`，提供 Agent/Classic、Cursor/Bubble、角色栏、focused/error input、accent/background customization 的整页截图，确认异形 frame 在真实设备尺寸和 IME 状态下对齐。
 
 ## 启动选择保护
 

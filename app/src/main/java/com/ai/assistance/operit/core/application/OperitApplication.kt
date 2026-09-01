@@ -216,9 +216,10 @@ class OperitApplication : Application(), ImageLoaderFactory, WorkConfiguration.P
                 check(ThemePackageDefaultV2.coordinate in runtimeIndex.linkedCoordinates) {
                     "Bundled default V2 theme package could not be linked."
                 }
+                val selectionRepository = ThemePackageSelectionRepositoryV2.getInstance(applicationContext)
                 val repairedCoordinate =
-                    ThemePackageSelectionRepositoryV2.getInstance(applicationContext)
-                        .repairUnavailableSelection(runtimeIndex.linkedCoordinates)
+                    selectionRepository.repairUnavailableSelection(runtimeIndex.linkedCoordinates)
+                selectionRepository.reconcileThemeImageGrants()
                 if (repairedCoordinate != null) {
                     AppLogger.w(
                         TAG,

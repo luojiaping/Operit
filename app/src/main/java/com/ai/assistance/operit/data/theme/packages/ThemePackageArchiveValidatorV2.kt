@@ -30,7 +30,7 @@ internal data class ThemePackageValidatedArchiveV2(
 )
 
 /**
- * Rejects malformed V2 archives before installation. This is intentionally strict: no manifest,
+ * Rejects malformed schema 3 archives before installation. This is intentionally strict: no manifest,
  * asset, scene, token, or presentation data is repaired at import time.
  */
 internal object ThemePackageArchiveValidatorV2 {
@@ -98,7 +98,7 @@ internal object ThemePackageArchiveValidatorV2 {
             }
         } catch (error: Throwable) {
             throw ThemePackageArchiveValidationExceptionV2(
-                "Theme package manifest is not a valid V2 theme manifest: ${error.message}",
+                "Theme package manifest is not a valid schema 3 theme manifest: ${error.message}",
                 error,
             )
         }

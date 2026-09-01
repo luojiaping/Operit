@@ -47,6 +47,7 @@ internal fun ChatMainSceneHost(
             error("Active chat theme has no text resource for ${key.value}.")
         },
         darkTheme = runtime.darkTheme,
+        stageImage = runtime.stageImage(ThemeSurfaceCatalogV2.CHAT_MAIN),
         modifier = modifier,
     )
 }

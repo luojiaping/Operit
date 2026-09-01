@@ -24,14 +24,18 @@ internal data class LinkedThemeRuntimeV2(
     val assets: Map<String, File>,
     val assetKinds: Map<String, ThemeAssetKindV2> = emptyMap(),
     val parameterDefinitions: Map<String, ThemeParameterDefinitionV2>,
+    val parameterOwners: Map<String, ThemePackageCoordinateV2> = emptyMap(),
 )
 
 internal data class ResolvedThemeParametersV2(
     val values: Map<String, ThemeParameterValueV2>,
+    val overriddenIds: Set<String> = emptySet(),
 ) {
     fun colorArgb(id: String): Long? = (values[id] as? ThemeParameterValueV2.ColorValue)?.argb
 
-    fun string(id: String): String? = (values[id] as? ThemeParameterValueV2.StringValue)?.value
+    fun imageUri(id: String): String? = (values[id] as? ThemeParameterValueV2.ImageUriValue)?.uri
+
+    fun isOverridden(id: String): Boolean = id in overriddenIds
 }
 
 internal object ThemePackageRuntimeLinkerV2 {
@@ -60,6 +64,7 @@ internal object ThemePackageRuntimeLinkerV2 {
                         "Theme parameter $id does not match declared type ${definition.type}.",
                     )
                 }
+                validateParameterValue(id, definition, value)
                 values[id] = value
             }
         }
@@ -70,7 +75,26 @@ internal object ThemePackageRuntimeLinkerV2 {
                 )
             }
         }
-        return ResolvedThemeParametersV2(values)
+        return ResolvedThemeParametersV2(
+            values = values,
+            overriddenIds = instance.parameterValues.keys,
+        )
+    }
+
+    private fun validateParameterValue(
+        id: String,
+        definition: ThemeParameterDefinitionV2,
+        value: ThemeParameterValueV2,
+    ) {
+        if (definition.type == ThemeParameterTypeV2.COLOR) {
+            val color = value as? ThemeParameterValueV2.ColorValue
+                ?: throw ThemePackageLinkExceptionV2("Theme color parameter $id must resolve to a color.")
+            if (color.argb ushr 24 != 0xFFL) {
+                throw ThemePackageLinkExceptionV2(
+                    "Theme color parameter $id must be opaque.",
+                )
+            }
+        }
     }
 
     private fun resolveChain(
@@ -98,18 +122,30 @@ internal object ThemePackageRuntimeLinkerV2 {
     }
 }
 
+private data class LinkedThemeParameterV2(
+    val definition: ThemeParameterDefinitionV2,
+    val owner: ThemePackageCoordinateV2,
+)
+
 private data class LinkedThemeAccumulatorV2(
     val material: ThemeMaterialProjectionV2? = null,
+    val materialOwner: ThemePackageCoordinateV2? = null,
     val componentSkins: Map<String, ThemeComponentSkinV2> = emptyMap(),
     val surfaces: Map<String, ThemeSurfaceImplementationV2> = emptyMap(),
+    val surfaceOwners: Map<String, ThemePackageCoordinateV2> = emptyMap(),
     val tokens: Map<String, ThemeSceneTokenValueV1> = emptyMap(),
+    val tokenOwners: Map<String, ThemePackageCoordinateV2> = emptyMap(),
     val scenes: Map<String, ThemeSceneDefinitionV1> = emptyMap(),
+    val sceneOwners: Map<String, ThemePackageCoordinateV2> = emptyMap(),
     val assets: Map<String, File> = emptyMap(),
     val assetKinds: Map<String, ThemeAssetKindV2> = emptyMap(),
-    val parameters: Map<String, ThemeParameterDefinitionV2> = emptyMap(),
+    val parameters: Map<String, LinkedThemeParameterV2> = emptyMap(),
 ) {
     fun merge(installation: PublishedThemeInstallationV2): LinkedThemeAccumulatorV2 {
         val manifest = installation.manifest
+        val declaredSurfaces = manifest.surfaces.associateBy { surface -> surface.surfaceId }
+        val declaredTokens = manifest.tokens.tokens
+        val declaredScenes = manifest.scenes.associateBy { scene -> scene.sceneId.value }
         val duplicateAssetKeys = assets.keys.intersect(manifest.assets.map { asset -> asset.key }.toSet())
         if (duplicateAssetKeys.isNotEmpty()) {
             throw ThemePackageLinkExceptionV2(
@@ -126,17 +162,33 @@ private data class LinkedThemeAccumulatorV2(
         }
         return copy(
             material = manifest.presentation.material ?: material,
+            materialOwner =
+                if (manifest.presentation.material != null) installation.coordinate else materialOwner,
             componentSkins = componentSkins + manifest.presentation.componentSkins,
-            surfaces = surfaces + manifest.surfaces.associateBy { surface -> surface.surfaceId },
-            tokens = tokens + manifest.tokens.tokens,
-            scenes = scenes + manifest.scenes.associateBy { scene -> scene.sceneId.value },
+            surfaces = surfaces + declaredSurfaces,
+            surfaceOwners =
+                surfaceOwners + declaredSurfaces.keys.associateWith { installation.coordinate },
+            tokens = tokens + declaredTokens,
+            tokenOwners =
+                tokenOwners + declaredTokens.keys.associateWith { installation.coordinate },
+            scenes = scenes + declaredScenes,
+            sceneOwners =
+                sceneOwners + declaredScenes.keys.associateWith { installation.coordinate },
             assets =
                 assets +
                     manifest.assets.associate { asset ->
                         asset.key to File(installation.rootDir, asset.path)
                     },
             assetKinds = assetKinds + manifest.assets.associate { asset -> asset.key to asset.kind },
-            parameters = parameters + manifest.parameters.associateBy { parameter -> parameter.id },
+            parameters =
+                parameters +
+                    manifest.parameters.associate { parameter ->
+                        parameter.id to
+                            LinkedThemeParameterV2(
+                                definition = parameter,
+                                owner = installation.coordinate,
+                            )
+                    },
         )
     }
 
@@ -146,11 +198,25 @@ private data class LinkedThemeAccumulatorV2(
     ): LinkedThemeRuntimeV2 {
         val resolvedMaterial = material
             ?: throw ThemePackageLinkExceptionV2("Theme package has no linked Material projection.")
+        val resolvedMaterialOwner = materialOwner
+            ?: throw ThemePackageLinkExceptionV2("Theme package has no Material projection owner.")
         val componentSkinMap = componentSkins.mapKeys { (id, _) -> ThemeComponentIdV2(id) }
         val surfaceMap = surfaces.mapKeys { (id, _) -> ThemeSurfaceIdV2(id) }
         validateCoverage(componentSkinMap, surfaceMap)
         validateTokenReferences(resolvedMaterial, componentSkinMap, tokens)
         validateSceneReferences(surfaces, scenes, tokens, assets, assetKinds)
+        validateParameterEffects(
+            activeCoordinate = coordinate,
+            parameters = parameters,
+            material = resolvedMaterial,
+            materialOwner = resolvedMaterialOwner,
+            surfaces = surfaceMap,
+            surfaceOwners = surfaceOwners,
+            scenes = scenes,
+            sceneOwners = sceneOwners,
+            tokens = tokens,
+            tokenOwners = tokenOwners,
+        )
         return LinkedThemeRuntimeV2(
             coordinate = coordinate,
             packageChain = packageChain,
@@ -161,7 +227,8 @@ private data class LinkedThemeAccumulatorV2(
             scenes = scenes,
             assets = assets,
             assetKinds = assetKinds,
-            parameterDefinitions = parameters,
+            parameterDefinitions = parameters.mapValues { (_, parameter) -> parameter.definition },
+            parameterOwners = parameters.mapValues { (_, parameter) -> parameter.owner },
         )
     }
 
@@ -237,6 +304,120 @@ private data class LinkedThemeAccumulatorV2(
         }
         scenes.values.forEach { scene ->
             validateSceneNode(scene.rootNode, tokens, assets, assetKinds)
+        }
+    }
+
+    private fun validateParameterEffects(
+        activeCoordinate: ThemePackageCoordinateV2,
+        parameters: Map<String, LinkedThemeParameterV2>,
+        material: ThemeMaterialProjectionV2,
+        materialOwner: ThemePackageCoordinateV2,
+        surfaces: Map<ThemeSurfaceIdV2, ThemeSurfaceImplementationV2>,
+        surfaceOwners: Map<String, ThemePackageCoordinateV2>,
+        scenes: Map<String, ThemeSceneDefinitionV1>,
+        sceneOwners: Map<String, ThemePackageCoordinateV2>,
+        tokens: Map<String, ThemeSceneTokenValueV1>,
+        tokenOwners: Map<String, ThemePackageCoordinateV2>,
+    ) {
+        parameters.values
+            .filter { parameter -> parameter.owner == activeCoordinate }
+            .groupBy { parameter -> parameter.owner }
+            .forEach { (owner, ownedParameters) ->
+                val colorTargets = mutableSetOf<String>()
+                val stageTargets = mutableSetOf<ThemeSurfaceIdV2>()
+                var accentPaletteDeclared = false
+                ownedParameters.forEach { parameter ->
+                    parameter.definition.effects.forEach { effect ->
+                        when (effect) {
+                            ThemeParameterEffectV2.AccentPalette -> {
+                                if (materialOwner != owner) {
+                                    throw ThemePackageLinkExceptionV2(
+                                        "Theme package ${owner.packageId.value} cannot apply an accent palette to inherited Material roles.",
+                                    )
+                                }
+                                if (accentPaletteDeclared) {
+                                    throw ThemePackageLinkExceptionV2(
+                                        "Theme package ${owner.packageId.value} declares multiple accent palette effects.",
+                                    )
+                                }
+                                accentPaletteDeclared = true
+                                val accentTokenIds = material.colors.accentTokenIds()
+                                if (accentTokenIds.distinct().size != accentTokenIds.size) {
+                                    throw ThemePackageLinkExceptionV2(
+                                        "Theme accent palette requires distinct Material role tokens.",
+                                    )
+                                }
+                                accentTokenIds.forEach { tokenId ->
+                                    requireColor(tokens, tokenId, "Accent palette")
+                                    requireOwnedTarget(tokenOwners[tokenId], owner, tokenId, "token")
+                                    if (!colorTargets.add(tokenId)) {
+                                        throw ThemePackageLinkExceptionV2(
+                                            "Theme package ${owner.packageId.value} assigns multiple color effects to $tokenId.",
+                                        )
+                                    }
+                                }
+                            }
+
+                            is ThemeParameterEffectV2.TokenColor ->
+                                effect.tokenIds.forEach { tokenId ->
+                                    requireColor(tokens, tokenId, "Theme parameter")
+                                    requireOwnedTarget(tokenOwners[tokenId], owner, tokenId, "token")
+                                    if (!colorTargets.add(tokenId)) {
+                                        throw ThemePackageLinkExceptionV2(
+                                            "Theme package ${owner.packageId.value} assigns multiple color effects to $tokenId.",
+                                        )
+                                    }
+                                }
+
+                            is ThemeParameterEffectV2.StageImage ->
+                                effect.surfaceIds.forEach { surfaceId ->
+                                    val surface = ThemeSurfaceIdV2(surfaceId)
+                                    val implementation = surfaces[surface]
+                                    if (implementation?.kind != ThemeSurfaceImplementationKindV2.SCENE) {
+                                        throw ThemePackageLinkExceptionV2(
+                                            "Theme stage image effect must target a scene surface: $surfaceId.",
+                                        )
+                                    }
+                                    requireOwnedTarget(
+                                        surfaceOwners[surfaceId],
+                                        owner,
+                                        surfaceId,
+                                        "surface",
+                                    )
+                                    val sceneId = requireNotNull(implementation.sceneId)
+                                    if (sceneId !in scenes) {
+                                        throw ThemePackageLinkExceptionV2(
+                                            "Theme stage image effect references missing scene $sceneId.",
+                                        )
+                                    }
+                                    requireOwnedTarget(
+                                        sceneOwners[sceneId],
+                                        owner,
+                                        sceneId,
+                                        "scene",
+                                    )
+                                    if (!stageTargets.add(surface)) {
+                                        throw ThemePackageLinkExceptionV2(
+                                            "Theme package ${owner.packageId.value} assigns multiple stage images to $surfaceId.",
+                                        )
+                                    }
+                                }
+                        }
+                    }
+                }
+            }
+    }
+
+    private fun requireOwnedTarget(
+        targetOwner: ThemePackageCoordinateV2?,
+        parameterOwner: ThemePackageCoordinateV2,
+        target: String,
+        targetKind: String,
+    ) {
+        if (targetOwner != parameterOwner) {
+            throw ThemePackageLinkExceptionV2(
+                "Theme package ${parameterOwner.packageId.value} cannot apply a parameter effect to inherited $targetKind $target.",
+            )
         }
     }
 
@@ -339,18 +520,11 @@ private data class LinkedThemeAccumulatorV2(
 private fun ThemeParameterDefaultV2.toValueOrNull(): ThemeParameterValueV2? =
     when (this) {
         is ThemeParameterDefaultV2.ColorValue -> ThemeParameterValueV2.ColorValue(argb)
-        is ThemeParameterDefaultV2.BooleanValue -> ThemeParameterValueV2.BooleanValue(value)
-        is ThemeParameterDefaultV2.IntegerValue -> ThemeParameterValueV2.IntegerValue(value)
-        is ThemeParameterDefaultV2.DecimalValue -> ThemeParameterValueV2.DecimalValue(value)
-        is ThemeParameterDefaultV2.StringValue -> ThemeParameterValueV2.StringValue(value)
         ThemeParameterDefaultV2.Unset -> null
     }
 
 private fun ThemeParameterValueV2.matches(type: ThemeParameterTypeV2): Boolean =
     when (type) {
         ThemeParameterTypeV2.COLOR -> this is ThemeParameterValueV2.ColorValue
-        ThemeParameterTypeV2.BOOLEAN -> this is ThemeParameterValueV2.BooleanValue
-        ThemeParameterTypeV2.INTEGER -> this is ThemeParameterValueV2.IntegerValue
-        ThemeParameterTypeV2.DECIMAL -> this is ThemeParameterValueV2.DecimalValue
-        ThemeParameterTypeV2.STRING -> this is ThemeParameterValueV2.StringValue
+        ThemeParameterTypeV2.IMAGE_URI -> this is ThemeParameterValueV2.ImageUriValue
     }

@@ -50,6 +50,7 @@ internal fun AppShellSceneHost(
             error("Active shell theme has no text resource for ${key.value}.")
         },
         darkTheme = runtime.darkTheme,
+        stageImage = runtime.stageImage(ThemeSurfaceCatalogV2.APP_SHELL),
         modifier = modifier,
     )
 }

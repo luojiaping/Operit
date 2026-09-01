@@ -1,6 +1,7 @@
 package com.ai.assistance.operit.data.theme.packages
 
 import com.ai.assistance.operit.ui.theme.scene.ThemeSceneDefinitionV1
+import com.ai.assistance.operit.ui.theme.scene.ThemeSceneImageFitV1
 import com.ai.assistance.operit.ui.theme.scene.ThemeSceneIdV1
 import com.ai.assistance.operit.ui.theme.scene.ThemeSceneTokenIdV1
 import com.ai.assistance.operit.ui.theme.scene.ThemeSceneTokenSetV1
@@ -10,7 +11,7 @@ import kotlinx.serialization.Serializable
 private val MEMBER_ID_PATTERN_V2 = Regex("^[a-z][a-z0-9_]*$")
 private val SHA256_PATTERN_V2 = Regex("^[0-9a-f]{64}$")
 
-internal const val THEME_PACKAGE_SCHEMA_VERSION_V2 = 2
+internal const val THEME_PACKAGE_SCHEMA_VERSION = 3
 internal const val THEME_PACKAGE_MANIFEST_ENTRY_V2 = "operit-theme.json"
 internal const val THEME_PACKAGE_EXTENSION_V2 = "otheme"
 internal const val THEME_PACKAGE_ZIP_COMMENT_V2 = "Operit Theme Package"
@@ -86,10 +87,7 @@ internal data class ThemePackageAttributionV2(
 @Serializable
 internal enum class ThemeParameterTypeV2 {
     COLOR,
-    BOOLEAN,
-    INTEGER,
-    DECIMAL,
-    STRING,
+    IMAGE_URI,
 }
 
 @Serializable
@@ -103,24 +101,94 @@ internal sealed interface ThemeParameterDefaultV2 {
     }
 
     @Serializable
-    @SerialName("boolean")
-    data class BooleanValue(val value: Boolean) : ThemeParameterDefaultV2
-
-    @Serializable
-    @SerialName("integer")
-    data class IntegerValue(val value: Long) : ThemeParameterDefaultV2
-
-    @Serializable
-    @SerialName("decimal")
-    data class DecimalValue(val value: Double) : ThemeParameterDefaultV2
-
-    @Serializable
-    @SerialName("string")
-    data class StringValue(val value: String) : ThemeParameterDefaultV2
-
-    @Serializable
     @SerialName("unset")
     data object Unset : ThemeParameterDefaultV2
+}
+
+/** Declares the compact native control used to edit one package-owned value. */
+@Serializable
+internal sealed interface ThemeParameterControlV2 {
+    @Serializable
+    @SerialName("color_palette")
+    data class ColorPalette(
+        val presetArgb: List<Long> = emptyList(),
+        val allowCustom: Boolean = true,
+    ) : ThemeParameterControlV2 {
+        init {
+            require(presetArgb.all { argb -> argb in 0..0xFFFFFFFFL }) {
+                "Theme color palette values must be ARGB within 0..0xffffffff."
+            }
+            require(presetArgb.all { argb -> argb ushr 24 == 0xFFL }) {
+                "Theme color palette values must be opaque."
+            }
+            require(presetArgb.distinct().size == presetArgb.size) {
+                "Theme color palette values must be unique."
+            }
+            require(presetArgb.isNotEmpty() || allowCustom) {
+                "Theme color palette must provide a preset or allow custom colors."
+            }
+        }
+    }
+
+    @Serializable
+    @SerialName("image_picker")
+    data class ImagePicker(
+        val mimeTypes: List<String> = DEFAULT_IMAGE_MIME_TYPES,
+    ) : ThemeParameterControlV2 {
+        init {
+            require(mimeTypes.isNotEmpty()) { "Theme image picker must declare MIME types." }
+            require(mimeTypes.all(ALLOWED_IMAGE_MIME_TYPES::contains)) {
+                "Theme image picker declares an unsupported MIME type."
+            }
+            require(mimeTypes.distinct().size == mimeTypes.size) {
+                "Theme image picker MIME types must be unique."
+            }
+        }
+
+        companion object {
+            val DEFAULT_IMAGE_MIME_TYPES = listOf("image/jpeg", "image/png", "image/webp")
+            private val ALLOWED_IMAGE_MIME_TYPES = DEFAULT_IMAGE_MIME_TYPES.toSet()
+        }
+    }
+}
+
+/** A parameter may only affect an explicit visual target owned by the declaring theme package. */
+@Serializable
+internal sealed interface ThemeParameterEffectV2 {
+    @Serializable
+    @SerialName("accent_palette")
+    data object AccentPalette : ThemeParameterEffectV2
+
+    @Serializable
+    @SerialName("token_color")
+    data class TokenColor(
+        val tokenIds: List<String>,
+    ) : ThemeParameterEffectV2 {
+        init {
+            require(tokenIds.isNotEmpty()) { "Theme token color effect must target a token." }
+            require(tokenIds.distinct().size == tokenIds.size) {
+                "Theme token color effect targets must be unique."
+            }
+            tokenIds.forEach(::ThemeSceneTokenIdV1)
+        }
+    }
+
+    @Serializable
+    @SerialName("stage_image")
+    data class StageImage(
+        val surfaceIds: List<String>,
+        val fit: ThemeSceneImageFitV1 = ThemeSceneImageFitV1.CROP,
+        val opacity: Float = 0.22f,
+    ) : ThemeParameterEffectV2 {
+        init {
+            require(surfaceIds.isNotEmpty()) { "Theme stage image effect must target a surface." }
+            require(surfaceIds.distinct().size == surfaceIds.size) {
+                "Theme stage image effect targets must be unique."
+            }
+            surfaceIds.forEach(::ThemeSurfaceIdV2)
+            require(opacity in 0f..1f) { "Theme stage image opacity must be within [0, 1]." }
+        }
+    }
 }
 
 @Serializable
@@ -129,11 +197,36 @@ internal data class ThemeParameterDefinitionV2(
     val type: ThemeParameterTypeV2,
     val defaultValue: ThemeParameterDefaultV2 = ThemeParameterDefaultV2.Unset,
     val label: ThemePackageLocalizedTextV2,
+    val description: ThemePackageLocalizedTextV2? = null,
+    val control: ThemeParameterControlV2,
+    val effects: List<ThemeParameterEffectV2>,
 ) {
     init {
         ThemeParameterIdV2(id)
         require(defaultValue.matches(type)) {
             "Theme parameter $id declares type $type with a mismatched default value."
+        }
+        require(control.matches(type)) {
+            "Theme parameter $id declares control $control for incompatible type $type."
+        }
+        require(effects.isNotEmpty()) { "Theme parameter $id must declare at least one visual effect." }
+        require(effects.all { effect -> effect.matches(type) }) {
+            "Theme parameter $id declares an effect incompatible with type $type."
+        }
+        if (type == ThemeParameterTypeV2.IMAGE_URI) {
+            require(defaultValue == ThemeParameterDefaultV2.Unset) {
+                "Theme image URI parameter $id must not declare a package default."
+            }
+        }
+        val palette = control as? ThemeParameterControlV2.ColorPalette
+        if (palette != null) {
+            val colorDefault = defaultValue as? ThemeParameterDefaultV2.ColorValue
+            require(colorDefault != null) {
+                "Theme color palette parameter $id must declare a color default."
+            }
+            require(colorDefault.argb ushr 24 == 0xFFL) {
+                "Theme color palette parameter $id must use an opaque default color."
+            }
         }
     }
 }
@@ -303,6 +396,27 @@ internal data class ThemeMaterialColorSchemeV2(
             )
     }
 }
+
+/** Semantic roles adjusted by a user-selected accent palette; surfaces remain package-owned. */
+internal fun ThemeMaterialColorSchemeV2.accentTokenIds(): List<String> =
+    listOf(
+        primary,
+        onPrimary,
+        primaryContainer,
+        onPrimaryContainer,
+        inversePrimary,
+        secondary,
+        onSecondary,
+        secondaryContainer,
+        onSecondaryContainer,
+        tertiary,
+        onTertiary,
+        tertiaryContainer,
+        onTertiaryContainer,
+        surfaceTint,
+        outline,
+        outlineVariant,
+    )
 
 @Serializable
 internal data class ThemeMaterialProjectionV2(
@@ -512,8 +626,8 @@ internal data class ThemePackageManifestV2(
     val presentation: ThemePackagePresentationPatchV2 = ThemePackagePresentationPatchV2(),
 ) {
     init {
-        require(schemaVersion == THEME_PACKAGE_SCHEMA_VERSION_V2) {
-            "Theme package schema version must be $THEME_PACKAGE_SCHEMA_VERSION_V2."
+        require(schemaVersion == THEME_PACKAGE_SCHEMA_VERSION) {
+            "Theme package schema version must be $THEME_PACKAGE_SCHEMA_VERSION."
         }
         ThemePackageIdV2(packageId)
         ThemePackageVersionV2(version)
@@ -549,8 +663,19 @@ internal data class ThemePackageManifestV2(
 internal fun ThemeParameterDefaultV2.matches(type: ThemeParameterTypeV2): Boolean =
     when (type) {
         ThemeParameterTypeV2.COLOR -> this is ThemeParameterDefaultV2.ColorValue || this is ThemeParameterDefaultV2.Unset
-        ThemeParameterTypeV2.BOOLEAN -> this is ThemeParameterDefaultV2.BooleanValue || this is ThemeParameterDefaultV2.Unset
-        ThemeParameterTypeV2.INTEGER -> this is ThemeParameterDefaultV2.IntegerValue || this is ThemeParameterDefaultV2.Unset
-        ThemeParameterTypeV2.DECIMAL -> this is ThemeParameterDefaultV2.DecimalValue || this is ThemeParameterDefaultV2.Unset
-        ThemeParameterTypeV2.STRING -> this is ThemeParameterDefaultV2.StringValue || this is ThemeParameterDefaultV2.Unset
+        ThemeParameterTypeV2.IMAGE_URI -> this is ThemeParameterDefaultV2.Unset
+    }
+
+internal fun ThemeParameterControlV2.matches(type: ThemeParameterTypeV2): Boolean =
+    when (this) {
+        is ThemeParameterControlV2.ColorPalette -> type == ThemeParameterTypeV2.COLOR
+        is ThemeParameterControlV2.ImagePicker -> type == ThemeParameterTypeV2.IMAGE_URI
+    }
+
+internal fun ThemeParameterEffectV2.matches(type: ThemeParameterTypeV2): Boolean =
+    when (this) {
+        ThemeParameterEffectV2.AccentPalette,
+        is ThemeParameterEffectV2.TokenColor -> type == ThemeParameterTypeV2.COLOR
+
+        is ThemeParameterEffectV2.StageImage -> type == ThemeParameterTypeV2.IMAGE_URI
     }

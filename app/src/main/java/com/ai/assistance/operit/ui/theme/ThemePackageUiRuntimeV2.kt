@@ -17,6 +17,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.graphics.ColorUtils
 import com.ai.assistance.operit.data.preferences.GlobalThemeMode
 import com.ai.assistance.operit.data.theme.packages.LinkedThemeRuntimeV2
 import com.ai.assistance.operit.data.theme.packages.ResolvedThemeParametersV2
@@ -24,12 +25,19 @@ import com.ai.assistance.operit.data.theme.packages.ThemeComponentSkinV2
 import com.ai.assistance.operit.data.theme.packages.ThemeComponentStateSkinV2
 import com.ai.assistance.operit.data.theme.packages.ThemeInstanceV2
 import com.ai.assistance.operit.data.theme.packages.ThemeMaterialColorSchemeV2
+import com.ai.assistance.operit.data.theme.packages.ThemeParameterEffectV2
+import com.ai.assistance.operit.data.theme.packages.ThemeParameterValueV2
 import com.ai.assistance.operit.data.theme.packages.ThemePackageRuntimeLinkerV2
 import com.ai.assistance.operit.data.theme.packages.ThemePackageSelectionRepositoryV2
 import com.ai.assistance.operit.data.theme.packages.ThemeRuntimeRepositoryV2
+import com.ai.assistance.operit.data.theme.packages.ThemeSurfaceIdV2
 import com.ai.assistance.operit.data.theme.packages.ThemeSystemFontFamilyV2
+import com.ai.assistance.operit.data.theme.packages.accentTokenIds
+import com.ai.assistance.operit.ui.theme.scene.ThemeSceneImageFitV1
 import com.ai.assistance.operit.ui.theme.scene.ThemeSceneTokenIdV1
+import com.ai.assistance.operit.ui.theme.scene.ThemeSceneTokenSetV1
 import com.ai.assistance.operit.ui.theme.scene.ThemeSceneTokenResolverV1
+import com.ai.assistance.operit.ui.theme.scene.ThemeSceneTokenValueV1
 import com.ai.assistance.operit.ui.theme.scene.render.ThemeSceneAssetRepositoryV1
 
 internal enum class ThemeComponentStateV2 {
@@ -52,6 +60,13 @@ internal data class ResolvedThemeComponentSkinV2(
     val paddingBottomDp: Float,
 )
 
+@Immutable
+internal data class ResolvedThemeStageImageV2(
+    val uri: String,
+    val fit: ThemeSceneImageFitV1,
+    val opacity: Float,
+)
+
 /** Runtime projection used by every Operit-owned Compose root. */
 @Immutable
 internal data class ThemePackageUiRuntimeV2(
@@ -63,6 +78,7 @@ internal data class ThemePackageUiRuntimeV2(
     val shapes: Shapes,
     val tokens: ThemeSceneTokenResolverV1,
     val assets: ThemeSceneAssetRepositoryV1,
+    val stageImages: Map<ThemeSurfaceIdV2, ResolvedThemeStageImageV2> = emptyMap(),
 ) {
     fun componentSkin(
         component: com.ai.assistance.operit.data.theme.packages.ThemeComponentIdV2,
@@ -88,6 +104,8 @@ internal data class ThemePackageUiRuntimeV2(
             }
         return selected.resolve(tokens, darkTheme)
     }
+
+    fun stageImage(surface: ThemeSurfaceIdV2): ResolvedThemeStageImageV2? = stageImages[surface]
 }
 
 /**
@@ -123,7 +141,8 @@ internal fun createThemePackageUiRuntimeV2(
     darkTheme: Boolean,
     userFontScale: Float,
 ): ThemePackageUiRuntimeV2 {
-    val tokens = ThemeSceneTokenResolverV1(linked.tokens)
+    val parameterizedPresentation = resolveThemeParameterPresentationV2(linked, parameters)
+    val tokens = ThemeSceneTokenResolverV1(parameterizedPresentation.tokens)
     val material = linked.material
     return ThemePackageUiRuntimeV2(
         linked = linked,
@@ -141,7 +160,158 @@ internal fun createThemePackageUiRuntimeV2(
             ),
         tokens = tokens,
         assets = ThemeSceneAssetRepositoryV1(linked.assets),
+        stageImages = parameterizedPresentation.stageImages,
     )
+}
+
+private data class ThemeParameterPresentationV2(
+    val tokens: ThemeSceneTokenSetV1,
+    val stageImages: Map<ThemeSurfaceIdV2, ResolvedThemeStageImageV2>,
+)
+
+/** Applies user-owned values to a runtime copy, never to a linked package or installed archive. */
+private fun resolveThemeParameterPresentationV2(
+    linked: LinkedThemeRuntimeV2,
+    parameters: ResolvedThemeParametersV2,
+): ThemeParameterPresentationV2 {
+    val tokens = linked.tokens.tokens.toMutableMap()
+    val stageImages = mutableMapOf<ThemeSurfaceIdV2, ResolvedThemeStageImageV2>()
+
+    linked.parameterDefinitions.forEach { (parameterId, definition) ->
+        if (linked.parameterOwners[parameterId] != linked.coordinate || !parameters.isOverridden(parameterId)) {
+            return@forEach
+        }
+        val value = requireNotNull(parameters.values[parameterId]) {
+            "Theme parameter $parameterId is marked overridden without a resolved value."
+        }
+        definition.effects.forEach { effect ->
+            when (effect) {
+                ThemeParameterEffectV2.AccentPalette -> {
+                    val color = value.requireColor(parameterId, "accent palette")
+                    require(color.argb ushr 24 == 0xFFL) {
+                        "Theme accent palette parameter $parameterId must be opaque."
+                    }
+                    tokens.putAll(linked.material.colors.accentPaletteTokens(color.argb))
+                }
+
+                is ThemeParameterEffectV2.TokenColor -> {
+                    val color = value.requireColor(parameterId, "token color")
+                    effect.tokenIds.forEach { tokenId ->
+                        tokens[tokenId] =
+                            ThemeSceneTokenValueV1.ColorToken(
+                                lightArgb = color.argb,
+                                darkArgb = color.argb,
+                            )
+                    }
+                }
+
+                is ThemeParameterEffectV2.StageImage -> {
+                    val uri = value.requireImageUri(parameterId)
+                    effect.surfaceIds.forEach { surfaceId ->
+                        val surface = ThemeSurfaceIdV2(surfaceId)
+                        stageImages[surface] =
+                            ResolvedThemeStageImageV2(
+                                uri = uri,
+                                fit = effect.fit,
+                                opacity = effect.opacity,
+                            )
+                    }
+                }
+            }
+        }
+    }
+
+    return ThemeParameterPresentationV2(
+        tokens = ThemeSceneTokenSetV1(tokens),
+        stageImages = stageImages,
+    )
+}
+
+private fun ThemeParameterValueV2.requireColor(
+    parameterId: String,
+    effect: String,
+): ThemeParameterValueV2.ColorValue =
+    this as? ThemeParameterValueV2.ColorValue
+        ?: error("Theme parameter $parameterId must resolve to a color for $effect.")
+
+private fun ThemeParameterValueV2.requireImageUri(parameterId: String): String =
+    (this as? ThemeParameterValueV2.ImageUriValue)?.uri
+        ?: error("Theme parameter $parameterId must resolve to an image URI.")
+
+private fun ThemeMaterialColorSchemeV2.accentPaletteTokens(seedArgb: Long): Map<String, ThemeSceneTokenValueV1.ColorToken> {
+    val seedHsl = FloatArray(3)
+    ColorUtils.colorToHSL(seedArgb.toInt(), seedHsl)
+    val primarySaturation = seedHsl[1].coerceIn(0.42f, 0.88f)
+    val secondarySaturation = (primarySaturation * 0.56f).coerceIn(0.24f, 0.52f)
+    val tertiarySaturation = (primarySaturation * 0.72f).coerceIn(0.34f, 0.68f)
+
+    fun tone(
+        hueOffset: Float,
+        saturation: Float,
+        light: Float,
+        dark: Float,
+    ): ThemeSceneTokenValueV1.ColorToken =
+        ThemeSceneTokenValueV1.ColorToken(
+            lightArgb = hslArgb(seedHsl[0] + hueOffset, saturation, light),
+            darkArgb = hslArgb(seedHsl[0] + hueOffset, saturation, dark),
+        )
+
+    val lightOn = 0xFFFFFFFFL
+    val darkOn = 0xFF101114L
+    fun contrast(light: Long, dark: Long) = ThemeSceneTokenValueV1.ColorToken(light, dark)
+    fun readableOn(color: Long): Long =
+        if (ColorUtils.calculateLuminance(color.toInt()) >= 0.45) darkOn else lightOn
+
+    val patch = linkedMapOf<String, ThemeSceneTokenValueV1.ColorToken>()
+    fun assign(
+        tokenId: String,
+        value: ThemeSceneTokenValueV1.ColorToken,
+    ) {
+        val existing = patch[tokenId]
+        require(existing == null || existing == value) {
+            "Accent palette maps token $tokenId to incompatible Material roles."
+        }
+        patch[tokenId] = value
+    }
+
+    val primaryColor = ThemeSceneTokenValueV1.ColorToken(seedArgb, seedArgb)
+    val primaryContainerColor = tone(0f, primarySaturation, 0.90f, 0.30f)
+    assign(this.primary, primaryColor)
+    assign(onPrimary, contrast(readableOn(seedArgb), readableOn(seedArgb)))
+    assign(primaryContainer, primaryContainerColor)
+    assign(onPrimaryContainer, contrast(darkOn, lightOn))
+    assign(inversePrimary, contrast(primaryColor.darkArgb, primaryColor.lightArgb))
+
+    val secondaryColor = tone(18f, secondarySaturation, 0.40f, 0.80f)
+    val secondaryContainerColor = tone(18f, secondarySaturation, 0.90f, 0.30f)
+    assign(this.secondary, secondaryColor)
+    assign(onSecondary, contrast(lightOn, darkOn))
+    assign(secondaryContainer, secondaryContainerColor)
+    assign(onSecondaryContainer, contrast(darkOn, lightOn))
+
+    val tertiaryColor = tone(58f, tertiarySaturation, 0.40f, 0.80f)
+    val tertiaryContainerColor = tone(58f, tertiarySaturation, 0.90f, 0.30f)
+    assign(this.tertiary, tertiaryColor)
+    assign(onTertiary, contrast(lightOn, darkOn))
+    assign(tertiaryContainer, tertiaryContainerColor)
+    assign(onTertiaryContainer, contrast(darkOn, lightOn))
+
+    assign(surfaceTint, primaryColor)
+    assign(outline, tone(0f, (primarySaturation * 0.42f).coerceAtLeast(0.18f), 0.48f, 0.62f))
+    assign(outlineVariant, tone(0f, (primarySaturation * 0.34f).coerceAtLeast(0.14f), 0.80f, 0.34f))
+
+    val expectedTargets = accentTokenIds().toSet()
+    require(patch.keys == expectedTargets) { "Accent palette must cover every declared accent role." }
+    return patch
+}
+
+private fun hslArgb(
+    hue: Float,
+    saturation: Float,
+    lightness: Float,
+): Long {
+    val normalizedHue = ((hue % 360f) + 360f) % 360f
+    return ColorUtils.HSLToColor(floatArrayOf(normalizedHue, saturation, lightness)).toLong() and 0xFFFFFFFFL
 }
 
 private fun ThemeComponentStateSkinV2.resolve(

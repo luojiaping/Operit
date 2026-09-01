@@ -1,12 +1,12 @@
-# V2 包与运行时契约
+# V2 主题运行时与 schema 3 包契约
 
 ## 旧问题
 
 V1 manifest 只声明 `chat.main` 和少数 token。`app.shell` 没有宿主，主题参数只有主色和背景图，Native component catalog 也没有由已安装包驱动。
 
-## V2 契约
+## 当前契约
 
-`operit-theme.json` schema version 为 `2`。包解析成不可变 `LinkedThemeRuntimeV2`，其中包括：
+`operit-theme.json` schema version 为 `3`。包解析成不可变 `LinkedThemeRuntimeV2`，其中包括：
 
 - 精确包坐标和显式 base package 坐标
 - 完整 Material 颜色、排版和形状投影
@@ -34,4 +34,4 @@ V2 manifest 提供完整 `material` palette、typography 和 shapes。Operit 的
 
 [DONE] 场景 DSL 新增按内容测量的 `scaffold` 节点与宿主槽位 `rowWeight`；九宫格在有子内容时按子内容包裹。
 
-[TODO] 参数→token/场景联动（当前参数机制已就绪但默认主题未声明参数）。
+[DONE] schema 3 参数声明 control 与受限 visual effect。默认主题公开 accent palette 与本地 stage image；运行时构造不可变 token/stage overlay，且只执行活动包自身声明的 effect，基底主题参数不会隐式改写 child package。

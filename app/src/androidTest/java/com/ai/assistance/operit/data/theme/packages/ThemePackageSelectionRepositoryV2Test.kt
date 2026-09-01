@@ -34,8 +34,8 @@ class ThemePackageSelectionRepositoryV2Test {
                 reference = ThemePackageReferenceV2(missing),
                 parameterValues =
                     mapOf(
-                        ThemePackageParameterIdsV2.BACKGROUND_IMAGE to
-                            ThemeParameterValueV2.StringValue("content://theme/background"),
+                        "background_image" to
+                            ThemeParameterValueV2.ImageUriValue("content://theme/background"),
                     ),
             ),
         )
@@ -65,7 +65,7 @@ class ThemePackageSelectionRepositoryV2Test {
     private fun coordinate(packageId: String, digestSeed: String): ThemePackageCoordinateV2 =
         ThemePackageCoordinateV2(
             packageId = ThemePackageIdV2(packageId),
-            version = ThemePackageVersionV2("2.1.0"),
+            version = ThemePackageVersionV2("2.2.0"),
             archiveSha256 = ThemeArchiveSha256V2(digestSeed.repeat(64)),
         )
 }

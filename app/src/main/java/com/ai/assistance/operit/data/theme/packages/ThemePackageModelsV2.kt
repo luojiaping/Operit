@@ -53,12 +53,6 @@ internal value class ThemeParameterIdV2(val value: String) {
     }
 }
 
-/** 产品级约定参数 ID：主题与设置页共享，不属于任何单个包的私有命名。 */
-internal object ThemePackageParameterIdsV2 {
-    const val PRIMARY_COLOR = "primary_color"
-    const val BACKGROUND_IMAGE = "background_image"
-}
-
 /** Identifies one immutable installed V2 package by its exact release archive. */
 @Serializable
 internal data class ThemePackageCoordinateV2(
@@ -83,20 +77,12 @@ internal sealed interface ThemeParameterValueV2 {
     }
 
     @Serializable
-    @SerialName("string")
-    data class StringValue(val value: String) : ThemeParameterValueV2
-
-    @Serializable
-    @SerialName("boolean")
-    data class BooleanValue(val value: Boolean) : ThemeParameterValueV2
-
-    @Serializable
-    @SerialName("integer")
-    data class IntegerValue(val value: Long) : ThemeParameterValueV2
-
-    @Serializable
-    @SerialName("decimal")
-    data class DecimalValue(val value: Double) : ThemeParameterValueV2
+    @SerialName("image_uri")
+    data class ImageUriValue(val uri: String) : ThemeParameterValueV2 {
+        init {
+            require(uri.startsWith("content://")) { "Theme image URIs must use content://." }
+        }
+    }
 }
 
 /** Application-level selection of one globally linked V2 theme package. */

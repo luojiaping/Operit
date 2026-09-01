@@ -47,6 +47,8 @@ import com.ai.assistance.operit.ui.theme.scene.ThemeSceneTextKeyIdV1
 import com.ai.assistance.operit.ui.theme.scene.ThemeSceneTextNodeV1
 import com.ai.assistance.operit.ui.theme.scene.ThemeSceneTokenResolverV1
 import com.ai.assistance.operit.ui.theme.scene.ThemeSceneTransformNodeV1
+import com.ai.assistance.operit.ui.theme.ResolvedThemeStageImageV2
+import coil.compose.AsyncImage
 import kotlin.math.roundToInt
 
 internal typealias ThemeSceneHostSlotsV1 =
@@ -67,6 +69,7 @@ internal fun ThemeSceneV1(
     hostSlots: ThemeSceneHostSlotsV1,
     textResolver: ThemeSceneTextResolverV1,
     darkTheme: Boolean,
+    stageImage: ResolvedThemeStageImageV2? = null,
     modifier: Modifier = Modifier,
 ) {
     Box(
@@ -79,6 +82,19 @@ internal fun ThemeSceneV1(
                         ?: Modifier,
                 ),
     ) {
+        stageImage?.let { image ->
+            AsyncImage(
+                model = image.uri,
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize().alpha(image.opacity),
+                contentScale =
+                    when (image.fit) {
+                        ThemeSceneImageFitV1.FILL -> ContentScale.FillBounds
+                        ThemeSceneImageFitV1.FIT -> ContentScale.Fit
+                        ThemeSceneImageFitV1.CROP -> ContentScale.Crop
+                    },
+            )
+        }
         stage.children.forEach { child ->
             ThemeSceneRenderNodeV1(child, tokens, assets, hostSlots, textResolver, darkTheme)
         }

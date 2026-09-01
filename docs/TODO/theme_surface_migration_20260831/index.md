@@ -19,7 +19,9 @@ V2 主题包已经声明 37 个日常 surface 和 16 个组件 skin，但运行�
 - 让 `SCENE`、`TEMPLATE`、`HOST_SHELL` 都有真实且可验证的 V2 renderer。
 - 将通用页面、导航、分区、列表、动作、输入、弹层和状态组件逐批接入 V2 skin。
 - 为赛博主题建立覆盖全应用的统一视觉系统，而非把聊天页的外观复制到每个页面。
-- 保持当前 V2 `2.1.0` 临时主题包可导入；本计划第一阶段不改变 manifest schema。
+[SUPERSEDED] 保持当前 V2 `2.1.0` 临时主题包可导入；本计划第一阶段不改变 manifest schema。
+
+当前主题包 document 使用 schema 3；`2.1.0` 开发 preview 不构成兼容边界。
 
 ## 所有权边界
 

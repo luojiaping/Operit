@@ -140,8 +140,8 @@ fun SettingsScreen(
                         
 
                         CompactSettingsItem(
-                                title = stringResource(R.string.theme_packages_title),
-                                subtitle = stringResource(R.string.theme_packages_builtin),
+                                 title = stringResource(R.string.theme_packages_title),
+                                subtitle = stringResource(R.string.theme_packages_subtitle),
                                 icon = Icons.Default.Palette,
                                 onClick = navigateToThemePackages
                         )

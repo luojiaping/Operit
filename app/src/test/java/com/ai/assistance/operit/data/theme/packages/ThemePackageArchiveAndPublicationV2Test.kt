@@ -76,7 +76,7 @@ class ThemePackageArchiveAndPublicationV2Test {
 
     internal fun minimalManifest(): ThemePackageManifestV2 =
         ThemePackageManifestV2(
-            schemaVersion = THEME_PACKAGE_SCHEMA_VERSION_V2,
+            schemaVersion = THEME_PACKAGE_SCHEMA_VERSION,
             packageId = "author.sample",
             version = "1.0.0",
             displayName = ThemePackageLocalizedTextV2(values = mapOf("*" to "Sample")),
@@ -183,7 +183,7 @@ class ThemePackageArchiveAndPublicationV2Test {
     @Test
     fun unknownManifestFieldIsRejected() {
         val archive =
-            writeArchive(minimalManifest(), rawManifestJson = "{\"schemaVersion\":2,\"extra\":true}")
+            writeArchive(minimalManifest(), rawManifestJson = "{\"schemaVersion\":3,\"extra\":true}")
 
         assertThrows(ThemePackageArchiveValidationExceptionV2::class.java) {
             ThemePackageArchiveValidatorV2.validate(archive)
@@ -249,7 +249,7 @@ class ThemePackageArchiveAndPublicationV2Test {
     fun futureSchemaVersionIsRejected() {
         val rawManifest =
             json.encodeToString(minimalManifest())
-                .replace("\"schemaVersion\":2", "\"schemaVersion\":3")
+                .replace("\"schemaVersion\":3", "\"schemaVersion\":4")
         val archive = writeArchive(minimalManifest(), rawManifestJson = rawManifest)
 
         assertThrows(ThemePackageArchiveValidationExceptionV2::class.java) {
