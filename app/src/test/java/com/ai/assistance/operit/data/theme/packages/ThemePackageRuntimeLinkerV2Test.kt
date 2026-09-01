@@ -122,7 +122,12 @@ class ThemePackageRuntimeLinkerV2Test {
                     material = materialProjection(),
                     componentSkins =
                         ThemeComponentCatalogV2.requiredComponents.associate { component ->
-                            component.value to componentSkin("color.${component.value}")
+                            component.value to
+                                if (component == ThemeComponentCatalogV2.INPUT) {
+                                    inputComponentSkin("color.${component.value}")
+                                } else {
+                                    componentSkin("color.${component.value}")
+                                }
                         },
                 ),
             parameters =
@@ -146,6 +151,28 @@ class ThemePackageRuntimeLinkerV2Test {
     private fun componentSkin(containerToken: String): ThemeComponentSkinV2 =
         ThemeComponentSkinV2(
             normal =
+                ThemeComponentStateSkinV2(
+                    containerToken = containerToken,
+                    contentToken = "color.background",
+                    frame = ThemeComponentFrameSpecV2.RoundRect(cornerRadiusDp = 0f),
+                ),
+        )
+
+    private fun inputComponentSkin(containerToken: String): ThemeComponentSkinV2 =
+        ThemeComponentSkinV2(
+            normal =
+                ThemeComponentStateSkinV2(
+                    containerToken = containerToken,
+                    contentToken = "color.background",
+                    frame = ThemeComponentFrameSpecV2.RoundRect(cornerRadiusDp = 0f),
+                ),
+            focused =
+                ThemeComponentStateSkinV2(
+                    containerToken = containerToken,
+                    contentToken = "color.background",
+                    frame = ThemeComponentFrameSpecV2.RoundRect(cornerRadiusDp = 0f),
+                ),
+            error =
                 ThemeComponentStateSkinV2(
                     containerToken = containerToken,
                     contentToken = "color.background",
@@ -235,6 +262,33 @@ class ThemePackageRuntimeLinkerV2Test {
                 PublishedThemeCatalogV2(listOf(installation), emptyList()),
             )
         }
+    }
+
+    @Test
+    fun inputWithoutFocusedAndErrorStatesIsRejected() {
+        val manifest =
+            completeManifest().copy(
+                presentation =
+                    completeManifest().presentation.copy(
+                        componentSkins =
+                            completeManifest().presentation.componentSkins +
+                                (
+                                    ThemeComponentCatalogV2.INPUT.value to
+                                        componentSkin("color.${ThemeComponentCatalogV2.INPUT.value}")
+                                ),
+                    ),
+            )
+        val installation = installation(manifest, tmp.newFolder("missing-input-states"))
+
+        val error =
+            assertThrows(ThemePackageLinkExceptionV2::class.java) {
+                ThemePackageRuntimeLinkerV2.link(
+                    installation,
+                    PublishedThemeCatalogV2(listOf(installation), emptyList()),
+                )
+            }
+
+        assertTrue(error.message!!.contains(ThemeComponentCatalogV2.INPUT.value))
     }
 
     @Test

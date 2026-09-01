@@ -29,7 +29,6 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -84,6 +83,7 @@ import com.ai.assistance.operit.R
 import com.ai.assistance.operit.ui.features.memory.screens.dialogs.MemorySearchSettingsDialog
 import com.ai.assistance.operit.ui.features.memory.screens.dialogs.MemorySearchSimulationDialog
 import com.ai.assistance.operit.ui.main.components.LocalIsCurrentScreen
+import com.ai.assistance.operit.ui.theme.ThemeOutlinedTextFieldV2
 
 @Composable
 fun MemorySearchBar(
@@ -108,7 +108,7 @@ fun MemorySearchBar(
                 tint = MaterialTheme.colorScheme.primary
             )
         }
-        OutlinedTextField(
+        ThemeOutlinedTextFieldV2(
             value = query,
             onValueChange = onQueryChange,
             modifier = Modifier.weight(1f),
@@ -118,7 +118,7 @@ fun MemorySearchBar(
             keyboardActions = KeyboardActions(onSearch = {
                 keyboardController?.hide()
                 onSearch()
-            })
+            }),
         )
         IconButton(onClick = onSettingsClick) {
             Icon(

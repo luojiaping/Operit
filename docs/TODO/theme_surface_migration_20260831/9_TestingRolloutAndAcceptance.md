@@ -50,4 +50,6 @@
 
 [DONE] 构建服务已同步 `8d1322af` 并完成 release 编译：`operit-release-feat_plugin-interface-8d1322af.apk`，SHA-256 `249608305136aa6989a8370c42967fce7964d7b0ba1e84c14e3ef75fc621f39d`。本次未执行 JVM/Android test。
 
+[DONE] Input primitive 试点已新增 state priority、archive/linker interaction-state contract、input frame/content/disabled semantics、Memory IME search callback、WebSession prompt 与 File Manager search confirm callback test；尚未执行测试命令。
+
 [TODO] 第一批 device acceptance。

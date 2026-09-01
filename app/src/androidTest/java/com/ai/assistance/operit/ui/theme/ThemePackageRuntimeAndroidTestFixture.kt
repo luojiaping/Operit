@@ -34,6 +34,9 @@ internal fun themePackageRuntimeForAndroidTest(
     val overlayDialogContainer = Color(0xFF3E2D56)
     val overlayDialogContent = Color(0xFFFFF0C7)
     val overlayDialogBorder = Color(0xFF00E5FF)
+    val inputNormalBorder = Color(0xFF617589)
+    val inputFocusedBorder = Color(0xFF00E5FF)
+    val inputErrorBorder = Color(0xFFFF4D6D)
     val tokens =
         ThemeSceneTokenSetV1(
             tokens =
@@ -46,6 +49,9 @@ internal fun themePackageRuntimeForAndroidTest(
                     "test.overlay_dialog_container" to colorToken(overlayDialogContainer),
                     "test.overlay_dialog_content" to colorToken(overlayDialogContent),
                     "test.overlay_dialog_border" to colorToken(overlayDialogBorder),
+                    "test.input_normal_border" to colorToken(inputNormalBorder),
+                    "test.input_focused_border" to colorToken(inputFocusedBorder),
+                    "test.input_error_border" to colorToken(inputErrorBorder),
                 ),
         )
     val coordinate =
@@ -79,6 +85,59 @@ internal fun themePackageRuntimeForAndroidTest(
                                         border =
                                             ThemeComponentFrameStrokeV2(
                                                 token = "test.overlay_dialog_border",
+                                                widthDp = 4f,
+                                            ),
+                                    ),
+                            ),
+                    )
+            ) +
+            (
+                ThemeComponentCatalogV2.INPUT to
+                    ThemeComponentSkinV2(
+                        normal =
+                            componentState(
+                                containerToken = "test.container",
+                                contentToken = "test.content",
+                                frame =
+                                    ThemeComponentFrameSpecV2.RoundRect(
+                                        cornerRadiusDp = 0f,
+                                        border =
+                                            ThemeComponentFrameStrokeV2(
+                                                token = "test.input_normal_border",
+                                                widthDp = 4f,
+                                            ),
+                                    ),
+                            ),
+                        disabled =
+                            componentState(
+                                containerToken = "test.disabled",
+                                contentToken = "test.content",
+                                frame = ThemeComponentFrameSpecV2.RoundRect(cornerRadiusDp = 0f),
+                            ),
+                        focused =
+                            componentState(
+                                containerToken = "test.selected",
+                                contentToken = "test.content",
+                                frame =
+                                    ThemeComponentFrameSpecV2.RoundRect(
+                                        cornerRadiusDp = 0f,
+                                        border =
+                                            ThemeComponentFrameStrokeV2(
+                                                token = "test.input_focused_border",
+                                                widthDp = 4f,
+                                            ),
+                                    ),
+                            ),
+                        error =
+                            componentState(
+                                containerToken = "test.error",
+                                contentToken = "test.content",
+                                frame =
+                                    ThemeComponentFrameSpecV2.RoundRect(
+                                        cornerRadiusDp = 0f,
+                                        border =
+                                            ThemeComponentFrameStrokeV2(
+                                                token = "test.input_error_border",
                                                 widthDp = 4f,
                                             ),
                                     ),

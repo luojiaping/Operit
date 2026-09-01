@@ -296,6 +296,34 @@ class ThemePackageArchiveAndPublicationV2Test {
     }
 
     @Test
+    fun directInputSkinWithoutFocusedAndErrorStatesIsRejected() {
+        val inputSkin =
+            ThemeComponentSkinV2(
+                normal =
+                    ThemeComponentStateSkinV2(
+                        containerToken = "color.background",
+                        contentToken = "color.background",
+                        frame = ThemeComponentFrameSpecV2.RoundRect(cornerRadiusDp = 0f),
+                    ),
+            )
+        val manifest =
+            minimalManifest().copy(
+                presentation =
+                    ThemePackagePresentationPatchV2(
+                        componentSkins = mapOf(ThemeComponentCatalogV2.INPUT.value to inputSkin),
+                    ),
+            )
+        val archive = writeArchive(manifest)
+
+        val error =
+            assertThrows(ThemePackageArchiveValidationExceptionV2::class.java) {
+                ThemePackageArchiveValidatorV2.validate(archive)
+            }
+
+        assertTrue(error.message!!.contains(ThemeComponentCatalogV2.INPUT.value))
+    }
+
+    @Test
     fun sceneSurfaceReferencingAnotherRegisteredSceneIsRejected() {
         val appShell =
             com.ai.assistance.operit.ui.theme.scene.ThemeSceneDefinitionV1(

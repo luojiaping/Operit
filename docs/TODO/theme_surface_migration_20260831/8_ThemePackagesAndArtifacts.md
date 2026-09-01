@@ -18,6 +18,8 @@
 
 [DONE] 默认与赛博主题源的 `scripts/package.sh` 已校验 direct surface 的 host kind、同名 scene ID、未知 ID 与 skin ID。无 basis 的默认包还必须完整覆盖 37 个 surface 和 16 个 component skin，防止生成应用 runtime 会隔离的 archive。
 
+[DONE] `input.focused` 与 `input.error` 已是生产交互 state。archive validator 拒绝不完整的 direct input skin，linker 拒绝继承链合并后不完整的 input skin；默认与赛博主题源的 package script 同步检查两者。
+
 当后续新增复杂 scene、资源或 token 时，再以新 package version 发布默认包与赛博包，并按顺序更新：
 
 1. 默认主题 archive 和 SHA-256

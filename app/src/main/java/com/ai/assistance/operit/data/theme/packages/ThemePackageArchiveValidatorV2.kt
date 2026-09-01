@@ -381,10 +381,17 @@ internal object ThemePackageArchiveValidatorV2 {
             }
         }
         val supportedComponents = ThemeComponentCatalogV2.requiredComponents.map { component -> component.value }.toSet()
-        manifest.presentation.componentSkins.keys.forEach { componentId ->
+        manifest.presentation.componentSkins.forEach { (componentId, skin) ->
             if (componentId !in supportedComponents) {
                 throw ThemePackageArchiveValidationExceptionV2(
                     "Theme package declares an unsupported component skin: $componentId",
+                )
+            }
+            val component = ThemeComponentIdV2(componentId)
+            val missingStates = ThemeComponentCatalogV2.missingRequiredStateNames(component, skin)
+            if (missingStates.isNotEmpty()) {
+                throw ThemePackageArchiveValidationExceptionV2(
+                    "Component $componentId must declare interaction states: ${missingStates.joinToString()}.",
                 )
             }
         }

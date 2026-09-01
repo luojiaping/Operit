@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.dp
 import com.ai.assistance.operit.R
 import com.ai.assistance.operit.ui.features.toolbox.screens.filemanager.models.FileItem
 import com.ai.assistance.operit.ui.features.toolbox.screens.filemanager.utils.getFileIcon
+import com.ai.assistance.operit.ui.theme.ThemeOutlinedTextFieldV2
 
 /**
  * 搜索对话框
@@ -43,12 +44,12 @@ fun SearchDialog(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    OutlinedTextField(
+                    ThemeOutlinedTextFieldV2(
                         value = searchQuery,
                         onValueChange = onQueryChange,
                         placeholder = { Text(stringResource(R.string.searching)) },
                         singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
                     )
                     
                     // 搜索选项
@@ -177,4 +178,4 @@ fun SearchResultsDialog(
             }
         )
     }
-} 
+}

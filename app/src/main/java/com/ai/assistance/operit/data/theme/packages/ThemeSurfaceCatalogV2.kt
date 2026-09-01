@@ -223,4 +223,15 @@ internal object ThemeComponentCatalogV2 {
             SNACKBAR,
             STATUS,
         )
+
+    fun missingRequiredStateNames(
+        component: ThemeComponentIdV2,
+        skin: ThemeComponentSkinV2,
+    ): List<String> =
+        buildList {
+            if (component == INPUT) {
+                if (skin.focused == null) add("focused")
+                if (skin.error == null) add("error")
+            }
+        }
 }

@@ -52,4 +52,6 @@
 
 [DONE] `ThemeOverlaySurfaceHostV2` 已将 `overlay.dialog`、`overlay.sheet`、`overlay.toast` 分别连接到 `dialog`、`sheet`、`snackbar` skin；WebSession 手写 dialog/sheet 与 `ChatToastHost` 已成为生产消费者，窗口、dismiss、IME、动画和队列仍由原调用方控制。
 
+[DONE] `ThemeOutlinedTextFieldV2` 已将无 floating label 的 `String`-backed Material field 接入 input skin，WebSession prompt、Memory search 与 File Manager search 已成为生产消费者。focused/error input skin 现为 archive/linker 强制交互状态，默认和 Cyber Grid `2.1.0` 已满足。
+
 [TODO] 其余 list item 家族、input、dialog、sheet、menu、snackbar 仍待后续 batch。

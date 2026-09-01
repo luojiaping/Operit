@@ -183,6 +183,15 @@ private data class LinkedThemeAccumulatorV2(
                     missingComponents.map { component -> component.value }.sorted().joinToString(),
             )
         }
+        componentSkins.forEach { (component, skin) ->
+            val missingStates = ThemeComponentCatalogV2.missingRequiredStateNames(component, skin)
+            if (missingStates.isNotEmpty()) {
+                throw ThemePackageLinkExceptionV2(
+                    "Theme package component ${component.value} is missing required interaction states: " +
+                        missingStates.joinToString(),
+                )
+            }
+        }
         surfaces.forEach { (surface, implementation) ->
             try {
                 ThemeSurfaceHostPolicyV2.requireSupportedImplementation(surface, implementation)

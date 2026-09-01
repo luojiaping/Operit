@@ -55,6 +55,7 @@ V2 主题包已经声明 37 个日常 surface 和 16 个组件 skin，但运行�
 9. [主题包与归档](8_ThemePackagesAndArtifacts.md)
 10. [测试、发布与验收](9_TestingRolloutAndAcceptance.md)
 11. [Overlay Primitive 试点](10_OverlayPrimitivesPilot.md)
+12. [Input Primitive 试点](11_InputPrimitivePilot.md)
 
 ## 依赖
 
@@ -70,8 +71,12 @@ V2 主题包已经声明 37 个日常 surface 和 16 个组件 skin，但运行�
 
 [DONE] 第二批 overlay primitive 试点：WebSession dialog/sheet 与 chat toast 已接入现有 V2 skin。
 
+[DONE] 第二批 input primitive 试点：WebSession、Memory 与 File Manager 的无 label text field 已接入 input skin。
+
 [DONE] 上一批全局 surface coverage 已推送并完成 release 编译，产物记录见 [测试、发布与验收](9_TestingRolloutAndAcceptance.md)。
 
 [DONE] Overlay primitive 试点已完成 release 编译；产物记录见 [测试、发布与验收](9_TestingRolloutAndAcceptance.md)。JVM/Android test 尚未执行。
+
+[TODO] Input primitive 试点尚未执行 build 或 test 命令。
 
 [TODO] 后续页面家族、独立宿主、主题归档与设备验收按各步骤文档推进。

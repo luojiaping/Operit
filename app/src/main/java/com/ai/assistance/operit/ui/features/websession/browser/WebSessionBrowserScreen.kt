@@ -21,7 +21,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -50,6 +49,7 @@ import com.ai.assistance.operit.core.tools.defaultTool.websession.browser.WebSes
 import com.ai.assistance.operit.core.tools.defaultTool.websession.userscript.ui.WebSessionUserscriptUiState
 import com.ai.assistance.operit.data.theme.packages.ThemeSurfaceCatalogV2
 import com.ai.assistance.operit.ui.theme.ThemeOverlaySurfaceHostV2
+import com.ai.assistance.operit.ui.theme.ThemeOutlinedTextFieldV2
 import java.util.Locale
 
 @Composable
@@ -456,11 +456,11 @@ internal fun PendingDialogOverlay(
                     style = MaterialTheme.typography.bodyMedium
                 )
                 if (dialog.type.equals("prompt", ignoreCase = true)) {
-                    OutlinedTextField(
+                    ThemeOutlinedTextFieldV2(
                         value = promptValue,
                         onValueChange = onPromptValueChange,
                         modifier = Modifier.fillMaxWidth(),
-                        singleLine = false
+                        singleLine = false,
                     )
                 }
                 Row(
