@@ -13,6 +13,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import java.util.concurrent.atomic.AtomicBoolean
 import java.io.File
 
 /**
@@ -280,6 +281,10 @@ object WaifuMessageProcessor {
     ): Stream<String> = stream {
         coroutineScope {
             val segmentQueue = Channel<String>(Channel.UNLIMITED)
+            // 速度修复（流结束追平）：上游模型流完结后，队列中剩余分段不再逐段等待
+            // 打字延迟，立即排空——消除"模型已说完、消息还在按节奏滴"的回合尾拖延迟。
+            // 流式进行中节奏保持不变，拟人感不受影响
+            val producerDone = AtomicBoolean(false)
             val producerJob = launch {
                 try {
                     streamSegments(
@@ -297,6 +302,7 @@ object WaifuMessageProcessor {
                         }
                     }
                 } finally {
+                    producerDone.set(true)
                     segmentQueue.close()
                 }
             }
@@ -304,11 +310,15 @@ object WaifuMessageProcessor {
             var isFirstSegment = true
             for (segment in segmentQueue) {
                 val waitMs =
-                    calculateTypingDelayMs(
-                        segmentLength = segment.length,
-                        charDelayMs = charDelayMs,
-                        isFirstSegment = isFirstSegment,
-                    )
+                    if (producerDone.get()) {
+                        0L
+                    } else {
+                        calculateTypingDelayMs(
+                            segmentLength = segment.length,
+                            charDelayMs = charDelayMs,
+                            isFirstSegment = isFirstSegment,
+                        )
+                    }
                 if (waitMs > 0L) {
                     delay(waitMs)
                 }

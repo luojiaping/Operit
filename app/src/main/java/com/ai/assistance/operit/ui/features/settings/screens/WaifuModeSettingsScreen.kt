@@ -338,8 +338,8 @@ fun WaifuModeSettingsScreen(
                                         waifuPreferences.saveWaifuCharDelay(newDelay.toInt())
                                     }
                                 },
-                                valueRange = 200f..1000f, // 200ms-1000ms per character (5-1字符/秒)
-                                steps = 39, // 20ms步长
+                                valueRange = 20f..1000f, // 20ms-1000ms per character (50-1字符/秒)
+                                steps = 48, // 20ms步长
                                 modifier = Modifier.weight(1f)
                             )
                             Text(
