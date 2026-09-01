@@ -104,18 +104,6 @@ class ChatHistoryDelegate(
         )
     }
 
-    private suspend fun refreshCurrentChatDisplayFlags(
-        chatId: String,
-        messages: List<ChatMessage> = _chatHistory.value,
-    ) {
-        val loadResult = buildCurrentChatLoadResult(chatId, messages)
-        setCurrentChatMessagesInMemory(
-            messages = loadResult.messages,
-            hasOlderPersistedHistory = loadResult.hasOlderPersistedHistory,
-            hasNewerPersistedHistory = loadResult.hasNewerPersistedHistory,
-        )
-    }
-
     private suspend fun buildCurrentChatLoadResult(
         chatId: String,
         messages: List<ChatMessage>,
@@ -1452,7 +1440,11 @@ class ChatHistoryDelegate(
                 if (isVisibleNewMessage) {
                     chatHistoryManager.addMessage(targetChatId, message)
                     ToolPkgChatMessageHookBridge.dispatchMessagePersisted(targetChatId, message)
-                    refreshCurrentChatDisplayFlags(targetChatId)
+                    // 此处不再刷新窗口 flags（原实现重发整个 _chatHistory 列表）：
+                    // isVisibleNewMessage 的前提是窗口就是最新（!hasPersistedNewerHistoryNow），
+                    // 且本分支是尾部追加——hasOlder 由窗口首条决定不可能翻转，
+                    // hasNewer 由窗口尾条决定、追加的消息正是新尾条且其后无消息，仍为 false。
+                    // waifu 模式逐分段追加，原实现每段多出 2 条 exists SQL + 1 次全列表发射
                 } else {
                     chatHistoryManager.updateMessage(targetChatId, message)
                     ToolPkgChatMessageHookBridge.dispatchMessagePersisted(targetChatId, message)

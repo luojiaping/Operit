@@ -6,6 +6,13 @@ import com.ai.assistance.operit.data.model.ChatMessage
 internal const val DISPLAY_PAGE_TRIGGER_COUNT = 5
 internal const val MAX_DISPLAY_PAGE_COUNT = 2
 
+// 窗口容量封顶（正确性回归）：分页原本只按 user/summary 触发计数，AI 分段消息全部
+// 落入最后一页——waifu 模式把一条回复拆成 K 条分段，长会话下显示窗口随分段数无界
+// 膨胀，非惰性渲染的列表重组成本随之失控。这里让页内消息条数（含 AI 分段）达到
+// 上限即闭合页面，窗口最多 2 页 × 上限条，渲染压力有界；代价是超长回合会更早出现
+// "加载更早"入口，属于预期行为变化。
+internal const val MAX_DISPLAY_PAGE_MESSAGE_COUNT = 50
+
 internal data class DisplayPageRange(
     val startIndex: Int,
     val endIndexExclusive: Int,
@@ -85,10 +92,12 @@ private inline fun <T> resolveDisplayPageRanges(
     while (cursor >= 0) {
         var pageStartIndex = 0
         var triggerCountInCurrentPage = 0
+        var pageMessageCount = 0
         var pageClosed = false
 
         while (cursor >= 0 && !pageClosed) {
             val message = messages[cursor]
+            pageMessageCount += 1
             if (isDisplayPageTriggerMessage(senderOf(message))) {
                 triggerCountInCurrentPage += 1
 
@@ -103,6 +112,12 @@ private inline fun <T> resolveDisplayPageRanges(
                     cursor -= 1
                     pageClosed = true
                 }
+            }
+
+            if (!pageClosed && pageMessageCount >= MAX_DISPLAY_PAGE_MESSAGE_COUNT) {
+                pageStartIndex = cursor
+                cursor -= 1
+                pageClosed = true
             }
 
             if (!pageClosed) {
