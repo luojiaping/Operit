@@ -303,6 +303,19 @@ fun ChatArea(
         }
     }
 
+    // 预计算稳定 key：timestamp + 同 timestamp 出现序号（历史中存在
+    // 同 timestamp 重复消息，仅用 timestamp 会撞 LazyColumn key）。
+    // 声明须先于下方跳转/旧页恢复 effect（它们按 key 定位 item）
+    val messageKeys =
+        remember(chatHistory) {
+            val occurrences = mutableMapOf<Long, Int>()
+            chatHistory.map { message ->
+                val occurrence = occurrences[message.timestamp] ?: 0
+                occurrences[message.timestamp] = occurrence + 1
+                ChatMessageItemKey(message.timestamp, occurrence)
+            }
+        }
+
     // 跳转：timestamp 是跨显示窗口分页的稳定标识，定位到 LazyColumn 的
     // item 下标后交给 LazyListState 滚动（替代旧 onGloballyPositioned 锚点机制）
     LaunchedEffect(
@@ -393,17 +406,6 @@ fun ChatArea(
             showLoadingIndicator &&
             chatStyle == ChatStyle.BUBBLE &&
             lastMessage?.sender == "ai"
-    // 预计算稳定 key：timestamp + 同 timestamp 出现序号（历史中存在
-    // 同 timestamp 重复消息，仅用 timestamp 会撞 LazyColumn key）
-    val messageKeys =
-        remember(chatHistory) {
-            val occurrences = mutableMapOf<Long, Int>()
-            chatHistory.map { message ->
-                val occurrence = occurrences[message.timestamp] ?: 0
-                occurrences[message.timestamp] = occurrence + 1
-                ChatMessageItemKey(message.timestamp, occurrence)
-            }
-        }
     Box(
         modifier =
             modifier
@@ -432,9 +434,15 @@ fun ChatArea(
                                 .clickable {
                                     onAutoScrollToBottomChange?.invoke(false)
                                     if (!isLoadingDisplayWindow) {
+                                        // 当前 Compose 版本的 LazyListState 未直接
+                                        // 暴露 firstVisibleItemKey 属性，经 layoutInfo
+                                        // 取首可见项 key
                                         pendingOlderLoadAnchor =
-                                            scrollState.firstVisibleItemKey to
-                                                scrollState.firstVisibleItemScrollOffset
+                                            (
+                                                scrollState.layoutInfo.visibleItemsInfo
+                                                    .firstOrNull()?.key
+                                                    ?: "load-older-history"
+                                            ) to scrollState.firstVisibleItemScrollOffset
                                         onLoadOlderDisplayWindow?.invoke()
                                     }
                                 }

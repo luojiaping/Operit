@@ -96,6 +96,7 @@ private data class ChatMessageLocatorEntry(
     val preview: ChatMessageLocatorPreview,
 )
 
+@Composable
 internal fun ChatScrollNavigator(
     chatHistory: List<ChatMessage>,
     currentChatId: String? = null,
