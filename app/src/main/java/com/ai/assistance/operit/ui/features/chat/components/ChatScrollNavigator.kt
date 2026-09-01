@@ -1,5 +1,7 @@
 package com.ai.assistance.operit.ui.features.chat.components
 
+import android.os.Parcelable
+import kotlinx.parcelize.Parcelize
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -85,11 +87,15 @@ private const val TAG = "ChatScrollNavigator"
 private const val NAVIGATOR_HIDE_DELAY_MS = 1200L
 
 // LazyColumn 消息项的稳定 key：timestamp + 同 timestamp 的出现序号
-// （历史中可能存在同 timestamp 的重复消息，仅用 timestamp 会撞 key）
+// （历史中可能存在同 timestamp 的重复消息，仅用 timestamp 会撞 key）。
+// 必须实现 Parcelable：LazyColumn 的 item key 会进入 SaveableStateHolder
+// 做 item 级状态保存，Android 上仅接受可存入 Bundle 的类型，
+// 普通 data class 作为 key 会在首次组合消息项时抛 IllegalArgumentException
+@Parcelize
 data class ChatMessageItemKey(
     val timestamp: Long,
     val occurrence: Int,
-)
+) : Parcelable
 
 private data class ChatMessageLocatorEntry(
     val index: Int,
