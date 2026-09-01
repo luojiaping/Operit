@@ -8,7 +8,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.keyframes
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -18,6 +18,7 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -27,6 +28,9 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -54,8 +58,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -67,8 +69,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -107,7 +107,6 @@ import com.ai.assistance.operit.util.LatexMathMlConverter
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -172,11 +171,29 @@ enum class ChatStyle {
     BUBBLE
 }
 
+// 滚动到指定 item 并使其尾部与视口内容末端对齐：animateScrollToItem 只保证
+// item 顶部对齐，流式输出的最后一条消息持续增高时顶部对齐会让新内容长出
+// 视口底部（旧 ScrollState.animateScrollTo(maxValue) 为贴底语义，此处保持一致）
+internal suspend fun LazyListState.animateScrollToItemEnd(index: Int) {
+    if (index < 0) {
+        return
+    }
+    animateScrollToItem(index)
+    val layout = layoutInfo
+    val target = layout.visibleItemsInfo.lastOrNull { it.index == index } ?: return
+    val contentViewportEnd = layout.viewportEndOffset - layout.afterContentPadding
+    val itemEnd = target.offset + target.size
+    val delta = (itemEnd - contentViewportEnd).toFloat()
+    if (delta > 0.5f) {
+        animateScrollBy(delta)
+    }
+}
+
 @Composable
 fun ChatArea(
     chatHistory: List<ChatMessage>,
     currentChatId: String,
-    scrollState: ScrollState,
+    scrollState: LazyListState,
     aiReferences: List<AiReference> = emptyList(),
     isLoading: Boolean,
     enableDialogs: Boolean = true,
@@ -246,12 +263,8 @@ fun ChatArea(
     val showMessageTokenStats = themeSnapshot.showMessageTokenStats
     val showMessageTimingStats = themeSnapshot.showMessageTimingStats
     val showMessageTimestamp = themeSnapshot.showMessageTimestamp
-    var viewportHeightPx by remember { mutableStateOf(0) }
-    val messageAnchors = remember(currentChatId) { mutableStateMapOf<Long, ChatScrollMessageAnchor>() }
     var pendingJumpToMessageTimestamp by remember(currentChatId) { mutableStateOf<Long?>(null) }
     val lastMessage = chatHistory.lastOrNull()
-    val pendingTargetAnchor =
-        pendingJumpToMessageTimestamp?.let { targetTimestamp -> messageAnchors[targetTimestamp] }
     var hasLastAiMessageStartedStreaming by remember(lastMessage?.timestamp) {
         mutableStateOf(lastMessage?.run { sender == "ai" && content.isNotBlank() } == true)
     }
@@ -261,6 +274,13 @@ fun ChatArea(
         if (chatHistory.isEmpty()) {
             pendingJumpToMessageTimestamp = null
         }
+    }
+
+    // 加载更旧历史时的滚动位置保持：LazyColumn 按下标对齐而非内容对齐，
+    // 头部插入新页后 firstVisibleItemIndex 不变会使视口跳到新头部；记录
+    // 触发加载时视口首项的 key 与偏移，新页组合后 scrollToItem 恢复
+    var pendingOlderLoadAnchor by remember(currentChatId) {
+        mutableStateOf<Pair<Any, Int>?>(null)
     }
 
     val lastMessageContentLength = lastMessage?.content?.length
@@ -283,13 +303,14 @@ fun ChatArea(
         }
     }
 
+    // 跳转：timestamp 是跨显示窗口分页的稳定标识，定位到 LazyColumn 的
+    // item 下标后交给 LazyListState 滚动（替代旧 onGloballyPositioned 锚点机制）
     LaunchedEffect(
         pendingJumpToMessageTimestamp,
         messagesCount,
         chatHistory.firstOrNull()?.timestamp,
         chatHistory.lastOrNull()?.timestamp,
-        pendingTargetAnchor,
-        scrollState.maxValue,
+        hasOlderDisplayHistory,
     ) {
         val targetTimestamp = pendingJumpToMessageTimestamp ?: return@LaunchedEffect
         val targetIndex = chatHistory.indexOfFirst { it.timestamp == targetTimestamp }
@@ -297,18 +318,42 @@ fun ChatArea(
             return@LaunchedEffect
         }
 
-        val targetAnchor = pendingTargetAnchor ?: return@LaunchedEffect
         val isActualLatestMessage = targetIndex == messagesCount - 1 && !hasNewerDisplayHistory
         onAutoScrollToBottomChange?.invoke(isActualLatestMessage)
 
+        // LazyColumn item 布局为 [加载更旧占位(条件)] [消息区] [尾部占位(条件)]，
+        // 消息区起始下标 = 头部占位数，与 chatHistory 下标构成确定偏移
+        val messageStartIndex = if (hasOlderDisplayHistory) 1 else 0
         if (targetIndex == messagesCount - 1) {
-            scrollState.animateScrollTo(scrollState.maxValue)
+            // 最新消息贴底对齐（流式增高时新内容始终可见）
+            scrollState.animateScrollToItemEnd(messageStartIndex + targetIndex)
         } else {
-            val targetOffset =
-                targetAnchor.absoluteTopPx.roundToInt().coerceIn(0, scrollState.maxValue)
-            scrollState.animateScrollTo(targetOffset)
+            scrollState.animateScrollToItem(messageStartIndex + targetIndex)
         }
         pendingJumpToMessageTimestamp = null
+    }
+
+    // 更旧历史页组合完成后恢复视口位置：按保存的 key 找到新下标并以原偏移
+    // 瞬时对齐（不使用动画，避免加载后可见跳动）
+    LaunchedEffect(chatHistory.firstOrNull()?.timestamp, hasOlderDisplayHistory) {
+        val anchor = pendingOlderLoadAnchor ?: return@LaunchedEffect
+        val anchorKey = anchor.first
+        val anchorOffset = anchor.second
+        pendingOlderLoadAnchor = null
+        val targetItemIndex =
+            when (anchorKey) {
+                is ChatMessageItemKey -> {
+                    val messageIndex = messageKeys.indexOfFirst { it == anchorKey }
+                    if (messageIndex < 0) {
+                        return@LaunchedEffect
+                    }
+                    (if (hasOlderDisplayHistory) 1 else 0) + messageIndex
+                }
+                // 首项是头部占位：视口本就停在顶部，占位 key 不变、位置语义自洽
+                "load-older-history" -> 0
+                else -> return@LaunchedEffect
+            }
+        scrollState.scrollToItem(targetItemIndex, anchorOffset)
     }
 
     LaunchedEffect(lastMessage?.timestamp, lastMessage?.contentStream) {
@@ -331,18 +376,6 @@ fun ChatArea(
         }
     }
 
-    LaunchedEffect(
-        messagesCount,
-        chatHistory.firstOrNull()?.timestamp,
-        chatHistory.lastOrNull()?.timestamp,
-    ) {
-        val visibleTimestamps = chatHistory.mapTo(mutableSetOf()) { it.timestamp }
-        messageAnchors.keys
-            .toList()
-            .filterNot { it in visibleTimestamps }
-            .forEach(messageAnchors::remove)
-    }
-
     val isLatestMessageVisible = messagesCount > 0 && !hasNewerDisplayHistory
     val showLoadingIndicator =
         isLatestMessageVisible &&
@@ -360,181 +393,187 @@ fun ChatArea(
             showLoadingIndicator &&
             chatStyle == ChatStyle.BUBBLE &&
             lastMessage?.sender == "ai"
+    // 预计算稳定 key：timestamp + 同 timestamp 出现序号（历史中存在
+    // 同 timestamp 重复消息，仅用 timestamp 会撞 LazyColumn key）
+    val messageKeys =
+        remember(chatHistory) {
+            val occurrences = mutableMapOf<Long, Int>()
+            chatHistory.map { message ->
+                val occurrence = occurrences[message.timestamp] ?: 0
+                occurrences[message.timestamp] = occurrence + 1
+                ChatMessageItemKey(message.timestamp, occurrence)
+            }
+        }
     Box(
         modifier =
             modifier
-                .background(Color.Transparent)
-                .onGloballyPositioned { coordinates ->
-                    viewportHeightPx = coordinates.size.height
-                },
+                .background(Color.Transparent),
     ) {
-        Column(
+        // 消息列表懒组合：仅组合可见与预取项，替代旧 Column+verticalScroll 的
+        // 全量组合（50 条窗口下启动首帧与滚动开销随消息内容显著放大，
+        // 真机 AnrMonitor 多次 >1s 告警）。
+        // item 布局固定为 [加载更旧占位(条件)] [消息区] [加载更新(条件)] [loading(条件)]
+        LazyColumn(
+            state = scrollState,
             modifier =
                 Modifier
                     .fillMaxWidth()
                     .padding(horizontal = horizontalPadding)
-                    .verticalScroll(scrollState)
-                    .background(Color.Transparent)
-                    .padding(top = topPadding, bottom = bottomPadding),
+                    .background(Color.Transparent),
+            contentPadding = PaddingValues(top = topPadding, bottom = bottomPadding + 16.dp),
         ) {
             if (hasOlderDisplayHistory) {
-                Text(
-                    text = stringResource(id = R.string.load_more_history),
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                onAutoScrollToBottomChange?.invoke(false)
-                                if (!isLoadingDisplayWindow) {
-                                    onLoadOlderDisplayWindow?.invoke()
+                item(key = "load-older-history") {
+                    Text(
+                        text = stringResource(id = R.string.load_more_history),
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    onAutoScrollToBottomChange?.invoke(false)
+                                    if (!isLoadingDisplayWindow) {
+                                        pendingOlderLoadAnchor =
+                                            scrollState.firstVisibleItemKey to
+                                                scrollState.firstVisibleItemScrollOffset
+                                        onLoadOlderDisplayWindow?.invoke()
+                                    }
                                 }
-                            }
-                            .padding(vertical = 16.dp),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color.Gray,
-                    textAlign = TextAlign.Center,
-                )
-                Spacer(modifier = Modifier.height(4.dp))
+                                .padding(vertical = 16.dp),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.Gray,
+                        textAlign = TextAlign.Center,
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                }
             }
 
-            val timestampKeyOccurrences = mutableMapOf<Long, Int>()
-            chatHistory.forEachIndexed { actualIndex, message ->
+            // 消息区：key 为预计算的 ChatMessageItemKey（timestamp + 出现序号）
+            itemsIndexed(
+                items = chatHistory,
+                key = { index, _ -> messageKeys[index] },
+            ) { actualIndex, message ->
                 val isLastAiMessage = actualIndex == messagesCount - 1 && message.sender == "ai"
                 val shouldHide = shouldHideLastAiMessage && isLastAiMessage
-                val timestampKeyOccurrence = timestampKeyOccurrences[message.timestamp] ?: 0
-                timestampKeyOccurrences[message.timestamp] = timestampKeyOccurrence + 1
-
-                key(message.timestamp, timestampKeyOccurrence) {
-                    Box(
-                        modifier =
-                            Modifier.onGloballyPositioned { coordinates ->
-                                messageAnchors[message.timestamp] =
-                                    ChatScrollMessageAnchor(
-                                        absoluteTopPx = coordinates.positionInParent().y,
-                                        heightPx = coordinates.size.height,
-                                    )
-                            },
-                    ) {
-                        MessageItem(
-                            index = actualIndex,
-                            message = message,
-                            enableDialogs = enableDialogs,
-                            userMessageColor = userMessageColor,
-                            aiMessageColor = aiMessageColor,
-                            userTextColor = userTextColor,
-                            aiTextColor = aiTextColor,
-                            systemMessageColor = systemMessageColor,
-                            systemTextColor = systemTextColor,
-                            thinkingBackgroundColor = thinkingBackgroundColor,
-                            thinkingTextColor = thinkingTextColor,
-                            onSelectMessageToEdit = onSelectMessageToEdit,
-                            onCopyMessage = onCopyMessage,
-                            onDeleteMessage = onDeleteMessage,
-                            onDeleteCurrentMessageVariant = onDeleteCurrentMessageVariant,
-                            onDeleteMessagesFrom = onDeleteMessagesFrom,
-                            onRollbackToMessage = onRollbackToMessage,
-                            onRegenerateMessage = onRegenerateMessage,
-                            onSwitchMessageVariant = onSwitchMessageVariant,
-                            onSpeakMessage = onSpeakMessage,
-                            onReplyToMessage = onReplyToMessage,
-                            onToggleFavoriteMessage = onToggleFavoriteMessage,
-                            onCreateBranch = onCreateBranch,
-                            onInsertSummary = onInsertSummary,
-                            onMentionRoleFromAvatar = onMentionRoleFromAvatar,
-                            chatStyle = chatStyle,
-                            showMessageTokenStats = showMessageTokenStats,
-                            showMessageTimingStats = showMessageTimingStats,
-                            showMessageTimestamp = showMessageTimestamp,
-                            cursorUserBubbleLiquidGlass = cursorUserBubbleLiquidGlass,
-                            cursorUserBubbleWaterGlass = cursorUserBubbleWaterGlass,
-                            bubbleUserBubbleLiquidGlass = bubbleUserBubbleLiquidGlass,
-                            bubbleUserBubbleWaterGlass = bubbleUserBubbleWaterGlass,
-                            bubbleAiBubbleLiquidGlass = bubbleAiBubbleLiquidGlass,
-                            bubbleAiBubbleWaterGlass = bubbleAiBubbleWaterGlass,
-                            isHidden = shouldHide,
-                            isMultiSelectMode = isMultiSelectMode,
-                            isSelected = selectedMessageIndices.contains(actualIndex),
-                            onToggleSelection = { onToggleMessageSelection?.invoke(actualIndex) },
-                            onToggleMultiSelectMode = onToggleMultiSelectMode,
-                            messageIndex = actualIndex,
-                            bubbleUserImageStyle = bubbleUserImageStyle,
-                            bubbleAiImageStyle = bubbleAiImageStyle,
-                            bubbleUserRoundedCornersEnabled = bubbleUserRoundedCornersEnabled,
-                            bubbleAiRoundedCornersEnabled = bubbleAiRoundedCornersEnabled,
-                            bubbleUserContentPaddingLeft = bubbleUserContentPaddingLeft,
-                            bubbleUserContentPaddingRight = bubbleUserContentPaddingRight,
-                            bubbleAiContentPaddingLeft = bubbleAiContentPaddingLeft,
-                            bubbleAiContentPaddingRight = bubbleAiContentPaddingRight,
-                        )
-                    }
+                Box {
+                    MessageItem(
+                        index = actualIndex,
+                        message = message,
+                        enableDialogs = enableDialogs,
+                        userMessageColor = userMessageColor,
+                        aiMessageColor = aiMessageColor,
+                        userTextColor = userTextColor,
+                        aiTextColor = aiTextColor,
+                        systemMessageColor = systemMessageColor,
+                        systemTextColor = systemTextColor,
+                        thinkingBackgroundColor = thinkingBackgroundColor,
+                        thinkingTextColor = thinkingTextColor,
+                        onSelectMessageToEdit = onSelectMessageToEdit,
+                        onCopyMessage = onCopyMessage,
+                        onDeleteMessage = onDeleteMessage,
+                        onDeleteCurrentMessageVariant = onDeleteCurrentMessageVariant,
+                        onDeleteMessagesFrom = onDeleteMessagesFrom,
+                        onRollbackToMessage = onRollbackToMessage,
+                        onRegenerateMessage = onRegenerateMessage,
+                        onSwitchMessageVariant = onSwitchMessageVariant,
+                        onSpeakMessage = onSpeakMessage,
+                        onReplyToMessage = onReplyToMessage,
+                        onToggleFavoriteMessage = onToggleFavoriteMessage,
+                        onCreateBranch = onCreateBranch,
+                        onInsertSummary = onInsertSummary,
+                        onMentionRoleFromAvatar = onMentionRoleFromAvatar,
+                        chatStyle = chatStyle,
+                        showMessageTokenStats = showMessageTokenStats,
+                        showMessageTimingStats = showMessageTimingStats,
+                        showMessageTimestamp = showMessageTimestamp,
+                        cursorUserBubbleLiquidGlass = cursorUserBubbleLiquidGlass,
+                        cursorUserBubbleWaterGlass = cursorUserBubbleWaterGlass,
+                        bubbleUserBubbleLiquidGlass = bubbleUserBubbleLiquidGlass,
+                        bubbleUserBubbleWaterGlass = bubbleUserBubbleWaterGlass,
+                        bubbleAiBubbleLiquidGlass = bubbleAiBubbleLiquidGlass,
+                        bubbleAiBubbleWaterGlass = bubbleAiBubbleWaterGlass,
+                        isHidden = shouldHide,
+                        isMultiSelectMode = isMultiSelectMode,
+                        isSelected = selectedMessageIndices.contains(actualIndex),
+                        onToggleSelection = { onToggleMessageSelection?.invoke(actualIndex) },
+                        onToggleMultiSelectMode = onToggleMultiSelectMode,
+                        messageIndex = actualIndex,
+                        bubbleUserImageStyle = bubbleUserImageStyle,
+                        bubbleAiImageStyle = bubbleAiImageStyle,
+                        bubbleUserRoundedCornersEnabled = bubbleUserRoundedCornersEnabled,
+                        bubbleAiRoundedCornersEnabled = bubbleAiRoundedCornersEnabled,
+                        bubbleUserContentPaddingLeft = bubbleUserContentPaddingLeft,
+                        bubbleUserContentPaddingRight = bubbleUserContentPaddingRight,
+                        bubbleAiContentPaddingLeft = bubbleAiContentPaddingLeft,
+                        bubbleAiContentPaddingRight = bubbleAiContentPaddingRight,
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
             }
 
             if (hasNewerDisplayHistory) {
-                Text(
-                    text = stringResource(id = R.string.load_newer_history),
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                if (!isLoadingDisplayWindow) {
-                                    onLoadNewerDisplayWindow?.invoke()
+                item(key = "load-newer-history") {
+                    Text(
+                        text = stringResource(id = R.string.load_newer_history),
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    if (!isLoadingDisplayWindow) {
+                                        onLoadNewerDisplayWindow?.invoke()
+                                    }
                                 }
-                            }
-                            .padding(vertical = 16.dp),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color.Gray,
-                    textAlign = TextAlign.Center,
-                )
-                Spacer(modifier = Modifier.height(4.dp))
+                                .padding(vertical = 16.dp),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.Gray,
+                        textAlign = TextAlign.Center,
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                }
             }
 
             if (showLoadingIndicator) {
-                when (chatStyle) {
-                    ChatStyle.BUBBLE -> {
-                        Column(
-                            modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 0.dp)
-                                    .offset(y = (-24).dp),
-                        ) {
-                            Box(modifier = Modifier.padding(start = 16.dp)) {
-                                if (showChatFloatingDotsAnimation) {
-                                    LoadingDotsIndicator(aiTextColor)
+                item(key = "loading-indicator") {
+                    when (chatStyle) {
+                        ChatStyle.BUBBLE -> {
+                            Column(
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 0.dp)
+                                        .offset(y = (-24).dp),
+                            ) {
+                                Box(modifier = Modifier.padding(start = 16.dp)) {
+                                    if (showChatFloatingDotsAnimation) {
+                                        LoadingDotsIndicator(aiTextColor)
+                                    }
                                 }
                             }
                         }
-                    }
 
-                    ChatStyle.CURSOR -> {
-                        Column(
-                            modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 0.dp),
-                        ) {
-                            Box(modifier = Modifier.padding(start = 16.dp)) {
-                                if (showChatFloatingDotsAnimation) {
-                                    LoadingDotsIndicator(aiTextColor)
+                        ChatStyle.CURSOR -> {
+                            Column(
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 0.dp),
+                            ) {
+                                Box(modifier = Modifier.padding(start = 16.dp)) {
+                                    if (showChatFloatingDotsAnimation) {
+                                        LoadingDotsIndicator(aiTextColor)
+                                    }
                                 }
                             }
                         }
                     }
                 }
             }
-
-            Spacer(modifier = Modifier.height(16.dp))
         }
 
         ChatScrollNavigator(
             chatHistory = chatHistory,
             currentChatId = currentChatId,
             scrollState = scrollState,
-            messageAnchors = messageAnchors,
-            viewportHeightPx = viewportHeightPx,
             autoScrollToBottom = autoScrollToBottom,
             hasNewerDisplayHistory = hasNewerDisplayHistory,
             loadLocatorEntries = loadMessageLocatorEntries,

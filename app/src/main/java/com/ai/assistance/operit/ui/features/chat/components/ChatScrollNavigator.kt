@@ -8,7 +8,6 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -26,6 +25,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -66,7 +66,6 @@ import com.ai.assistance.operit.R
 import com.ai.assistance.operit.data.model.ChatMessage
 import com.ai.assistance.operit.data.model.ChatMessageDisplayMode
 import com.ai.assistance.operit.data.model.ChatMessageLocatorPreview
-import com.ai.assistance.operit.ui.features.chat.components.lazy.LazyListState as ChatLazyListState
 import com.ai.assistance.operit.util.AppLogger
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.CancellationException
@@ -85,9 +84,11 @@ private const val LOCATOR_PREVIEW_CHAR_COUNT = 48
 private const val TAG = "ChatScrollNavigator"
 private const val NAVIGATOR_HIDE_DELAY_MS = 1200L
 
-internal data class ChatScrollMessageAnchor(
-    val absoluteTopPx: Float,
-    val heightPx: Int,
+// LazyColumn 消息项的稳定 key：timestamp + 同 timestamp 的出现序号
+// （历史中可能存在同 timestamp 的重复消息，仅用 timestamp 会撞 key）
+data class ChatMessageItemKey(
+    val timestamp: Long,
+    val occurrence: Int,
 )
 
 private data class ChatMessageLocatorEntry(
@@ -95,227 +96,10 @@ private data class ChatMessageLocatorEntry(
     val preview: ChatMessageLocatorPreview,
 )
 
-@Composable
 internal fun ChatScrollNavigator(
     chatHistory: List<ChatMessage>,
     currentChatId: String? = null,
-    scrollState: ChatLazyListState,
-    minVisibleIndex: Int,
-    visibleMessageCount: Int,
-    loadLocatorEntries: (suspend (String, String) -> List<ChatMessageLocatorPreview>)? = null,
-    onJumpToMessageTimestamp: ((Long) -> Unit)? = null,
-    onJumpToMessage: (Int) -> Unit,
-    onToggleFavoriteMessage: ((Long, Boolean) -> Unit)? = null,
-    modifier: Modifier = Modifier,
-) {
-    if (chatHistory.size <= 1 || visibleMessageCount <= 0) {
-        return
-    }
-
-    val isDragged by scrollState.interactionSource.collectIsDraggedAsState()
-    val currentIsDragged by rememberUpdatedState(isDragged)
-    var showNavigatorChip by remember { mutableStateOf(false) }
-    var userScrollSessionActive by remember { mutableStateOf(false) }
-    var showLocatorDialog by remember { mutableStateOf(false) }
-    var currentMessageIndex by remember(chatHistory) {
-        mutableStateOf(chatHistory.lastIndex.takeIf { it >= 0 })
-    }
-
-    LaunchedEffect(isDragged) {
-        if (isDragged) {
-            userScrollSessionActive = true
-            showNavigatorChip = true
-        }
-    }
-
-    LaunchedEffect(scrollState, minVisibleIndex, visibleMessageCount, chatHistory.size) {
-        snapshotFlow {
-            ChatScrollNavigatorSnapshot(
-                centeredMessageIndex =
-                    resolveCenteredMessageIndex(
-                        scrollState = scrollState,
-                        minVisibleIndex = minVisibleIndex,
-                        visibleMessageCount = visibleMessageCount,
-                        totalMessageCount = chatHistory.size,
-                    ),
-                isScrollInProgress = scrollState.isScrollInProgress,
-            )
-        }.collectLatest { snapshot ->
-            snapshot.centeredMessageIndex?.let { currentMessageIndex = it }
-            if (!userScrollSessionActive) {
-                return@collectLatest
-            }
-            if (snapshot.isScrollInProgress || currentIsDragged) {
-                showNavigatorChip = true
-                return@collectLatest
-            }
-            delay(NAVIGATOR_HIDE_DELAY_MS)
-            if (!scrollState.isScrollInProgress && !currentIsDragged) {
-                showNavigatorChip = false
-                userScrollSessionActive = false
-            }
-        }
-    }
-
-    val activeMessageIndex = currentMessageIndex
-    val activeMessageTimestamp = activeMessageIndex?.let { chatHistory.getOrNull(it)?.timestamp }
-    var locatorEntries by remember(currentChatId) { mutableStateOf<List<ChatMessageLocatorPreview>>(emptyList()) }
-    var isLoadingLocatorEntries by remember(currentChatId) { mutableStateOf(false) }
-    var locatorLoadFailed by remember(currentChatId) { mutableStateOf(false) }
-
-    LaunchedEffect(
-        currentChatId,
-        chatHistory.size,
-        chatHistory.firstOrNull()?.timestamp,
-        chatHistory.lastOrNull()?.timestamp,
-    ) {
-        if (currentChatId.isNullOrBlank() || loadLocatorEntries == null) {
-            locatorEntries = chatHistory.map(::toLocatorPreview)
-            isLoadingLocatorEntries = false
-            locatorLoadFailed = false
-            return@LaunchedEffect
-        }
-
-        isLoadingLocatorEntries = true
-        locatorLoadFailed = false
-        try {
-            locatorEntries = loadLocatorEntries(currentChatId, "")
-            locatorLoadFailed = false
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            AppLogger.e(TAG, "加载聊天定位预览失败", e)
-            locatorEntries = emptyList()
-            locatorLoadFailed = true
-        }
-        isLoadingLocatorEntries = false
-    }
-
-    val activeGlobalMessageIndex =
-        activeMessageTimestamp?.let { timestamp ->
-            locatorEntries.indexOfFirst { it.timestamp == timestamp }.takeIf { it >= 0 }
-        }
-
-    AnimatedVisibility(
-        visible = showNavigatorChip && activeMessageIndex != null,
-        modifier = modifier,
-        enter = fadeIn(animationSpec = tween(180)) + slideInHorizontally(initialOffsetX = { it / 2 }),
-        exit = fadeOut(animationSpec = tween(120)) + slideOutHorizontally(targetOffsetX = { it / 2 }),
-    ) {
-        val bubbleColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f)
-        val anchorLineColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
-        val anchorDotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.92f)
-        val navigatorBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.12f)
-        val navigatorShape =
-            RoundedCornerShape(
-                topStart = 14.dp,
-                bottomStart = 14.dp,
-                topEnd = 10.dp,
-                bottomEnd = 10.dp,
-            )
-        val progressTotalCount =
-            locatorEntries.size.takeIf { it > 0 } ?: chatHistory.size
-        val progressIndex =
-            activeGlobalMessageIndex ?: activeMessageIndex ?: 0
-        val progress =
-            if (progressTotalCount <= 1) {
-                1f
-            } else {
-                (progressIndex.toFloat() / (progressTotalCount - 1).toFloat()).coerceIn(0f, 1f)
-            }
-
-        Row(
-            modifier =
-                Modifier.clickable {
-                    showLocatorDialog = true
-                    showNavigatorChip = false
-                    userScrollSessionActive = false
-                },
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(
-                modifier =
-                    Modifier
-                        .clip(navigatorShape)
-                        .background(bubbleColor)
-                        .border(1.dp, navigatorBorderColor, navigatorShape),
-            ) {
-                Box(
-                    modifier =
-                        Modifier
-                            .width(20.dp)
-                            .height(58.dp)
-                            .padding(vertical = 8.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Canvas(modifier = Modifier.size(width = 8.dp, height = 34.dp)) {
-                        val centerX = size.width / 2f
-                        val topY = 2.dp.toPx()
-                        val bottomY = size.height - 2.dp.toPx()
-                        val dotCenterY = topY + (bottomY - topY) * progress
-                        drawLine(
-                            color = anchorLineColor,
-                            start = Offset(centerX, topY),
-                            end = Offset(centerX, bottomY),
-                            strokeWidth = 1.5.dp.toPx(),
-                        )
-                        drawCircle(
-                            color = anchorDotColor,
-                            radius = 3.dp.toPx(),
-                            center = Offset(centerX, dotCenterY),
-                        )
-                    }
-                }
-            }
-
-            Canvas(
-                modifier =
-                    Modifier
-                        .offset(x = (-1).dp)
-                        .size(width = 9.dp, height = 18.dp),
-            ) {
-                val arrowPath =
-                    Path().apply {
-                        moveTo(0f, 0f)
-                        lineTo(size.width, size.height / 2f)
-                        lineTo(0f, size.height)
-                        close()
-                    }
-                drawPath(path = arrowPath, color = bubbleColor)
-            }
-        }
-    }
-
-    if (showLocatorDialog && activeMessageTimestamp != null) {
-        ChatMessageLocatorDialog(
-            locatorEntries = locatorEntries,
-            currentMessageTimestamp = activeMessageTimestamp,
-            isLoading = isLoadingLocatorEntries,
-            loadFailed = locatorLoadFailed,
-            currentChatId = currentChatId,
-            loadLocatorEntries = loadLocatorEntries,
-            onDismiss = { showLocatorDialog = false },
-            onToggleFavoriteMessage = onToggleFavoriteMessage,
-            onJumpToMessage = { targetTimestamp ->
-                showLocatorDialog = false
-                val targetIndex = chatHistory.indexOfFirst { it.timestamp == targetTimestamp }
-                if (targetIndex >= 0) {
-                    onJumpToMessage(targetIndex)
-                } else {
-                    onJumpToMessageTimestamp?.invoke(targetTimestamp)
-                }
-            },
-        )
-    }
-}
-
-@Composable
-internal fun ChatScrollNavigator(
-    chatHistory: List<ChatMessage>,
-    currentChatId: String? = null,
-    scrollState: ScrollState,
-    messageAnchors: Map<Long, ChatScrollMessageAnchor>,
-    viewportHeightPx: Int,
+    scrollState: LazyListState,
     autoScrollToBottom: Boolean,
     hasNewerDisplayHistory: Boolean = false,
     loadLocatorEntries: (suspend (String, String) -> List<ChatMessageLocatorPreview>)? = null,
@@ -326,7 +110,7 @@ internal fun ChatScrollNavigator(
     onToggleFavoriteMessage: ((Long, Boolean) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
-    if (chatHistory.isEmpty() || viewportHeightPx <= 0) {
+    if (chatHistory.isEmpty()) {
         return
     }
 
@@ -353,7 +137,6 @@ internal fun ChatScrollNavigator(
 
     LaunchedEffect(
         scrollState,
-        viewportHeightPx,
         chatHistory.size,
         chatHistory.firstOrNull()?.timestamp,
         chatHistory.lastOrNull()?.timestamp,
@@ -363,9 +146,7 @@ internal fun ChatScrollNavigator(
                 centeredMessageIndex =
                     resolveCenteredMessageIndex(
                         scrollState = scrollState,
-                        viewportHeightPx = viewportHeightPx,
                         chatHistory = chatHistory,
-                        messageAnchors = messageAnchors,
                     ),
                 isScrollInProgress = scrollState.isScrollInProgress,
             )
@@ -386,27 +167,23 @@ internal fun ChatScrollNavigator(
         }
     }
 
+    // 滚动会话结束（含惯性）时按"是否处于底部"恢复/解除自动滚动：
+    // LazyListState 无绝对滚动位置，canScrollForward==false 即内容（含
+    // contentPadding）已全部滚出，语义与旧 value>=maxValue 一致
     LaunchedEffect(scrollState) {
-        var lastPosition = scrollState.value
-        snapshotFlow { scrollState.value }
+        snapshotFlow { scrollState.isScrollInProgress }
             .distinctUntilChanged()
-            .collectLatest { currentPosition ->
-                if (scrollState.isScrollInProgress) {
-                    val movedAwayFromBottom = currentPosition < lastPosition
-                    if (movedAwayFromBottom) {
-                        if (currentAutoScrollToBottom) {
-                            currentOnAutoScrollToBottomChange?.invoke(false)
-                        }
-                    } else {
-                        val isAtBottom =
-                            scrollState.value >= scrollState.maxValue &&
-                                !currentHasNewerDisplayHistory
-                        if (isAtBottom && !currentAutoScrollToBottom) {
-                            currentOnAutoScrollToBottomChange?.invoke(true)
-                        }
-                    }
+            .collectLatest { scrollInProgress ->
+                if (scrollInProgress) {
+                    return@collectLatest
                 }
-                lastPosition = currentPosition
+                val isAtBottom =
+                    !scrollState.canScrollForward && !currentHasNewerDisplayHistory
+                if (isAtBottom && !currentAutoScrollToBottom) {
+                    currentOnAutoScrollToBottomChange?.invoke(true)
+                } else if (!isAtBottom && currentAutoScrollToBottom) {
+                    currentOnAutoScrollToBottomChange?.invoke(false)
+                }
             }
     }
 
@@ -557,7 +334,9 @@ internal fun ChatScrollNavigator(
                                 if (currentHasNewerDisplayHistory) {
                                     currentOnRequestLatestMessages?.invoke()
                                 }
-                                scrollState.animateScrollTo(scrollState.maxValue)
+                                scrollState.animateScrollToItemEnd(
+                                    scrollState.layoutInfo.totalItemsCount - 1,
+                                )
                             }
                             currentOnAutoScrollToBottomChange?.invoke(true)
                         },
@@ -1123,46 +902,31 @@ private fun ChatMessageLocatorRow(
     }
 }
 
+// 视口中心的消息项：LazyColumn 可见项中过滤消息 key（ChatMessageItemKey），
+// 找中心点落在其跨度内（或中心距离最近）的一项，经 timestamp 反查 chatHistory 下标
 private fun resolveCenteredMessageIndex(
-    scrollState: ChatLazyListState,
-    minVisibleIndex: Int,
-    visibleMessageCount: Int,
-    totalMessageCount: Int,
+    scrollState: LazyListState,
+    chatHistory: List<ChatMessage>,
 ): Int? {
-    if (visibleMessageCount <= 0 || totalMessageCount <= 0) {
+    if (chatHistory.isEmpty()) {
         return null
     }
     val layoutInfo = scrollState.layoutInfo
     val viewportCenter = (layoutInfo.viewportStartOffset + layoutInfo.viewportEndOffset) / 2f
-    val visibleMessageItem =
+    val centeredItem =
         layoutInfo.visibleItemsInfo
-            .filter { it.index in 0 until visibleMessageCount }
+            .filter { it.key is ChatMessageItemKey }
             .minByOrNull { item ->
-                abs((item.offset + item.size / 2f) - viewportCenter)
+                val itemCenter = item.offset + item.size / 2f
+                if (viewportCenter >= item.offset && viewportCenter <= item.offset + item.size) {
+                    0f
+                } else {
+                    kotlin.math.abs(itemCenter - viewportCenter)
+                }
             } ?: return null
 
-    return (minVisibleIndex + visibleMessageItem.index).coerceIn(0, totalMessageCount - 1)
-}
-
-private fun resolveCenteredMessageIndex(
-    scrollState: ScrollState,
-    viewportHeightPx: Int,
-    chatHistory: List<ChatMessage>,
-    messageAnchors: Map<Long, ChatScrollMessageAnchor>,
-): Int? {
-    if (viewportHeightPx <= 0 || chatHistory.isEmpty() || messageAnchors.isEmpty()) {
-        return null
-    }
-
-    val viewportCenter = scrollState.value + viewportHeightPx / 2f
-    val centeredTimestamp =
-        messageAnchors
-            .entries
-            .minByOrNull { (_, anchor) ->
-                abs((anchor.absoluteTopPx + anchor.heightPx / 2f) - viewportCenter)
-            }?.key ?: return null
-
-    return chatHistory.indexOfFirst { it.timestamp == centeredTimestamp }.takeIf { it >= 0 }
+    val centeredKey = centeredItem.key as ChatMessageItemKey
+    return chatHistory.indexOfFirst { it.timestamp == centeredKey.timestamp }.takeIf { it >= 0 }
 }
 
 private fun senderLabelRes(sender: String): Int =

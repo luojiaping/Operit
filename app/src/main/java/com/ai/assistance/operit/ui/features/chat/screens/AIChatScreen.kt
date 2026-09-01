@@ -19,7 +19,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.CodeOff
@@ -405,7 +404,7 @@ val actualViewModel: ChatViewModel = viewModel ?: viewModel { ChatViewModel(cont
     val canDrawOverlays = remember { mutableStateOf(Settings.canDrawOverlays(context)) }
 
     // UI state
-    val scrollState = rememberScrollState()
+    val scrollState = rememberLazyListState()
     val historyListState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
     val characterCardManager = remember { CharacterCardManager.getInstance(context) }
@@ -677,7 +676,9 @@ val actualViewModel: ChatViewModel = viewModel ?: viewModel { ChatViewModel(cont
             ) {
                 try {
                     if (latestChatHistory.isNotEmpty()) {
-                        scrollState.animateScrollTo(scrollState.maxValue)
+                        scrollState.animateScrollToItemEnd(
+                            scrollState.layoutInfo.totalItemsCount - 1,
+                        )
                     }
                 } catch (e: Exception) {
                     // AppLogger.e("AIChatScreen", "自动滚动失败", e)
