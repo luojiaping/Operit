@@ -113,10 +113,31 @@ export function bubbleImageStyle(
     return undefined;
   }
 
+  const cropWidth = Math.max(0.01, imageTheme.crop_right - imageTheme.crop_left);
+  const cropHeight = Math.max(0.01, imageTheme.crop_bottom - imageTheme.crop_top);
+  const scale = Math.max(0.1, imageTheme.scale);
+  const tiled = imageTheme.render_mode === 'tiled_nine_slice';
+  const repeatWidth = Math.max(0.01, imageTheme.repeat_end - imageTheme.repeat_start);
+  const repeatHeight = Math.max(0.01, imageTheme.repeat_y_end - imageTheme.repeat_y_start);
+
+  if (imageTheme.render_mode === 'nine_patch') {
+    return {
+      backgroundColor: 'transparent',
+      borderImageRepeat: 'stretch',
+      borderImageSlice: `${imageTheme.repeat_y_start * 100}% ${(1 - imageTheme.repeat_end) * 100}% ${(1 - imageTheme.repeat_y_end) * 100}% ${imageTheme.repeat_start * 100}% fill`,
+      borderImageSource: `url(${imageTheme.asset_url})`,
+      borderImageWidth: '12px',
+      borderStyle: 'solid',
+      borderWidth: '12px'
+    };
+  }
+
   return {
     backgroundImage: `linear-gradient(180deg, rgba(10, 12, 20, 0.06), rgba(10, 12, 20, 0.12)), url(${imageTheme.asset_url})`,
-    backgroundSize: imageTheme.render_mode === 'repeat' ? 'auto' : 'cover',
-    backgroundRepeat: imageTheme.render_mode === 'repeat' ? 'repeat' : 'no-repeat',
-    backgroundPosition: 'center'
+    backgroundSize: tiled
+      ? `${(scale * 100) / repeatWidth}% ${(scale * 100) / repeatHeight}%`
+      : `${(scale * 100) / cropWidth}% ${(scale * 100) / cropHeight}%`,
+    backgroundRepeat: tiled ? 'repeat' : 'no-repeat',
+    backgroundPosition: `${imageTheme.crop_left * 100}% ${imageTheme.crop_top * 100}%`
   };
 }

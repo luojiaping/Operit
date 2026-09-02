@@ -56,9 +56,6 @@ data class GlobalPresentationSnapshot(
     val showMessageTokenStats: Boolean = false,
     val showMessageTimingStats: Boolean = false,
     val showMessageTimestamp: Boolean = false,
-    val bubbleShowAvatar: Boolean = true,
-    val bubbleWideLayoutEnabled: Boolean = false,
-    val cursorUserBubbleFollowTheme: Boolean = true,
 ) {
     companion object {
         const val MIN_FONT_SCALE = 0.5f
@@ -85,10 +82,6 @@ private val KEY_SHOW_USER_NAME = booleanPreferencesKey("show_user_name")
 private val KEY_SHOW_MESSAGE_TOKEN_STATS = booleanPreferencesKey("show_message_token_stats")
 private val KEY_SHOW_MESSAGE_TIMING_STATS = booleanPreferencesKey("show_message_timing_stats")
 private val KEY_SHOW_MESSAGE_TIMESTAMP = booleanPreferencesKey("show_message_timestamp")
-private val KEY_BUBBLE_SHOW_AVATAR = booleanPreferencesKey("bubble_show_avatar")
-private val KEY_BUBBLE_WIDE_LAYOUT_ENABLED = booleanPreferencesKey("bubble_wide_layout_enabled")
-private val KEY_CURSOR_USER_BUBBLE_FOLLOW_THEME =
-    booleanPreferencesKey("cursor_user_bubble_follow_theme")
 
 private val Context.globalPresentationDataStore by versionedPreferencesDataStore(
     name = "global_presentation",
@@ -159,14 +152,6 @@ class GlobalPresentationManager private constructor(private val context: Context
     suspend fun setShowMessageTimestamp(value: Boolean) =
         edit { it[KEY_SHOW_MESSAGE_TIMESTAMP] = value }
 
-    suspend fun setBubbleShowAvatar(value: Boolean) = edit { it[KEY_BUBBLE_SHOW_AVATAR] = value }
-
-    suspend fun setBubbleWideLayoutEnabled(value: Boolean) =
-        edit { it[KEY_BUBBLE_WIDE_LAYOUT_ENABLED] = value }
-
-    suspend fun setCursorUserBubbleFollowTheme(value: Boolean) =
-        edit { it[KEY_CURSOR_USER_BUBBLE_FOLLOW_THEME] = value }
-
     private suspend fun edit(transform: (androidx.datastore.preferences.core.MutablePreferences) -> Unit) {
         context.globalPresentationDataStore.edit(transform)
     }
@@ -205,7 +190,4 @@ private fun readSnapshot(preferences: Preferences): GlobalPresentationSnapshot =
         showMessageTokenStats = preferences[KEY_SHOW_MESSAGE_TOKEN_STATS] ?: false,
         showMessageTimingStats = preferences[KEY_SHOW_MESSAGE_TIMING_STATS] ?: false,
         showMessageTimestamp = preferences[KEY_SHOW_MESSAGE_TIMESTAMP] ?: false,
-        bubbleShowAvatar = preferences[KEY_BUBBLE_SHOW_AVATAR] ?: true,
-        bubbleWideLayoutEnabled = preferences[KEY_BUBBLE_WIDE_LAYOUT_ENABLED] ?: false,
-        cursorUserBubbleFollowTheme = preferences[KEY_CURSOR_USER_BUBBLE_FOLLOW_THEME] ?: true,
     )

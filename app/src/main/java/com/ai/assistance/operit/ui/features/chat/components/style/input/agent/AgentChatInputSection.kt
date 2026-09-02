@@ -139,6 +139,7 @@ import com.ai.assistance.operit.ui.features.chat.viewmodel.ChatViewModel
 import com.ai.assistance.operit.ui.floating.FloatingMode
 import com.ai.assistance.operit.ui.permissions.PermissionLevel
 import com.ai.assistance.operit.ui.theme.LocalThemePackageUiRuntimeV2
+import com.ai.assistance.operit.ui.theme.ThemeComposerSurfaceV2
 import com.ai.assistance.operit.ui.theme.ThemeComponentStateV2
 import com.ai.assistance.operit.ui.theme.ThemeComponentSurfaceV2
 import com.ai.assistance.operit.util.ChatUtils
@@ -609,8 +610,7 @@ fun AgentChatInputSection(
             inputSkinState,
         )
 
-    ThemeComponentSurfaceV2(
-        component = ThemeComponentCatalogV2.COMPOSER,
+    ThemeComposerSurfaceV2(
         modifier = modifier,
     ) {
         Column {

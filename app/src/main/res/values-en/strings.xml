@@ -4954,6 +4954,8 @@
     <string name="theme_packages_section_theme">Theme</string>
     <string name="theme_packages_section_appearance">Appearance</string>
     <string name="theme_packages_section_conversation">Conversation</string>
+    <string name="theme_packages_section_composer">Composer</string>
+    <string name="theme_packages_section_app_chrome">App Chrome</string>
     <string name="theme_packages_picker_title">Choose Theme</string>
     <string name="theme_packages_close">Close</string>
     <string name="theme_packages_import">Import theme package (.otheme)</string>
@@ -4966,8 +4968,13 @@
     <string name="theme_packages_uninstalled">Uninstalled</string>
     <string name="theme_packages_uninstall_failed">Uninstall failed</string>
     <string name="theme_packages_pick_image">Pick image</string>
+    <string name="theme_packages_pick_video">Pick video</string>
+    <string name="theme_packages_pick_font">Pick font</string>
     <string name="theme_packages_background_selected">Background image updated</string>
     <string name="theme_packages_background_invalid">This background image cannot be used</string>
+    <string name="theme_packages_resource_selected">Theme resource updated</string>
+    <string name="theme_packages_resource_invalid">This theme resource cannot be used</string>
+    <string name="theme_packages_resource_selection_expired">Theme changed. Choose the theme resource again.</string>
     <string name="theme_packages_image_selection_expired">Theme changed. Choose the background image again.</string>
     <string name="theme_packages_clear">Clear</string>
     <string name="theme_packages_reset">Restore theme default</string>
@@ -4999,9 +5006,6 @@
     <string name="global_presentation_show_message_token_stats">Show token stats</string>
     <string name="global_presentation_show_message_timing_stats">Show timing stats</string>
     <string name="global_presentation_show_message_timestamp">Show timestamp</string>
-    <string name="global_presentation_bubble_show_avatar">Show avatar in bubbles</string>
-    <string name="global_presentation_bubble_wide_layout">Wide bubble layout</string>
-    <string name="global_presentation_cursor_user_bubble_follow_theme">User bubble color follows theme</string>
     
     <!-- Chat History Management -->
     <string name="default_profile_name">Default Profile</string>

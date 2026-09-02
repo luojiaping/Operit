@@ -5,13 +5,13 @@ import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-/** Exact schema 3 artifact bundled with Operit and used as the required base theme. */
+/** Exact schema 4 artifact bundled with Operit and used as the required base theme. */
 internal object ThemePackageDefaultV2 {
     const val PACKAGE_ID = "operit.default"
-    const val VERSION = "2.2.0"
-    const val ARCHIVE_SHA256 = "dba4169c8e1636c5f2d85749f7770b8657d99217764563aac0302137e37ef4fd"
+    const val VERSION = "3.0.0"
+    const val ARCHIVE_SHA256 = "5a96abf521ec22a8c486ccb5b4d7f561a4bed4f6f90dfe742647024eb79db91f"
 
-    private const val ASSET_PATH = "theme-packages/operit-default-v2.otheme"
+    private const val ASSET_PATH = "theme-packages/operit-default-v4.otheme"
 
     val coordinate =
         ThemePackageCoordinateV2(
@@ -23,17 +23,16 @@ internal object ThemePackageDefaultV2 {
     suspend fun ensureInstalled(context: Context) {
         withContext(Dispatchers.IO) {
             val installer = ThemePackageInstallerV2.getInstance(context)
-            installer.clearUnpublishedSchema2Installations()
             if (installer.find(coordinate) != null) return@withContext
 
-            val staged = File(context.cacheDir, "operit-default-v2.$THEME_PACKAGE_EXTENSION_V2")
+            val staged = File(context.cacheDir, "operit-default-v4.$THEME_PACKAGE_EXTENSION_V2")
             try {
                 context.assets.open(ASSET_PATH).use { input ->
                     staged.outputStream().use { output -> input.copyTo(output) }
                 }
                 val installed = installer.import(staged, expectedSha256 = ARCHIVE_SHA256)
                 check(installed == coordinate) {
-                    "Bundled default schema 3 theme coordinate does not match its release lock."
+                    "Bundled default schema 4 theme coordinate does not match its release lock."
                 }
             } finally {
                 staged.delete()

@@ -27,27 +27,7 @@ class ThemePackageSelectionRepositoryV2Test {
     }
 
     @Test
-    fun missingExternalSelectionIsAtomicallyReplacedWithBundledDefault() = runBlocking {
-        val missing = coordinate("operit.cyber_grid", "a")
-        repository.replace(
-            ThemeInstanceV2(
-                reference = ThemePackageReferenceV2(missing),
-                parameterValues =
-                    mapOf(
-                        "background_image" to
-                            ThemeParameterValueV2.ImageUriValue("content://theme/background"),
-                    ),
-            ),
-        )
-
-        val repairedFrom = repository.repairUnavailableSelection(setOf(ThemePackageDefaultV2.coordinate))
-
-        assertEquals(missing, repairedFrom)
-        assertEquals(ThemeInstanceV2.defaultBundled(), repository.selectionFlow.first())
-    }
-
-    @Test
-    fun installedExternalSelectionIsPreserved() = runBlocking {
+    fun externalSelectionIsPersistedWithoutSelectionRepair() = runBlocking {
         val installed = coordinate("operit.cyber_grid", "b")
         val selection =
             ThemeInstanceV2(
@@ -56,16 +36,13 @@ class ThemePackageSelectionRepositoryV2Test {
             )
         repository.replace(selection)
 
-        val repairedFrom = repository.repairUnavailableSelection(setOf(ThemePackageDefaultV2.coordinate, installed))
-
-        assertEquals(null, repairedFrom)
         assertEquals(selection, repository.selectionFlow.first())
     }
 
     private fun coordinate(packageId: String, digestSeed: String): ThemePackageCoordinateV2 =
         ThemePackageCoordinateV2(
             packageId = ThemePackageIdV2(packageId),
-            version = ThemePackageVersionV2("2.2.0"),
+            version = ThemePackageVersionV2("3.0.0"),
             archiveSha256 = ThemeArchiveSha256V2(digestSeed.repeat(64)),
         )
 }

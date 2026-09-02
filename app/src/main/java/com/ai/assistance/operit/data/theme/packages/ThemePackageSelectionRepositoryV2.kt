@@ -6,7 +6,6 @@ import android.net.Uri
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
-import com.ai.assistance.operit.data.preferences.missingPreferencesSchemaMigration
 import com.ai.assistance.operit.data.preferences.preferenceSchemaMigration
 import com.ai.assistance.operit.data.preferences.versionedPreferencesDataStore
 import com.ai.assistance.operit.util.AppLogger
@@ -17,7 +16,7 @@ import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
-internal val THEME_INSTANCE_V2_KEY = stringPreferencesKey("theme_instance_v2_json")
+internal val THEME_INSTANCE_V2_KEY = stringPreferencesKey("theme_instance_v4_json")
 
 private val themeSelectionJsonV2 = Json {
     ignoreUnknownKeys = false
@@ -25,42 +24,25 @@ private val themeSelectionJsonV2 = Json {
     explicitNulls = false
 }
 
-private val THEME_OWNED_IMAGE_URIS_V3_KEY = stringPreferencesKey("theme_owned_image_uris_v3_json")
-private val THEME_PENDING_IMAGE_GRANTS_V3_KEY = stringPreferencesKey("theme_pending_image_grants_v3_json")
-private val THEME_PENDING_IMAGE_REVOCATIONS_V3_KEY =
-    stringPreferencesKey("theme_pending_image_revocations_v3_json")
+private val THEME_OWNED_RESOURCE_URIS_V4_KEY = stringPreferencesKey("theme_owned_resource_uris_v4_json")
+private val THEME_PENDING_RESOURCE_GRANTS_V4_KEY =
+    stringPreferencesKey("theme_pending_resource_grants_v4_json")
+private val THEME_PENDING_RESOURCE_REVOCATIONS_V4_KEY =
+    stringPreferencesKey("theme_pending_resource_revocations_v4_json")
 
 private val Context.themePackageSelectionV2DataStore by versionedPreferencesDataStore(
-    name = "theme_package_selection_v2",
-    currentVersion = 2,
+    name = "theme_package_selection_v4",
+    currentVersion = 1,
     createMigration = {
         preferenceSchemaMigration { version, preferences ->
-            migrateThemePackageSelectionSchemaV2(version, preferences)
+            require(version == 0) { "Theme package selection v4 has no prior record version." }
+            preferences[THEME_INSTANCE_V2_KEY] =
+                themeSelectionJsonV2.encodeToString(ThemeInstanceV2.defaultBundled())
         }
     },
 )
 
-internal fun migrateThemePackageSelectionSchemaV2(
-    version: Int,
-    preferences: androidx.datastore.preferences.core.MutablePreferences,
-) {
-    when (version) {
-        0,
-        1,
-        -> {
-            // Schema 3 removes the unpublished string-based parameter representation.
-            preferences[THEME_INSTANCE_V2_KEY] =
-                themeSelectionJsonV2.encodeToString(ThemeInstanceV2.defaultBundled())
-            preferences.remove(THEME_OWNED_IMAGE_URIS_V3_KEY)
-            preferences.remove(THEME_PENDING_IMAGE_GRANTS_V3_KEY)
-            preferences.remove(THEME_PENDING_IMAGE_REVOCATIONS_V3_KEY)
-        }
-
-        else -> missingPreferencesSchemaMigration(version)
-    }
-}
-
-/** A V2-only global theme selection with no reader for the unpublished V1 record. */
+/** A schema-4-only global theme selection with no reader for unpublished prior records. */
 internal class ThemePackageSelectionRepositoryV2 private constructor(context: Context) {
     private val appContext = context.applicationContext
     private val dataStore = appContext.themePackageSelectionV2DataStore
@@ -109,14 +91,14 @@ internal class ThemePackageSelectionRepositoryV2 private constructor(context: Co
 
     suspend fun replaceSelection(instance: ThemeInstanceV2) {
         dataStore.edit { preferences ->
-            val ownedUris = preferences.decodeThemeImageUrisV3(THEME_OWNED_IMAGE_URIS_V3_KEY)
-            val retainedUris = instance.themeImageUris()
+            val ownedUris = preferences.decodeThemeResourceUrisV4(THEME_OWNED_RESOURCE_URIS_V4_KEY)
+            val retainedUris = instance.themeResourceUris()
             val releasedUris = ownedUris - retainedUris
             preferences[THEME_INSTANCE_V2_KEY] = themeSelectionJsonV2.encodeToString(instance)
-            preferences.writeThemeImageUrisV3(THEME_OWNED_IMAGE_URIS_V3_KEY, ownedUris - releasedUris)
-            preferences.writeThemeImageUrisV3(
-                THEME_PENDING_IMAGE_REVOCATIONS_V3_KEY,
-                (preferences.decodeThemeImageUrisV3(THEME_PENDING_IMAGE_REVOCATIONS_V3_KEY) - retainedUris) +
+            preferences.writeThemeResourceUrisV4(THEME_OWNED_RESOURCE_URIS_V4_KEY, ownedUris - releasedUris)
+            preferences.writeThemeResourceUrisV4(
+                THEME_PENDING_RESOURCE_REVOCATIONS_V4_KEY,
+                (preferences.decodeThemeResourceUrisV4(THEME_PENDING_RESOURCE_REVOCATIONS_V4_KEY) - retainedUris) +
                     releasedUris,
             )
         }
@@ -124,86 +106,87 @@ internal class ThemePackageSelectionRepositoryV2 private constructor(context: Co
 
     suspend fun currentSelection(): ThemeInstanceV2 = selectionFlow.first()
 
-    suspend fun markPendingImageGrant(uri: String) {
+    suspend fun markPendingResourceGrant(uri: String) {
         dataStore.edit { preferences ->
-            val pendingUris = preferences.decodeThemeImageUrisV3(THEME_PENDING_IMAGE_GRANTS_V3_KEY)
-            preferences.writeThemeImageUrisV3(THEME_PENDING_IMAGE_GRANTS_V3_KEY, pendingUris + uri)
+            val pendingUris = preferences.decodeThemeResourceUrisV4(THEME_PENDING_RESOURCE_GRANTS_V4_KEY)
+            preferences.writeThemeResourceUrisV4(THEME_PENDING_RESOURCE_GRANTS_V4_KEY, pendingUris + uri)
         }
     }
 
-    suspend fun hasThemeImageGrantOwnership(uri: String): Boolean {
+    suspend fun hasThemeResourceGrantOwnership(uri: String): Boolean {
         val preferences = dataStore.data.first()
-        return uri in preferences.decodeThemeImageUrisV3(THEME_OWNED_IMAGE_URIS_V3_KEY) ||
-            uri in preferences.decodeThemeImageUrisV3(THEME_PENDING_IMAGE_GRANTS_V3_KEY) ||
-            uri in preferences.decodeThemeImageUrisV3(THEME_PENDING_IMAGE_REVOCATIONS_V3_KEY)
+        return uri in preferences.decodeThemeResourceUrisV4(THEME_OWNED_RESOURCE_URIS_V4_KEY) ||
+            uri in preferences.decodeThemeResourceUrisV4(THEME_PENDING_RESOURCE_GRANTS_V4_KEY) ||
+            uri in preferences.decodeThemeResourceUrisV4(THEME_PENDING_RESOURCE_REVOCATIONS_V4_KEY)
     }
 
-    suspend fun replaceImageParameter(
+    suspend fun replaceResourceParameter(
         expectedCoordinate: ThemePackageCoordinateV2,
         parameterId: String,
-        value: ThemeParameterValueV2.ImageUriValue,
+        value: ThemeParameterValueV2,
         trackUriOwnership: Boolean,
     ) {
         dataStore.edit { preferences ->
             val current = preferences.decodeThemeInstanceV2()
             check(current.reference.coordinate == expectedCoordinate) {
-                "Theme selection changed before image parameter $parameterId was written."
+                "Theme selection changed before resource parameter $parameterId was written."
             }
             val updated =
                 current.copy(
                     parameterValues = current.parameterValues + (parameterId to value),
                 )
-            val ownedUris = preferences.decodeThemeImageUrisV3(THEME_OWNED_IMAGE_URIS_V3_KEY)
-            val nextOwnedUris = if (trackUriOwnership) ownedUris + value.uri else ownedUris
-            val retainedUris = updated.themeImageUris()
+            val ownedUris = preferences.decodeThemeResourceUrisV4(THEME_OWNED_RESOURCE_URIS_V4_KEY)
+            val resourceUri = value.requireResourceUri()
+            val nextOwnedUris = if (trackUriOwnership) ownedUris + resourceUri else ownedUris
+            val retainedUris = updated.themeResourceUris()
             val releasedUris = nextOwnedUris - retainedUris
             preferences[THEME_INSTANCE_V2_KEY] = themeSelectionJsonV2.encodeToString(updated)
-            preferences.writeThemeImageUrisV3(
-                THEME_OWNED_IMAGE_URIS_V3_KEY,
+            preferences.writeThemeResourceUrisV4(
+                THEME_OWNED_RESOURCE_URIS_V4_KEY,
                 nextOwnedUris - releasedUris,
             )
-            preferences.writeThemeImageUrisV3(
-                THEME_PENDING_IMAGE_GRANTS_V3_KEY,
-                preferences.decodeThemeImageUrisV3(THEME_PENDING_IMAGE_GRANTS_V3_KEY) - value.uri,
+            preferences.writeThemeResourceUrisV4(
+                THEME_PENDING_RESOURCE_GRANTS_V4_KEY,
+                preferences.decodeThemeResourceUrisV4(THEME_PENDING_RESOURCE_GRANTS_V4_KEY) - resourceUri,
             )
-            preferences.writeThemeImageUrisV3(
-                THEME_PENDING_IMAGE_REVOCATIONS_V3_KEY,
-                (preferences.decodeThemeImageUrisV3(THEME_PENDING_IMAGE_REVOCATIONS_V3_KEY) - retainedUris) +
+            preferences.writeThemeResourceUrisV4(
+                THEME_PENDING_RESOURCE_REVOCATIONS_V4_KEY,
+                (preferences.decodeThemeResourceUrisV4(THEME_PENDING_RESOURCE_REVOCATIONS_V4_KEY) - retainedUris) +
                     releasedUris,
             )
         }
     }
 
-    suspend fun clearImageParameter(
+    suspend fun clearResourceParameter(
         expectedCoordinate: ThemePackageCoordinateV2,
         parameterId: String,
     ) {
         dataStore.edit { preferences ->
             val current = preferences.decodeThemeInstanceV2()
             check(current.reference.coordinate == expectedCoordinate) {
-                "Theme selection changed before image parameter $parameterId was reset."
+                "Theme selection changed before resource parameter $parameterId was reset."
             }
             val updated =
                 current.copy(
                     parameterValues = current.parameterValues - parameterId,
                 )
-            val ownedUris = preferences.decodeThemeImageUrisV3(THEME_OWNED_IMAGE_URIS_V3_KEY)
-            val retainedUris = updated.themeImageUris()
+            val ownedUris = preferences.decodeThemeResourceUrisV4(THEME_OWNED_RESOURCE_URIS_V4_KEY)
+            val retainedUris = updated.themeResourceUris()
             val releasedUris = ownedUris - retainedUris
             preferences[THEME_INSTANCE_V2_KEY] = themeSelectionJsonV2.encodeToString(updated)
-            preferences.writeThemeImageUrisV3(
-                THEME_OWNED_IMAGE_URIS_V3_KEY,
+            preferences.writeThemeResourceUrisV4(
+                THEME_OWNED_RESOURCE_URIS_V4_KEY,
                 ownedUris - releasedUris,
             )
-            preferences.writeThemeImageUrisV3(
-                THEME_PENDING_IMAGE_REVOCATIONS_V3_KEY,
-                preferences.decodeThemeImageUrisV3(THEME_PENDING_IMAGE_REVOCATIONS_V3_KEY) + releasedUris,
+            preferences.writeThemeResourceUrisV4(
+                THEME_PENDING_RESOURCE_REVOCATIONS_V4_KEY,
+                preferences.decodeThemeResourceUrisV4(THEME_PENDING_RESOURCE_REVOCATIONS_V4_KEY) + releasedUris,
             )
         }
     }
 
-    suspend fun reconcileThemeImageGrants() {
-        val candidates = collectThemeImageGrantCandidates()
+    suspend fun reconcileThemeResourceGrants() {
+        val candidates = collectThemeResourceGrantCandidates()
         val resolvedUris = candidates.filterTo(mutableSetOf()) { rawUri ->
             val uri = Uri.parse(rawUri)
             val persisted =
@@ -227,69 +210,47 @@ internal class ThemePackageSelectionRepositoryV2 private constructor(context: Co
         }
         if (resolvedUris.isEmpty()) return
         dataStore.edit { preferences ->
-            preferences.writeThemeImageUrisV3(
-                THEME_PENDING_IMAGE_GRANTS_V3_KEY,
-                preferences.decodeThemeImageUrisV3(THEME_PENDING_IMAGE_GRANTS_V3_KEY) - resolvedUris,
-            )
-            preferences.writeThemeImageUrisV3(
-                THEME_PENDING_IMAGE_REVOCATIONS_V3_KEY,
-                preferences.decodeThemeImageUrisV3(THEME_PENDING_IMAGE_REVOCATIONS_V3_KEY) - resolvedUris,
+                preferences.writeThemeResourceUrisV4(
+                    THEME_PENDING_RESOURCE_GRANTS_V4_KEY,
+                    preferences.decodeThemeResourceUrisV4(THEME_PENDING_RESOURCE_GRANTS_V4_KEY) - resolvedUris,
+                )
+            preferences.writeThemeResourceUrisV4(
+                THEME_PENDING_RESOURCE_REVOCATIONS_V4_KEY,
+                preferences.decodeThemeResourceUrisV4(THEME_PENDING_RESOURCE_REVOCATIONS_V4_KEY) - resolvedUris,
             )
         }
     }
 
-    private suspend fun collectThemeImageGrantCandidates(): Set<String> {
+    private suspend fun collectThemeResourceGrantCandidates(): Set<String> {
         var candidates = emptySet<String>()
         dataStore.edit { preferences ->
             val current = preferences.decodeThemeInstanceV2()
-            val retainedUris = current.themeImageUris()
-            val ownedUris = preferences.decodeThemeImageUrisV3(THEME_OWNED_IMAGE_URIS_V3_KEY)
+            val retainedUris = current.themeResourceUris()
+            val ownedUris = preferences.decodeThemeResourceUrisV4(THEME_OWNED_RESOURCE_URIS_V4_KEY)
             val newlyRevokedUris = ownedUris - retainedUris
             if (newlyRevokedUris.isNotEmpty()) {
-                preferences.writeThemeImageUrisV3(
-                    THEME_OWNED_IMAGE_URIS_V3_KEY,
+                preferences.writeThemeResourceUrisV4(
+                    THEME_OWNED_RESOURCE_URIS_V4_KEY,
                     ownedUris - newlyRevokedUris,
                 )
-                preferences.writeThemeImageUrisV3(
-                    THEME_PENDING_IMAGE_REVOCATIONS_V3_KEY,
-                    preferences.decodeThemeImageUrisV3(THEME_PENDING_IMAGE_REVOCATIONS_V3_KEY) +
+                preferences.writeThemeResourceUrisV4(
+                    THEME_PENDING_RESOURCE_REVOCATIONS_V4_KEY,
+                    preferences.decodeThemeResourceUrisV4(THEME_PENDING_RESOURCE_REVOCATIONS_V4_KEY) +
                         newlyRevokedUris,
                 )
             }
             val pendingGrants =
-                preferences.decodeThemeImageUrisV3(THEME_PENDING_IMAGE_GRANTS_V3_KEY) - retainedUris
+                preferences.decodeThemeResourceUrisV4(THEME_PENDING_RESOURCE_GRANTS_V4_KEY) - retainedUris
             val pendingRevocations =
-                preferences.decodeThemeImageUrisV3(THEME_PENDING_IMAGE_REVOCATIONS_V3_KEY) - retainedUris
-            preferences.writeThemeImageUrisV3(THEME_PENDING_IMAGE_GRANTS_V3_KEY, pendingGrants)
-            preferences.writeThemeImageUrisV3(
-                THEME_PENDING_IMAGE_REVOCATIONS_V3_KEY,
+                preferences.decodeThemeResourceUrisV4(THEME_PENDING_RESOURCE_REVOCATIONS_V4_KEY) - retainedUris
+            preferences.writeThemeResourceUrisV4(THEME_PENDING_RESOURCE_GRANTS_V4_KEY, pendingGrants)
+            preferences.writeThemeResourceUrisV4(
+                THEME_PENDING_RESOURCE_REVOCATIONS_V4_KEY,
                 pendingRevocations,
             )
             candidates = pendingGrants + pendingRevocations
         }
         return candidates
-    }
-
-    /**
-     * Repairs a persisted selection whose exact immutable runtime is unavailable. The whole
-     * record is replaced so parameters from that package cannot leak into the bundled default
-     * package.
-     */
-    suspend fun repairUnavailableSelection(
-        installedCoordinates: Set<ThemePackageCoordinateV2>,
-    ): ThemePackageCoordinateV2? {
-        var repairedCoordinate: ThemePackageCoordinateV2? = null
-        dataStore.edit { preferences ->
-            val current = preferences.decodeThemeInstanceV2()
-            if (current.reference.coordinate !in installedCoordinates) {
-                repairedCoordinate = current.reference.coordinate
-                preferences[THEME_INSTANCE_V2_KEY] =
-                    themeSelectionJsonV2.encodeToString(
-                        current.repairUnavailableSelection(installedCoordinates),
-                    )
-            }
-        }
-        return repairedCoordinate
     }
 
     companion object {
@@ -305,33 +266,35 @@ internal class ThemePackageSelectionRepositoryV2 private constructor(context: Co
     }
 }
 
-internal fun ThemeInstanceV2.repairUnavailableSelection(
-    installedCoordinates: Set<ThemePackageCoordinateV2>,
-): ThemeInstanceV2 =
-    if (reference.coordinate in installedCoordinates) {
-        this
-    } else {
-        ThemeInstanceV2.defaultBundled()
-    }
-
 internal fun Preferences.decodeThemeInstanceV2(): ThemeInstanceV2 {
     val raw =
         this[THEME_INSTANCE_V2_KEY]
-            ?: throw IllegalStateException("Global V2 theme selection record is missing.")
+            ?: throw IllegalStateException("Global schema-4 theme selection record is missing.")
     return themeSelectionJsonV2.decodeFromString(raw)
 }
 
-private fun ThemeInstanceV2.themeImageUris(): Set<String> =
+private fun ThemeInstanceV2.themeResourceUris(): Set<String> =
     parameterValues.values
-        .mapNotNull { value -> (value as? ThemeParameterValueV2.ImageUriValue)?.uri }
+        .mapNotNull(ThemeParameterValueV2::resourceUriOrNull)
         .toSet()
 
-private fun Preferences.decodeThemeImageUrisV3(key: Preferences.Key<String>): Set<String> {
+private fun ThemeParameterValueV2.resourceUriOrNull(): String? =
+    when (this) {
+        is ThemeParameterValueV2.ImageUriValue -> uri
+        is ThemeParameterValueV2.VideoUriValue -> uri
+        is ThemeParameterValueV2.FontUriValue -> uri
+        else -> null
+    }
+
+private fun ThemeParameterValueV2.requireResourceUri(): String =
+    requireNotNull(resourceUriOrNull()) { "Theme parameter value must be a resource URI." }
+
+private fun Preferences.decodeThemeResourceUrisV4(key: Preferences.Key<String>): Set<String> {
     val raw = this[key] ?: return emptySet()
     return themeSelectionJsonV2.decodeFromString<List<String>>(raw).toSet()
 }
 
-private fun androidx.datastore.preferences.core.MutablePreferences.writeThemeImageUrisV3(
+private fun androidx.datastore.preferences.core.MutablePreferences.writeThemeResourceUrisV4(
     key: Preferences.Key<String>,
     uris: Set<String>,
 ) {

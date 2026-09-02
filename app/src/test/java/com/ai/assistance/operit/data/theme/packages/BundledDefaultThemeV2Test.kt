@@ -5,6 +5,7 @@ import com.ai.assistance.operit.ui.theme.createThemePackageUiRuntimeV2
 import java.io.File
 import java.util.zip.ZipFile
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.Rule
@@ -12,7 +13,7 @@ import org.junit.rules.TemporaryFolder
 
 /**
  * 内置默认主题必须与外置仓库 Release 字节一致，并使用与导入包完全相同的
- * schema 3 校验器。这是“默认主题不是特殊分支”的静态门槛。
+ * schema 4 校验器。这是“默认主题不是特殊分支”的静态门槛。
  */
 class BundledDefaultThemeV2Test {
     @get:Rule
@@ -20,7 +21,7 @@ class BundledDefaultThemeV2Test {
 
     @Test
     fun bundledDefaultArchivePassesTheSameValidatorAsImportedPackages() {
-        val archive = File("src/main/assets/theme-packages/operit-default-v2.otheme")
+        val archive = File("src/main/assets/theme-packages/operit-default-v4.otheme")
         assertTrue("Bundled default package is missing: ${archive.absolutePath}", archive.isFile)
 
         val validated =
@@ -33,7 +34,23 @@ class BundledDefaultThemeV2Test {
         assertEquals(ThemePackageDefaultV2.VERSION, validated.manifest.version)
         assertEquals(THEME_PACKAGE_SCHEMA_VERSION, validated.manifest.schemaVersion)
         assertEquals(
-            setOf("accent_color", "background_image"),
+            setOf(
+                "accent_color",
+                "background_image",
+                "background_opacity",
+                "use_custom_font",
+                "font_family",
+                "typography_scale",
+                "shape_scale",
+                "show_avatars",
+                "wide_bubbles",
+                "avatar_shape",
+                "composer_transparent",
+                "composer_frame_scale",
+                "app_chrome_frame_scale",
+                "bubble_user_content_insets",
+                "chrome_status_bar_transparent",
+            ),
             validated.manifest.parameters.map { parameter -> parameter.id }.toSet(),
         )
         assertEquals(
@@ -47,7 +64,7 @@ class BundledDefaultThemeV2Test {
 
     @Test
     fun bundledDefaultArchiveLinksAndProjectsItsDeclaredParameters() {
-        val archive = File("src/main/assets/theme-packages/operit-default-v2.otheme")
+        val archive = File("src/main/assets/theme-packages/operit-default-v4.otheme")
         val validated = ThemePackageArchiveValidatorV2.validate(archive)
         val root = tmp.newFolder("installed")
         val coordinate = ThemePackagePublicationV2.publish(archive, validated, root)
@@ -81,6 +98,7 @@ class BundledDefaultThemeV2Test {
             )
 
         assertEquals(0xFF00687A.toInt(), runtime.colorScheme.primary.toArgb())
+        assertEquals(true, runtime.booleanPresentation(ThemePresentationTargetV2.BUBBLE_SHOW_AVATAR))
         assertEquals(
             "content://theme/background",
             runtime.stageImage(ThemeSurfaceCatalogV2.APP_SHELL)?.uri,
@@ -89,5 +107,48 @@ class BundledDefaultThemeV2Test {
             "content://theme/background",
             runtime.stageImage(ThemeSurfaceCatalogV2.CHAT_MAIN)?.uri,
         )
+    }
+
+    @Test
+    fun bundledDefaultKeepsAuthorParametersOutOfTheUserSettingsSurface() {
+        val archive = File("src/main/assets/theme-packages/operit-default-v4.otheme")
+        val validated = ThemePackageArchiveValidatorV2.validate(archive)
+        val root = tmp.newFolder("visibility-installed")
+        ThemePackagePublicationV2.publish(archive, validated, root)
+        val catalog = ThemePackagePublicationV2.catalog(root)
+        val installation = requireNotNull(catalog.installations.singleOrNull())
+        val linked = ThemePackageRuntimeLinkerV2.link(installation, catalog)
+
+        val defaults =
+            ThemePackageRuntimeLinkerV2.resolveParameters(
+                ThemeInstanceV2(reference = ThemePackageReferenceV2(installation.coordinate)),
+                linked,
+            )
+        val backgroundImage = linked.parameterDefinitions.getValue("background_image")
+        val backgroundOpacity = linked.parameterDefinitions.getValue("background_opacity")
+        val fontFamily = linked.parameterDefinitions.getValue("font_family")
+        val authorInsets = linked.parameterDefinitions.getValue("bubble_user_content_insets")
+
+        assertTrue(defaults.isUserVisible(backgroundImage))
+        assertFalse(defaults.isUserVisible(backgroundOpacity))
+        assertFalse(defaults.isUserVisible(fontFamily))
+        assertFalse(defaults.isUserVisible(authorInsets))
+
+        val configured =
+            ThemePackageRuntimeLinkerV2.resolveParameters(
+                ThemeInstanceV2(
+                    reference = ThemePackageReferenceV2(installation.coordinate),
+                    parameterValues =
+                        mapOf(
+                            "background_image" to ThemeParameterValueV2.ImageUriValue("content://theme/background"),
+                            "use_custom_font" to ThemeParameterValueV2.BooleanValue(true),
+                        ),
+                ),
+                linked,
+            )
+
+        assertTrue(configured.isUserVisible(backgroundImage))
+        assertTrue(configured.isUserVisible(backgroundOpacity))
+        assertTrue(configured.isUserVisible(fontFamily))
     }
 }

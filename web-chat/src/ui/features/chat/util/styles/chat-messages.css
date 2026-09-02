@@ -1128,15 +1128,15 @@
 }
 
 .bubble-assistant-message .chat-message-content {
-  padding-top: 12px;
-  padding-bottom: 12px;
+  padding-top: var(--chat-assistant-padding-top);
+  padding-bottom: var(--chat-assistant-padding-bottom);
   padding-left: var(--chat-assistant-padding-left);
   padding-right: var(--chat-assistant-padding-right);
 }
 
 .bubble-user-message .chat-message-content {
-  padding-top: 12px;
-  padding-bottom: 12px;
+  padding-top: var(--chat-user-padding-top);
+  padding-bottom: var(--chat-user-padding-bottom);
   padding-left: var(--chat-user-padding-left);
   padding-right: var(--chat-user-padding-right);
 }

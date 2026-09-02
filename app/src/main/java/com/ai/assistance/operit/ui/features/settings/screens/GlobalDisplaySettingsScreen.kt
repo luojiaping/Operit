@@ -308,36 +308,6 @@ fun GlobalDisplaySettingsScreen(
                 backgroundColor = componentBackgroundColor
             )
 
-            DisplayToggleItem(
-                title = stringResource(R.string.global_presentation_bubble_show_avatar),
-                subtitle = "",
-                checked = presentation.bubbleShowAvatar,
-                onCheckedChange = {
-                    scope.launch { globalPresentation.setBubbleShowAvatar(it) }
-                },
-                backgroundColor = componentBackgroundColor
-            )
-
-            DisplayToggleItem(
-                title = stringResource(R.string.global_presentation_bubble_wide_layout),
-                subtitle = "",
-                checked = presentation.bubbleWideLayoutEnabled,
-                onCheckedChange = {
-                    scope.launch { globalPresentation.setBubbleWideLayoutEnabled(it) }
-                },
-                backgroundColor = componentBackgroundColor
-            )
-
-            DisplayToggleItem(
-                title = stringResource(R.string.global_presentation_cursor_user_bubble_follow_theme),
-                subtitle = "",
-                checked = presentation.cursorUserBubbleFollowTheme,
-                onCheckedChange = {
-                    scope.launch { globalPresentation.setCursorUserBubbleFollowTheme(it) }
-                },
-                backgroundColor = componentBackgroundColor
-            )
-
             Spacer(modifier = Modifier.height(16.dp))
 
             SectionTitle(

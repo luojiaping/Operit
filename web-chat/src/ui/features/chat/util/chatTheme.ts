@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react';
-import type { WebThemeSnapshot } from './chatTypes';
+import type { WebFontTheme, WebThemeSnapshot } from './chatTypes';
 
 type ThemeStyle = CSSProperties & Record<string, string | number>;
 
@@ -7,14 +7,46 @@ function fallbackColor(value: string | null | undefined, fallback: string) {
   return value ?? fallback;
 }
 
-function resolveFontFamily(theme: WebThemeSnapshot) {
-  if (theme.font.custom_font_asset_url) {
-    return '"OperitThemeFont", "PingFang SC", "Microsoft YaHei", sans-serif';
+export function resolveThemeFontFamily(
+  font: WebFontTheme | null | undefined,
+  customFontFamily = 'OperitThemeFont'
+): string | undefined {
+  if (!font) {
+    return undefined;
   }
-  if (theme.font.system_font_name?.trim()) {
-    return `"${theme.font.system_font_name}", "PingFang SC", "Microsoft YaHei", sans-serif`;
+  if (font.custom_font_asset_url) {
+    return `"${customFontFamily}", "PingFang SC", "Microsoft YaHei", sans-serif`;
+  }
+  switch (font.system_font_name) {
+    case 'sans_serif':
+      return 'ui-sans-serif, "PingFang SC", "Microsoft YaHei", sans-serif';
+    case 'serif':
+      return 'ui-serif, "Songti SC", "SimSun", serif';
+    case 'monospace':
+      return 'ui-monospace, "Cascadia Mono", "SFMono-Regular", monospace';
+    case 'cursive':
+      return 'cursive';
+    case 'default':
+      return '"PingFang SC", "Microsoft YaHei", sans-serif';
   }
   return '"PingFang SC", "Microsoft YaHei", sans-serif';
+}
+
+function resolveFontFamily(theme: WebThemeSnapshot) {
+  return resolveThemeFontFamily(theme.font) ?? '"PingFang SC", "Microsoft YaHei", sans-serif';
+}
+
+function resolveStageBackgroundSize(fit: string): string {
+  switch (fit) {
+    case 'fill':
+      return '100% 100%';
+    case 'fit':
+      return 'contain';
+    case 'crop':
+      return 'cover';
+    default:
+      throw new Error(`Unsupported theme stage image fit: ${fit}`);
+  }
 }
 
 function clampOpacity(value: number | undefined) {
@@ -124,10 +156,13 @@ export function buildChatThemeStyle(theme: WebThemeSnapshot | null): ThemeStyle 
     return {};
   }
 
-  const backgroundOpacity = clampOpacity(theme.background.opacity);
+  const stageBackground = theme.background.stage;
+  const mediaBackground = theme.background.media;
+  const stageOpacity = stageBackground == null ? 0 : clampOpacity(stageBackground.opacity);
+  const mediaOpacity = mediaBackground == null ? 0 : clampOpacity(mediaBackground.opacity);
   const isLight = theme.theme_mode === 'light';
   const palette = theme.palette;
-  const hasBackgroundAsset = Boolean(theme.background.asset_url);
+  const hasBackgroundAsset = Boolean(stageBackground?.asset_url || mediaBackground?.asset_url);
   const primary = theme.primary_color || palette.primary_color || '#8ca9ff';
   const secondary = theme.secondary_color || palette.secondary_color || '#67d4c8';
   const backgroundColor = palette.background_color || (isLight ? '#faf8ff' : '#101520');
@@ -182,8 +217,16 @@ export function buildChatThemeStyle(theme: WebThemeSnapshot | null): ThemeStyle 
     '--chat-on-primary': onPrimaryColor,
     '--chat-on-secondary': onSecondaryColor,
     '--chat-root-background': backgroundColor,
-    '--chat-background-image': theme.background.asset_url ? `url(${theme.background.asset_url})` : 'none',
-    '--chat-background-opacity': String(theme.background.asset_url ? backgroundOpacity : 0),
+    '--chat-stage-background-image':
+      stageBackground == null ? 'none' : `url(${stageBackground.asset_url})`,
+    '--chat-stage-background-size':
+      stageBackground == null ? 'cover' : resolveStageBackgroundSize(stageBackground.fit),
+    '--chat-stage-background-opacity': String(stageOpacity),
+    '--chat-media-background-image':
+      mediaBackground?.type === 'image' ? `url(${mediaBackground.asset_url})` : 'none',
+    '--chat-media-background-opacity': String(mediaBackground?.type === 'image' ? mediaOpacity : 0),
+    '--chat-media-background-blur':
+      mediaBackground?.blur_enabled ? `${mediaBackground.blur_radius_dp}px` : '0px',
     '--chat-background-tint': backgroundTint,
     '--chat-surface-color': surfaceColor,
     '--chat-surface-variant-color': surfaceVariantColor,
@@ -219,13 +262,19 @@ export function buildChatThemeStyle(theme: WebThemeSnapshot | null): ThemeStyle 
     '--chat-user-radius': theme.bubble.user_rounded ? '20px' : '8px',
     '--chat-assistant-radius': theme.bubble.assistant_rounded ? '20px' : '8px',
     '--chat-avatar-radius':
-      theme.avatars.shape === 'square'
-        ? `${theme.avatars.corner_radius ?? 10}px`
-        : '999px',
-    '--chat-user-padding-left': `${theme.bubble.user_padding_left || 12}px`,
-    '--chat-user-padding-right': `${theme.bubble.user_padding_right || 12}px`,
-    '--chat-assistant-padding-left': `${theme.bubble.assistant_padding_left || 12}px`,
-    '--chat-assistant-padding-right': `${theme.bubble.assistant_padding_right || 12}px`,
+      theme.avatars.shape === 'circle'
+        ? '999px'
+        : theme.avatars.shape === 'rounded'
+          ? `${theme.avatars.corner_radius ?? 12}px`
+          : '0px',
+    '--chat-user-padding-left': `${theme.bubble.user_padding_left}px`,
+    '--chat-user-padding-right': `${theme.bubble.user_padding_right}px`,
+    '--chat-user-padding-top': `${theme.bubble.user_padding_top}px`,
+    '--chat-user-padding-bottom': `${theme.bubble.user_padding_bottom}px`,
+    '--chat-assistant-padding-left': `${theme.bubble.assistant_padding_left}px`,
+    '--chat-assistant-padding-right': `${theme.bubble.assistant_padding_right}px`,
+    '--chat-assistant-padding-top': `${theme.bubble.assistant_padding_top}px`,
+    '--chat-assistant-padding-bottom': `${theme.bubble.assistant_padding_bottom}px`,
     '--chat-header-bg': theme.header.transparent
       ? 'transparent'
       : toRgba(surfaceVariantColor, 0.2) ?? surfaceVariantColor,
@@ -257,12 +306,26 @@ export function buildChatThemeStyle(theme: WebThemeSnapshot | null): ThemeStyle 
 }
 
 export function buildChatFontFaceCss(theme: WebThemeSnapshot | null) {
-  if (!theme?.font.custom_font_asset_url) {
+  if (!theme) {
+    return '';
+  }
+
+  return [
+    buildThemeFontFace(theme.font, 'OperitThemeFont'),
+    buildThemeFontFace(theme.bubble.user_font, 'OperitThemeUserBubbleFont'),
+    buildThemeFontFace(theme.bubble.assistant_font, 'OperitThemeAssistantBubbleFont')
+  ]
+    .filter((value): value is string => value !== '')
+    .join('\n');
+}
+
+function buildThemeFontFace(font: WebFontTheme, family: string): string {
+  if (!font.custom_font_asset_url) {
     return '';
   }
 
   return `@font-face {
-    font-family: "OperitThemeFont";
-    src: url("${theme.font.custom_font_asset_url}");
+    font-family: "${family}";
+    src: url("${font.custom_font_asset_url}");
   }`;
 }

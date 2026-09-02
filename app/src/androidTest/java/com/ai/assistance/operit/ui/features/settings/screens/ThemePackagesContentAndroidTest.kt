@@ -8,11 +8,12 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.ai.assistance.operit.R
 import com.ai.assistance.operit.data.preferences.GlobalPresentationSnapshot
 import com.ai.assistance.operit.data.theme.packages.ThemeParameterControlV2
-import com.ai.assistance.operit.data.theme.packages.ThemeParameterDefaultV2
 import com.ai.assistance.operit.data.theme.packages.ThemeParameterDefinitionV2
 import com.ai.assistance.operit.data.theme.packages.ThemeParameterEffectV2
+import com.ai.assistance.operit.data.theme.packages.ThemeParameterSectionV2
 import com.ai.assistance.operit.data.theme.packages.ThemeParameterTypeV2
 import com.ai.assistance.operit.data.theme.packages.ThemeParameterValueV2
+import com.ai.assistance.operit.data.theme.packages.ThemeParameterVisibilityV2
 import com.ai.assistance.operit.ui.theme.NativeThemeOffscreenHost
 import com.ai.assistance.operit.ui.theme.themePackageRuntimeForAndroidTest
 import org.junit.Rule
@@ -30,10 +31,12 @@ class ThemePackagesContentAndroidTest {
             ThemeParameterDefinitionV2(
                 id = "accent_color",
                 type = ThemeParameterTypeV2.COLOR,
-                defaultValue = ThemeParameterDefaultV2.ColorValue(0xFF6750A4),
+                defaultValue = ThemeParameterValueV2.ColorValue(0xFF6750A4),
                 label = localized("Accent color"),
                 control = ThemeParameterControlV2.ColorPalette(presetArgb = listOf(0xFF6750A4)),
                 effects = listOf(ThemeParameterEffectV2.AccentPalette),
+                visibility = ThemeParameterVisibilityV2.USER,
+                section = ThemeParameterSectionV2.APPEARANCE,
             )
         val background =
             ThemeParameterDefinitionV2(
@@ -47,6 +50,8 @@ class ThemePackagesContentAndroidTest {
                             surfaceIds = listOf("app.shell", "chat.main"),
                         ),
                     ),
+                visibility = ThemeParameterVisibilityV2.USER,
+                section = ThemeParameterSectionV2.APPEARANCE,
             )
 
         composeTestRule.setContent {
@@ -56,7 +61,7 @@ class ThemePackagesContentAndroidTest {
             ) {
                 ThemePackagesContent(
                     selectedTitle = "Operit Default",
-                    selectedSubtitle = "operit.default · v2.2.0",
+                    selectedSubtitle = "operit.default · v3.0.0",
                     installed = emptyList(),
                     presentation = GlobalPresentationSnapshot.default(),
                     definitions = listOf(accent, background),
@@ -75,7 +80,7 @@ class ThemePackagesContentAndroidTest {
                     onInputStyleChange = {},
                     onParameterChange = { _, _ -> },
                     onParameterClear = {},
-                    onOpenImagePicker = {},
+                    onOpenResourcePicker = {},
                     onOpenColorDialog = {},
                 )
             }

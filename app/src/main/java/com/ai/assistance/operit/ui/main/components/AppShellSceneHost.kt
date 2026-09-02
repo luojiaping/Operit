@@ -9,6 +9,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import com.ai.assistance.operit.data.theme.packages.ThemeSurfaceCatalogV2
 import com.ai.assistance.operit.ui.theme.LocalThemePackageUiRuntimeV2
+import com.ai.assistance.operit.ui.theme.ThemePackageBackgroundMediaV2
 import com.ai.assistance.operit.ui.theme.sceneFor
 import com.ai.assistance.operit.ui.theme.scene.ThemeSceneSlotIdV1
 import com.ai.assistance.operit.ui.theme.scene.render.ThemeSceneV1
@@ -51,6 +52,7 @@ internal fun AppShellSceneHost(
         },
         darkTheme = runtime.darkTheme,
         stageImage = runtime.stageImage(ThemeSurfaceCatalogV2.APP_SHELL),
+        stageUnderlay = { ThemePackageBackgroundMediaV2(runtime) },
         modifier = modifier,
     )
 }

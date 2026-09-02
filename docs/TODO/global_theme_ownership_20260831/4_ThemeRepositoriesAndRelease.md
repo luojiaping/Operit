@@ -1,5 +1,7 @@
 # 主题仓库与发布
 
+> [SUPERSEDED] 当前 default/Cyber source artifact coordinate 记录见 [schema 4 验收](../theme_parameter_contract_rebuild_20260901/5_TestingAndAcceptance.md)。本文件的 schema 3 release 坐标是历史信息。
+
 ## 默认主题
 
 `luojiaping/operit-theme-default` 是 V2 默认主题的唯一源。它实现全部 required daily surface 与通用组件皮肤。APK 仅内置其精确 source artifact 与 SHA-256 lock；稳定发布时该 artifact 必须与对应 Release asset 字节一致。

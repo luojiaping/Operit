@@ -1,5 +1,7 @@
 # V2 主题运行时与 schema 3 包契约
 
+> [SUPERSEDED] 当前 package contract 为 [schema 4 全量参数契约](../theme_parameter_contract_rebuild_20260901/)，不再维护本文件中的 schema 3 parameter 限制。
+
 ## 旧问题
 
 V1 manifest 只声明 `chat.main` 和少数 token。`app.shell` 没有宿主，主题参数只有主色和背景图，Native component catalog 也没有由已安装包驱动。

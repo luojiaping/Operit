@@ -1,6 +1,8 @@
 package com.ai.assistance.operit.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
@@ -10,8 +12,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -23,6 +27,8 @@ import com.ai.assistance.operit.data.theme.packages.LinkedThemeRuntimeV2
 import com.ai.assistance.operit.data.theme.packages.ResolvedThemeParametersV2
 import com.ai.assistance.operit.data.theme.packages.ThemeComponentSkinV2
 import com.ai.assistance.operit.data.theme.packages.ThemeComponentStateSkinV2
+import com.ai.assistance.operit.data.theme.packages.ThemeComponentFrameSpecV2
+import com.ai.assistance.operit.data.theme.packages.ThemeComponentInsetsV2
 import com.ai.assistance.operit.data.theme.packages.ThemeInstanceV2
 import com.ai.assistance.operit.data.theme.packages.ThemeMaterialColorSchemeV2
 import com.ai.assistance.operit.data.theme.packages.ThemeParameterEffectV2
@@ -32,6 +38,10 @@ import com.ai.assistance.operit.data.theme.packages.ThemePackageSelectionReposit
 import com.ai.assistance.operit.data.theme.packages.ThemeRuntimeRepositoryV2
 import com.ai.assistance.operit.data.theme.packages.ThemeSurfaceIdV2
 import com.ai.assistance.operit.data.theme.packages.ThemeSystemFontFamilyV2
+import com.ai.assistance.operit.data.theme.packages.ThemePresentationTargetV2
+import com.ai.assistance.operit.data.theme.packages.ThemePackagePresentationBehaviorV2
+import com.ai.assistance.operit.data.theme.packages.ThemeShapesV2
+import com.ai.assistance.operit.data.theme.packages.ThemeTypographyV2
 import com.ai.assistance.operit.data.theme.packages.accentTokenIds
 import com.ai.assistance.operit.ui.theme.scene.ThemeSceneImageFitV1
 import com.ai.assistance.operit.ui.theme.scene.ThemeSceneTokenIdV1
@@ -67,6 +77,22 @@ internal data class ResolvedThemeStageImageV2(
     val opacity: Float,
 )
 
+@Immutable
+internal data class ResolvedThemeBackgroundMediaV2(
+    val uri: String,
+    val type: ThemeBackgroundMediaTypeV2,
+    val opacity: Float,
+    val blurEnabled: Boolean,
+    val blurRadiusDp: Float,
+    val videoMuted: Boolean,
+    val videoLoop: Boolean,
+)
+
+internal enum class ThemeBackgroundMediaTypeV2 {
+    IMAGE,
+    VIDEO,
+}
+
 /** Runtime projection used by every Operit-owned Compose root. */
 @Immutable
 internal data class ThemePackageUiRuntimeV2(
@@ -78,16 +104,106 @@ internal data class ThemePackageUiRuntimeV2(
     val shapes: Shapes,
     val tokens: ThemeSceneTokenResolverV1,
     val assets: ThemeSceneAssetRepositoryV1,
+    val componentSkins: Map<com.ai.assistance.operit.data.theme.packages.ThemeComponentIdV2, ThemeComponentSkinV2> = linked.componentSkins,
     val stageImages: Map<ThemeSurfaceIdV2, ResolvedThemeStageImageV2> = emptyMap(),
+    val presentationValues: Map<ThemePresentationTargetV2, ThemeParameterValueV2> = emptyMap(),
+    val presentationFonts: Map<ThemePresentationTargetV2, FontFamily> = emptyMap(),
 ) {
     fun componentSkin(
         component: com.ai.assistance.operit.data.theme.packages.ThemeComponentIdV2,
         state: ThemeComponentStateV2 = ThemeComponentStateV2.NORMAL,
     ): ResolvedThemeComponentSkinV2 {
-        val skin = requireNotNull(linked.componentSkins[component]) {
+        val skin = requireNotNull(componentSkins[component]) {
             "Active theme has no skin for ${component.value}."
         }
-        return resolveComponentState(skin, state)
+        return resolveComponentState(skin, state).applyComponentPresentation(component, presentationValues)
+    }
+
+    fun bubbleMessageSkin(
+        component: com.ai.assistance.operit.data.theme.packages.ThemeComponentIdV2,
+        state: ThemeComponentStateV2 = ThemeComponentStateV2.NORMAL,
+    ): ResolvedThemeComponentSkinV2 {
+        require(
+            component == com.ai.assistance.operit.data.theme.packages.ThemeComponentCatalogV2.MESSAGE_USER ||
+                component == com.ai.assistance.operit.data.theme.packages.ThemeComponentCatalogV2.MESSAGE_ASSISTANT,
+        ) { "Bubble message projection requires a message component." }
+        val skin = componentSkin(component, state)
+        val parameterizedSkin =
+            when (component) {
+            com.ai.assistance.operit.data.theme.packages.ThemeComponentCatalogV2.MESSAGE_USER ->
+                skin.withColors(
+                    container = colorPresentation(ThemePresentationTargetV2.BUBBLE_USER_COLOR),
+                    content = colorPresentation(ThemePresentationTargetV2.BUBBLE_USER_TEXT_COLOR),
+                ).withInsets(insetsPresentation(ThemePresentationTargetV2.BUBBLE_USER_CONTENT_INSETS))
+
+            com.ai.assistance.operit.data.theme.packages.ThemeComponentCatalogV2.MESSAGE_ASSISTANT ->
+                skin.withColors(
+                    container = colorPresentation(ThemePresentationTargetV2.BUBBLE_ASSISTANT_COLOR),
+                    content = colorPresentation(ThemePresentationTargetV2.BUBBLE_ASSISTANT_TEXT_COLOR),
+                ).withInsets(insetsPresentation(ThemePresentationTargetV2.BUBBLE_ASSISTANT_CONTENT_INSETS))
+
+            else -> error("Bubble message projection requires a message component.")
+        }
+        val roundedTarget =
+            if (component == com.ai.assistance.operit.data.theme.packages.ThemeComponentCatalogV2.MESSAGE_USER) {
+                ThemePresentationTargetV2.BUBBLE_USER_ROUNDED_CORNERS
+            } else {
+                ThemePresentationTargetV2.BUBBLE_ASSISTANT_ROUNDED_CORNERS
+            }
+        return parameterizedSkin.withRoundedCorners(requireNotNull(booleanPresentation(roundedTarget)))
+    }
+
+    fun cursorUserMessageSkin(
+        state: ThemeComponentStateV2 = ThemeComponentStateV2.NORMAL,
+    ): ResolvedThemeComponentSkinV2 {
+        val skin = componentSkin(com.ai.assistance.operit.data.theme.packages.ThemeComponentCatalogV2.MESSAGE_USER, state)
+        val followsTheme = requireNotNull(booleanPresentation(ThemePresentationTargetV2.CURSOR_USER_BUBBLE_FOLLOW_THEME))
+        return if (followsTheme) skin else skin.withColors(
+            container = colorPresentation(ThemePresentationTargetV2.CURSOR_USER_BUBBLE_COLOR),
+        )
+    }
+
+    fun avatarShape(): Shape =
+        when (optionPresentation(ThemePresentationTargetV2.AVATAR_SHAPE)) {
+            null, "circle" -> CircleShape
+
+            "rounded" ->
+                RoundedCornerShape(
+                    requireNotNull(cornerRadiusPresentation(ThemePresentationTargetV2.AVATAR_CORNER_RADIUS)).dp,
+                )
+            "square" -> RoundedCornerShape(0.dp)
+            else -> error("Theme avatar shape must be circle, rounded, or square.")
+        }
+
+    fun bubbleFontFamily(
+        component: com.ai.assistance.operit.data.theme.packages.ThemeComponentIdV2,
+    ): FontFamily? =
+        when (component) {
+            com.ai.assistance.operit.data.theme.packages.ThemeComponentCatalogV2.MESSAGE_USER ->
+                resolveBubbleFontFamily(
+                    enabledTarget = ThemePresentationTargetV2.BUBBLE_USER_USE_CUSTOM_FONT,
+                    familyTarget = ThemePresentationTargetV2.BUBBLE_USER_FONT_FAMILY,
+                    fontTarget = ThemePresentationTargetV2.BUBBLE_USER_FONT_URI,
+                )
+
+            com.ai.assistance.operit.data.theme.packages.ThemeComponentCatalogV2.MESSAGE_ASSISTANT ->
+                resolveBubbleFontFamily(
+                    enabledTarget = ThemePresentationTargetV2.BUBBLE_ASSISTANT_USE_CUSTOM_FONT,
+                    familyTarget = ThemePresentationTargetV2.BUBBLE_ASSISTANT_FONT_FAMILY,
+                    fontTarget = ThemePresentationTargetV2.BUBBLE_ASSISTANT_FONT_URI,
+                )
+
+            else -> error("Theme Bubble font projection requires a message component.")
+        }
+
+    private fun resolveBubbleFontFamily(
+        enabledTarget: ThemePresentationTargetV2,
+        familyTarget: ThemePresentationTargetV2,
+        fontTarget: ThemePresentationTargetV2,
+    ): FontFamily? {
+        if (!requireNotNull(booleanPresentation(enabledTarget))) return null
+        return presentationFonts[fontTarget]
+            ?: requireNotNull(optionPresentation(familyTarget)).toThemeSystemFontFamily().toComposeFontFamily()
     }
 
     private fun resolveComponentState(
@@ -106,7 +222,197 @@ internal data class ThemePackageUiRuntimeV2(
     }
 
     fun stageImage(surface: ThemeSurfaceIdV2): ResolvedThemeStageImageV2? = stageImages[surface]
+
+    fun presentationValue(target: ThemePresentationTargetV2): ThemeParameterValueV2? =
+        presentationValues[target]
+
+    fun booleanPresentation(target: ThemePresentationTargetV2): Boolean? =
+        (presentationValues[target] as? ThemeParameterValueV2.BooleanValue)?.value
+
+    fun colorPresentation(target: ThemePresentationTargetV2): Color? =
+        (presentationValues[target] as? ThemeParameterValueV2.ColorValue)?.let { value -> Color(value.argb.toInt()) }
+
+    fun insetsPresentation(target: ThemePresentationTargetV2): ThemeParameterValueV2.InsetsValue? =
+        presentationValues[target] as? ThemeParameterValueV2.InsetsValue
+
+    fun optionPresentation(target: ThemePresentationTargetV2): String? =
+        (presentationValues[target] as? ThemeParameterValueV2.OptionValue)?.value
+
+    fun floatPresentation(target: ThemePresentationTargetV2): Float? =
+        (presentationValues[target] as? ThemeParameterValueV2.FloatValue)?.value
+
+    fun imageUriPresentation(target: ThemePresentationTargetV2): String? =
+        (presentationValues[target] as? ThemeParameterValueV2.ImageUriValue)?.uri
+
+    fun videoUriPresentation(target: ThemePresentationTargetV2): String? =
+        (presentationValues[target] as? ThemeParameterValueV2.VideoUriValue)?.uri
+
+    fun fontUriPresentation(target: ThemePresentationTargetV2): String? =
+        (presentationValues[target] as? ThemeParameterValueV2.FontUriValue)?.uri
+
+    fun imageLayoutPresentation(target: ThemePresentationTargetV2): ThemeParameterValueV2.ImageLayoutValue? =
+        presentationValues[target] as? ThemeParameterValueV2.ImageLayoutValue
+
+    fun cornerRadiusPresentation(target: ThemePresentationTargetV2): Float? =
+        (presentationValues[target] as? ThemeParameterValueV2.CornerRadiusValue)?.valueDp
+
+    fun backgroundMedia(): ResolvedThemeBackgroundMediaV2? {
+        if (booleanPresentation(ThemePresentationTargetV2.BACKGROUND_USE_IMAGE) != true) return null
+        return when (optionPresentation(ThemePresentationTargetV2.BACKGROUND_MEDIA_TYPE)) {
+            "image" -> {
+                val uri = imageUriPresentation(ThemePresentationTargetV2.BACKGROUND_IMAGE_URI) ?: return null
+                ResolvedThemeBackgroundMediaV2(
+                    uri = uri,
+                    type = ThemeBackgroundMediaTypeV2.IMAGE,
+                    opacity = requireBackgroundOpacity(),
+                    blurEnabled = booleanPresentation(ThemePresentationTargetV2.BACKGROUND_BLUR_ENABLED) == true,
+                    blurRadiusDp = floatPresentation(ThemePresentationTargetV2.BACKGROUND_BLUR_RADIUS) ?: 0f,
+                    videoMuted = true,
+                    videoLoop = false,
+                )
+            }
+
+            "video" -> {
+                val uri = videoUriPresentation(ThemePresentationTargetV2.BACKGROUND_VIDEO_URI) ?: return null
+                ResolvedThemeBackgroundMediaV2(
+                    uri = uri,
+                    type = ThemeBackgroundMediaTypeV2.VIDEO,
+                    opacity = requireBackgroundOpacity(),
+                    blurEnabled = false,
+                    blurRadiusDp = 0f,
+                    videoMuted = booleanPresentation(ThemePresentationTargetV2.BACKGROUND_VIDEO_MUTED) == true,
+                    videoLoop = booleanPresentation(ThemePresentationTargetV2.BACKGROUND_VIDEO_LOOP) == true,
+                )
+            }
+
+            else -> null
+        }
+    }
+
+    private fun requireBackgroundOpacity(): Float =
+        requireNotNull(floatPresentation(ThemePresentationTargetV2.BACKGROUND_OPACITY)) {
+            "Theme background media requires BACKGROUND_OPACITY."
+        }.coerceIn(0f, 1f)
+
 }
+
+private fun ResolvedThemeComponentSkinV2.applyComponentPresentation(
+    component: com.ai.assistance.operit.data.theme.packages.ThemeComponentIdV2,
+    values: Map<ThemePresentationTargetV2, ThemeParameterValueV2>,
+): ResolvedThemeComponentSkinV2 =
+    when (component) {
+        com.ai.assistance.operit.data.theme.packages.ThemeComponentCatalogV2.COMPOSER ->
+            if ((values[ThemePresentationTargetV2.COMPOSER_TRANSPARENT] as? ThemeParameterValueV2.BooleanValue)?.value == true) {
+                copy(container = Color.Transparent)
+            } else {
+                this
+            }
+
+        com.ai.assistance.operit.data.theme.packages.ThemeComponentCatalogV2.APP_BAR ->
+            withColors(
+                container =
+                    if (
+                        (values[ThemePresentationTargetV2.CHROME_TOOLBAR_TRANSPARENT]
+                            as? ThemeParameterValueV2.BooleanValue)
+                            ?.value == true
+                    ) {
+                        Color.Transparent
+                    } else {
+                        (values[ThemePresentationTargetV2.CHROME_TOOLBAR_COLOR] as? ThemeParameterValueV2.ColorValue)
+                            ?.let { value -> Color(value.argb.toInt()) }
+                    },
+            )
+
+        com.ai.assistance.operit.data.theme.packages.ThemeComponentCatalogV2.NAVIGATION ->
+            withColors(
+                container =
+                    (values[ThemePresentationTargetV2.CHROME_NAVIGATION_BACKGROUND_COLOR]
+                        as? ThemeParameterValueV2.ColorValue)
+                        ?.let { value -> Color(value.argb.toInt()) },
+            ).withFrameAccent(
+                (values[ThemePresentationTargetV2.CHROME_NAVIGATION_ACCENT_COLOR]
+                    as? ThemeParameterValueV2.ColorValue)
+                    ?.let { value -> Color(value.argb.toInt()) },
+            )
+
+        else -> this
+    }
+
+private fun ResolvedThemeComponentSkinV2.withColors(
+    container: Color? = null,
+    content: Color? = null,
+): ResolvedThemeComponentSkinV2 =
+    copy(
+        container = container ?: this.container,
+        content = content ?: this.content,
+    )
+
+private fun ResolvedThemeComponentSkinV2.withInsets(
+    insets: ThemeParameterValueV2.InsetsValue?,
+): ResolvedThemeComponentSkinV2 =
+    if (insets == null) {
+        this
+    } else {
+        copy(
+            paddingStartDp = insets.startDp,
+            paddingTopDp = insets.topDp,
+            paddingEndDp = insets.endDp,
+            paddingBottomDp = insets.bottomDp,
+        )
+    }
+
+private fun ResolvedThemeComponentSkinV2.withRoundedCorners(
+    enabled: Boolean,
+): ResolvedThemeComponentSkinV2 =
+    if (enabled) {
+        this
+    } else {
+        copy(frame = ResolvedThemeComponentFrameV2.RoundRect(cornerRadiusDp = 0f, border = null))
+    }
+
+private fun ResolvedThemeComponentSkinV2.withFrameAccent(
+    color: Color?,
+): ResolvedThemeComponentSkinV2 =
+    if (color == null) {
+        this
+    } else {
+        copy(frame = frame.withAccent(color))
+    }
+
+private fun ResolvedThemeComponentFrameV2.withAccent(color: Color): ResolvedThemeComponentFrameV2 =
+    when (this) {
+        ResolvedThemeComponentFrameV2.None -> this
+        is ResolvedThemeComponentFrameV2.RoundRect -> this
+        is ResolvedThemeComponentFrameV2.CutCorners ->
+            copy(
+                accent =
+                    ResolvedThemeComponentFrameStrokeV2(
+                        color = color,
+                        widthDp = accent?.widthDp ?: border.widthDp,
+                    ),
+            )
+
+        is ResolvedThemeComponentFrameV2.HudNotched ->
+            copy(
+                accent =
+                    ResolvedThemeComponentFrameStrokeV2(
+                        color = color,
+                        widthDp = accent?.widthDp ?: border.widthDp,
+                    ),
+            )
+
+        is ResolvedThemeComponentFrameV2.CornerBrackets ->
+            copy(
+                accent =
+                    ResolvedThemeComponentFrameStrokeV2(
+                        color = color,
+                        widthDp = accent?.widthDp ?: border.widthDp,
+                    ),
+            )
+
+        is ResolvedThemeComponentFrameV2.SegmentedRail ->
+            copy(accent = accent.copy(color = color))
+    }
 
 /**
  * 单一解析入口：主界面、悬浮窗、overlay 与离屏导出共用同一套链接结果，
@@ -123,14 +429,30 @@ internal fun rememberActiveThemePackageRuntimeV2(): ThemePackageUiRuntimeV2 {
     val darkTheme =
         presentation.themeMode == GlobalThemeMode.DARK ||
             (presentation.themeMode == GlobalThemeMode.SYSTEM && systemDarkTheme)
-    return remember(instance, darkTheme, presentation.fontScale) {
-        val linked = ThemeRuntimeRepositoryV2.require(instance.reference.coordinate)
-        val parameters = ThemePackageRuntimeLinkerV2.resolveParameters(instance, linked)
+    val linked = remember(instance.reference.coordinate) {
+        ThemeRuntimeRepositoryV2.require(instance.reference.coordinate)
+    }
+    val parameters = remember(instance, linked) {
+        ThemePackageRuntimeLinkerV2.resolveParameters(instance, linked)
+    }
+    val baseRuntime = remember(linked, parameters, darkTheme, presentation.fontScale) {
         createThemePackageUiRuntimeV2(
             linked = linked,
             parameters = parameters,
             darkTheme = darkTheme,
             userFontScale = presentation.fontScale,
+        )
+    }
+    val presentationFonts by produceState<Map<ThemePresentationTargetV2, FontFamily>>(emptyMap(), context, baseRuntime) {
+        value = resolveThemePackageFontFamiliesV2(context, baseRuntime)
+    }
+    return remember(linked, parameters, darkTheme, presentation.fontScale, presentationFonts) {
+        createThemePackageUiRuntimeV2(
+            linked = linked,
+            parameters = parameters,
+            darkTheme = darkTheme,
+            userFontScale = presentation.fontScale,
+            presentationFonts = presentationFonts,
         )
     }
 }
@@ -140,6 +462,7 @@ internal fun createThemePackageUiRuntimeV2(
     parameters: ResolvedThemeParametersV2,
     darkTheme: Boolean,
     userFontScale: Float,
+    presentationFonts: Map<ThemePresentationTargetV2, FontFamily> = emptyMap(),
 ): ThemePackageUiRuntimeV2 {
     val parameterizedPresentation = resolveThemeParameterPresentationV2(linked, parameters)
     val tokens = ThemeSceneTokenResolverV1(parameterizedPresentation.tokens)
@@ -149,24 +472,35 @@ internal fun createThemePackageUiRuntimeV2(
         parameters = parameters,
         darkTheme = darkTheme,
         colorScheme = material.colors.toColorScheme(tokens, darkTheme),
-        typography = material.typography.toTypography(userFontScale),
+        typography =
+            parameterizedPresentation.typography.toTypography(
+                userFontScale,
+                presentationFonts[ThemePresentationTargetV2.TYPOGRAPHY_FONT_URI],
+            ),
         shapes =
             Shapes(
-                extraSmall = androidx.compose.foundation.shape.RoundedCornerShape(material.shapes.extraSmallDp.dp),
-                small = androidx.compose.foundation.shape.RoundedCornerShape(material.shapes.smallDp.dp),
-                medium = androidx.compose.foundation.shape.RoundedCornerShape(material.shapes.mediumDp.dp),
-                large = androidx.compose.foundation.shape.RoundedCornerShape(material.shapes.largeDp.dp),
-                extraLarge = androidx.compose.foundation.shape.RoundedCornerShape(material.shapes.extraLargeDp.dp),
+                extraSmall = androidx.compose.foundation.shape.RoundedCornerShape(parameterizedPresentation.shapes.extraSmallDp.dp),
+                small = androidx.compose.foundation.shape.RoundedCornerShape(parameterizedPresentation.shapes.smallDp.dp),
+                medium = androidx.compose.foundation.shape.RoundedCornerShape(parameterizedPresentation.shapes.mediumDp.dp),
+                large = androidx.compose.foundation.shape.RoundedCornerShape(parameterizedPresentation.shapes.largeDp.dp),
+                extraLarge = androidx.compose.foundation.shape.RoundedCornerShape(parameterizedPresentation.shapes.extraLargeDp.dp),
             ),
         tokens = tokens,
         assets = ThemeSceneAssetRepositoryV1(linked.assets),
+        componentSkins = parameterizedPresentation.componentSkins,
         stageImages = parameterizedPresentation.stageImages,
+        presentationValues = parameterizedPresentation.values,
+        presentationFonts = presentationFonts,
     )
 }
 
 private data class ThemeParameterPresentationV2(
     val tokens: ThemeSceneTokenSetV1,
+    val typography: ThemeTypographyV2,
+    val shapes: ThemeShapesV2,
+    val componentSkins: Map<com.ai.assistance.operit.data.theme.packages.ThemeComponentIdV2, ThemeComponentSkinV2>,
     val stageImages: Map<ThemeSurfaceIdV2, ResolvedThemeStageImageV2>,
+    val values: Map<ThemePresentationTargetV2, ThemeParameterValueV2>,
 )
 
 /** Applies user-owned values to a runtime copy, never to a linked package or installed archive. */
@@ -176,15 +510,32 @@ private fun resolveThemeParameterPresentationV2(
 ): ThemeParameterPresentationV2 {
     val tokens = linked.tokens.tokens.toMutableMap()
     val stageImages = mutableMapOf<ThemeSurfaceIdV2, ResolvedThemeStageImageV2>()
+    val presentationValues = linked.behavior.parameterValues().toMutableMap()
+    var typography: ThemeTypographyV2
+    var shapes = linked.material.shapes
+    var componentSkins = linked.componentSkins
 
-    linked.parameterDefinitions.forEach { (parameterId, definition) ->
-        if (linked.parameterOwners[parameterId] != linked.coordinate || !parameters.isOverridden(parameterId)) {
-            return@forEach
+    val activeParameters =
+        linked.parameterDefinitions.mapNotNull { (parameterId, definition) ->
+            if (linked.parameterOwners[parameterId] != linked.coordinate) {
+                null
+            } else {
+                parameters.values[parameterId]?.let { value -> parameterId to (definition to value) }
+            }
         }
-        val value = requireNotNull(parameters.values[parameterId]) {
-            "Theme parameter $parameterId is marked overridden without a resolved value."
+
+    activeParameters.forEach { (_, pair) ->
+        val (definition, value) = pair
+        definition.effects.filterIsInstance<ThemeParameterEffectV2.Presentation>().forEach { effect ->
+            effect.targets.forEach { target -> presentationValues[target] = value }
         }
+    }
+    typography = linked.material.typography.withPresentation(presentationValues)
+
+    activeParameters.forEach { (parameterId, pair) ->
+        val (definition, value) = pair
         definition.effects.forEach { effect ->
+            if (effect is ThemeParameterEffectV2.Presentation) return@forEach
             when (effect) {
                 ThemeParameterEffectV2.AccentPalette -> {
                     val color = value.requireColor(parameterId, "accent palette")
@@ -205,27 +556,146 @@ private fun resolveThemeParameterPresentationV2(
                     }
                 }
 
+                is ThemeParameterEffectV2.TokenColorPair -> {
+                    val color = value.requireColorPair(parameterId, "token color pair")
+                    effect.tokenIds.forEach { tokenId ->
+                        tokens[tokenId] =
+                            ThemeSceneTokenValueV1.ColorToken(
+                                lightArgb = color.lightArgb,
+                                darkArgb = color.darkArgb,
+                            )
+                    }
+                }
+
                 is ThemeParameterEffectV2.StageImage -> {
                     val uri = value.requireImageUri(parameterId)
+                    val opacity =
+                        (presentationValues[ThemePresentationTargetV2.BACKGROUND_OPACITY]
+                            as? ThemeParameterValueV2.FloatValue)
+                            ?.value
+                            ?.coerceIn(0f, 1f)
+                            ?: effect.opacity
                     effect.surfaceIds.forEach { surfaceId ->
                         val surface = ThemeSurfaceIdV2(surfaceId)
                         stageImages[surface] =
                             ResolvedThemeStageImageV2(
                                 uri = uri,
                                 fit = effect.fit,
-                                opacity = effect.opacity,
+                                opacity = opacity,
                             )
                     }
                 }
+
+                ThemeParameterEffectV2.TypographyScale -> {
+                    val scale = value.requireFloat(parameterId, "typography scale")
+                    typography = typography.scaledBy(scale)
+                    val existingScale =
+                        (presentationValues[ThemePresentationTargetV2.TYPOGRAPHY_SCALE]
+                            as? ThemeParameterValueV2.FloatValue)
+                            ?.value
+                            ?: 1f
+                    presentationValues[ThemePresentationTargetV2.TYPOGRAPHY_SCALE] =
+                        ThemeParameterValueV2.FloatValue((existingScale * scale).coerceIn(0.5f, 2f))
+                }
+
+                ThemeParameterEffectV2.ShapeScale -> {
+                    val scale = value.requireFloat(parameterId, "shape scale")
+                    shapes = shapes.scaledBy(scale)
+                }
+
+                is ThemeParameterEffectV2.ComponentFrameScale -> {
+                    val scale = value.requireFloat(parameterId, "component frame scale")
+                    effect.componentIds.forEach { componentId ->
+                        val key = com.ai.assistance.operit.data.theme.packages.ThemeComponentIdV2(componentId)
+                        val skin = requireNotNull(componentSkins[key]) {
+                            "Theme component frame parameter $parameterId targets missing $componentId."
+                        }
+                        componentSkins = componentSkins + (key to skin.scaleFrameGeometry(scale))
+                    }
+                }
+
+                is ThemeParameterEffectV2.ComponentContentInsets -> {
+                    val insets = value.requireInsets(parameterId, "component content insets")
+                    effect.componentIds.forEach { componentId ->
+                        val key = com.ai.assistance.operit.data.theme.packages.ThemeComponentIdV2(componentId)
+                        val skin = requireNotNull(componentSkins[key]) {
+                            "Theme component inset parameter $parameterId targets missing $componentId."
+                        }
+                        componentSkins = componentSkins + (key to skin.withContentInsets(insets))
+                    }
+                }
+
+                is ThemeParameterEffectV2.Presentation -> Unit
             }
         }
     }
 
     return ThemeParameterPresentationV2(
         tokens = ThemeSceneTokenSetV1(tokens),
+        typography = typography,
+        shapes = shapes,
+        componentSkins = componentSkins,
         stageImages = stageImages,
+        values = presentationValues,
     )
 }
+
+private fun ThemePackagePresentationBehaviorV2.parameterValues(): Map<ThemePresentationTargetV2, ThemeParameterValueV2> =
+    buildMap {
+        put(ThemePresentationTargetV2.TYPOGRAPHY_USE_CUSTOM_FONT, ThemeParameterValueV2.BooleanValue(typography.useCustomFont))
+        put(ThemePresentationTargetV2.TYPOGRAPHY_FAMILY, ThemeParameterValueV2.OptionValue(typography.family.name.lowercase()))
+        put(ThemePresentationTargetV2.TYPOGRAPHY_SCALE, ThemeParameterValueV2.FloatValue(typography.scale))
+        put(ThemePresentationTargetV2.BACKGROUND_USE_IMAGE, ThemeParameterValueV2.BooleanValue(background.enabled))
+        put(ThemePresentationTargetV2.BACKGROUND_MEDIA_TYPE, ThemeParameterValueV2.OptionValue(background.mediaType.name.lowercase()))
+        put(ThemePresentationTargetV2.BACKGROUND_OPACITY, ThemeParameterValueV2.FloatValue(background.opacity))
+        put(ThemePresentationTargetV2.BACKGROUND_BLUR_ENABLED, ThemeParameterValueV2.BooleanValue(background.blurEnabled))
+        put(ThemePresentationTargetV2.BACKGROUND_BLUR_RADIUS, ThemeParameterValueV2.FloatValue(background.blurRadiusDp))
+        put(ThemePresentationTargetV2.BACKGROUND_VIDEO_MUTED, ThemeParameterValueV2.BooleanValue(background.videoMuted))
+        put(ThemePresentationTargetV2.BACKGROUND_VIDEO_LOOP, ThemeParameterValueV2.BooleanValue(background.videoLoop))
+        put(ThemePresentationTargetV2.CURSOR_USER_BUBBLE_FOLLOW_THEME, ThemeParameterValueV2.BooleanValue(conversation.cursorUserBubbleFollowTheme))
+        put(ThemePresentationTargetV2.CURSOR_USER_BUBBLE_LIQUID_GLASS, ThemeParameterValueV2.BooleanValue(conversation.cursorUserBubbleLiquidGlass))
+        put(ThemePresentationTargetV2.CURSOR_USER_BUBBLE_WATER_GLASS, ThemeParameterValueV2.BooleanValue(conversation.cursorUserBubbleWaterGlass))
+        conversation.cursorUserBubbleColorArgb?.let { color ->
+            put(ThemePresentationTargetV2.CURSOR_USER_BUBBLE_COLOR, ThemeParameterValueV2.ColorValue(color))
+        }
+        put(ThemePresentationTargetV2.BUBBLE_SHOW_AVATAR, ThemeParameterValueV2.BooleanValue(conversation.bubbleShowAvatar))
+        put(ThemePresentationTargetV2.BUBBLE_WIDE_LAYOUT, ThemeParameterValueV2.BooleanValue(conversation.bubbleWideLayout))
+        put(ThemePresentationTargetV2.BUBBLE_USER_LIQUID_GLASS, ThemeParameterValueV2.BooleanValue(conversation.bubbleUserLiquidGlass))
+        put(ThemePresentationTargetV2.BUBBLE_USER_WATER_GLASS, ThemeParameterValueV2.BooleanValue(conversation.bubbleUserWaterGlass))
+        put(ThemePresentationTargetV2.BUBBLE_ASSISTANT_LIQUID_GLASS, ThemeParameterValueV2.BooleanValue(conversation.bubbleAssistantLiquidGlass))
+        put(ThemePresentationTargetV2.BUBBLE_ASSISTANT_WATER_GLASS, ThemeParameterValueV2.BooleanValue(conversation.bubbleAssistantWaterGlass))
+        put(ThemePresentationTargetV2.BUBBLE_IMAGE_RENDER_MODE, ThemeParameterValueV2.OptionValue(conversation.bubbleImageRenderMode.name.lowercase()))
+        put(ThemePresentationTargetV2.BUBBLE_USER_ROUNDED_CORNERS, ThemeParameterValueV2.BooleanValue(conversation.bubbleUserRoundedCorners))
+        put(ThemePresentationTargetV2.BUBBLE_ASSISTANT_ROUNDED_CORNERS, ThemeParameterValueV2.BooleanValue(conversation.bubbleAssistantRoundedCorners))
+        conversation.bubbleUserColorArgb?.let { color -> put(ThemePresentationTargetV2.BUBBLE_USER_COLOR, ThemeParameterValueV2.ColorValue(color)) }
+        conversation.bubbleAssistantColorArgb?.let { color -> put(ThemePresentationTargetV2.BUBBLE_ASSISTANT_COLOR, ThemeParameterValueV2.ColorValue(color)) }
+        conversation.bubbleUserTextColorArgb?.let { color -> put(ThemePresentationTargetV2.BUBBLE_USER_TEXT_COLOR, ThemeParameterValueV2.ColorValue(color)) }
+        conversation.bubbleAssistantTextColorArgb?.let { color -> put(ThemePresentationTargetV2.BUBBLE_ASSISTANT_TEXT_COLOR, ThemeParameterValueV2.ColorValue(color)) }
+        put(ThemePresentationTargetV2.BUBBLE_USER_USE_CUSTOM_FONT, ThemeParameterValueV2.BooleanValue(conversation.bubbleUserUseCustomFont))
+        put(ThemePresentationTargetV2.BUBBLE_USER_FONT_FAMILY, ThemeParameterValueV2.OptionValue(conversation.bubbleUserFontFamily.name.lowercase()))
+        put(ThemePresentationTargetV2.BUBBLE_ASSISTANT_USE_CUSTOM_FONT, ThemeParameterValueV2.BooleanValue(conversation.bubbleAssistantUseCustomFont))
+        put(ThemePresentationTargetV2.BUBBLE_ASSISTANT_FONT_FAMILY, ThemeParameterValueV2.OptionValue(conversation.bubbleAssistantFontFamily.name.lowercase()))
+        put(ThemePresentationTargetV2.AVATAR_SHAPE, ThemeParameterValueV2.OptionValue(conversation.avatarShape.name.lowercase()))
+        put(ThemePresentationTargetV2.AVATAR_CORNER_RADIUS, ThemeParameterValueV2.CornerRadiusValue(conversation.avatarCornerRadiusDp))
+        put(ThemePresentationTargetV2.COMPOSER_TRANSPARENT, ThemeParameterValueV2.BooleanValue(composer.transparent))
+        put(ThemePresentationTargetV2.COMPOSER_FLOATING, ThemeParameterValueV2.BooleanValue(composer.floating))
+        put(ThemePresentationTargetV2.COMPOSER_LIQUID_GLASS, ThemeParameterValueV2.BooleanValue(composer.liquidGlass))
+        put(ThemePresentationTargetV2.COMPOSER_WATER_GLASS, ThemeParameterValueV2.BooleanValue(composer.waterGlass))
+        put(ThemePresentationTargetV2.CHROME_STATUS_BAR_HIDDEN, ThemeParameterValueV2.BooleanValue(chrome.statusBarHidden))
+        put(ThemePresentationTargetV2.CHROME_STATUS_BAR_TRANSPARENT, ThemeParameterValueV2.BooleanValue(chrome.statusBarTransparent))
+        chrome.statusBarColorArgb?.let { color -> put(ThemePresentationTargetV2.CHROME_STATUS_BAR_COLOR, ThemeParameterValueV2.ColorValue(color)) }
+        put(ThemePresentationTargetV2.CHROME_TOOLBAR_TRANSPARENT, ThemeParameterValueV2.BooleanValue(chrome.toolbarTransparent))
+        chrome.toolbarColorArgb?.let { color -> put(ThemePresentationTargetV2.CHROME_TOOLBAR_COLOR, ThemeParameterValueV2.ColorValue(color)) }
+        put(ThemePresentationTargetV2.CHROME_NAVIGATION_WATER_GLASS, ThemeParameterValueV2.BooleanValue(chrome.navigationWaterGlass))
+        put(ThemePresentationTargetV2.CHROME_NAVIGATION_BUTTON_LIQUID_GLASS, ThemeParameterValueV2.BooleanValue(chrome.navigationButtonLiquidGlass))
+        chrome.navigationBackgroundColorArgb?.let { color -> put(ThemePresentationTargetV2.CHROME_NAVIGATION_BACKGROUND_COLOR, ThemeParameterValueV2.ColorValue(color)) }
+        chrome.navigationAccentColorArgb?.let { color -> put(ThemePresentationTargetV2.CHROME_NAVIGATION_ACCENT_COLOR, ThemeParameterValueV2.ColorValue(color)) }
+        put(ThemePresentationTargetV2.CHROME_CHAT_HEADER_TRANSPARENT, ThemeParameterValueV2.BooleanValue(chrome.chatHeaderTransparent))
+        put(ThemePresentationTargetV2.CHROME_CHAT_HEADER_OVERLAY_MODE, ThemeParameterValueV2.OptionValue(chrome.chatHeaderOverlayMode.name.lowercase()))
+        put(ThemePresentationTargetV2.CHROME_APP_BAR_CONTENT_COLOR_MODE, ThemeParameterValueV2.OptionValue(chrome.appBarContentColorMode.name.lowercase()))
+        chrome.chatHeaderHistoryIconColorArgb?.let { color -> put(ThemePresentationTargetV2.CHROME_CHAT_HEADER_HISTORY_ICON_COLOR, ThemeParameterValueV2.ColorValue(color)) }
+        chrome.chatHeaderPipIconColorArgb?.let { color -> put(ThemePresentationTargetV2.CHROME_CHAT_HEADER_PIP_ICON_COLOR, ThemeParameterValueV2.ColorValue(color)) }
+    }
 
 private fun ThemeParameterValueV2.requireColor(
     parameterId: String,
@@ -237,6 +707,138 @@ private fun ThemeParameterValueV2.requireColor(
 private fun ThemeParameterValueV2.requireImageUri(parameterId: String): String =
     (this as? ThemeParameterValueV2.ImageUriValue)?.uri
         ?: error("Theme parameter $parameterId must resolve to an image URI.")
+
+private fun ThemeParameterValueV2.requireColorPair(
+    parameterId: String,
+    effect: String,
+): ThemeParameterValueV2.ColorPairValue =
+    this as? ThemeParameterValueV2.ColorPairValue
+        ?: error("Theme parameter $parameterId must resolve to a color pair for $effect.")
+
+private fun ThemeParameterValueV2.requireFloat(
+    parameterId: String,
+    effect: String,
+): Float =
+    (this as? ThemeParameterValueV2.FloatValue)?.value
+        ?: error("Theme parameter $parameterId must resolve to a number for $effect.")
+
+private fun ThemeParameterValueV2.requireInsets(
+    parameterId: String,
+    effect: String,
+): ThemeParameterValueV2.InsetsValue =
+    this as? ThemeParameterValueV2.InsetsValue
+        ?: error("Theme parameter $parameterId must resolve to insets for $effect.")
+
+private fun ThemeTypographyV2.scaledBy(scale: Float): ThemeTypographyV2 =
+    copy(
+        displayScale = (displayScale * scale).coerceIn(0.5f, 2f),
+        titleScale = (titleScale * scale).coerceIn(0.5f, 2f),
+        bodyScale = (bodyScale * scale).coerceIn(0.5f, 2f),
+        labelScale = (labelScale * scale).coerceIn(0.5f, 2f),
+    )
+
+private fun ThemeTypographyV2.withPresentation(
+    values: Map<ThemePresentationTargetV2, ThemeParameterValueV2>,
+): ThemeTypographyV2 {
+    val useCustomFont =
+        (values[ThemePresentationTargetV2.TYPOGRAPHY_USE_CUSTOM_FONT] as? ThemeParameterValueV2.BooleanValue)
+            ?.value == true
+    val selectedFamily =
+        (values[ThemePresentationTargetV2.TYPOGRAPHY_FAMILY] as? ThemeParameterValueV2.OptionValue)
+            ?.value
+            ?.toThemeSystemFontFamily()
+    val scale =
+        (values[ThemePresentationTargetV2.TYPOGRAPHY_SCALE] as? ThemeParameterValueV2.FloatValue)
+            ?.value
+            ?.coerceIn(0.5f, 2f)
+            ?: 1f
+    return copy(
+        family = if (useCustomFont) requireNotNull(selectedFamily) else family,
+        displayScale = (displayScale * scale).coerceIn(0.5f, 2f),
+        titleScale = (titleScale * scale).coerceIn(0.5f, 2f),
+        bodyScale = (bodyScale * scale).coerceIn(0.5f, 2f),
+        labelScale = (labelScale * scale).coerceIn(0.5f, 2f),
+    )
+}
+
+private fun String.toThemeSystemFontFamily(): ThemeSystemFontFamilyV2 =
+    ThemeSystemFontFamilyV2.entries.firstOrNull { family -> family.name.equals(this, ignoreCase = true) }
+        ?: error("Theme font family must be one of ${ThemeSystemFontFamilyV2.entries.joinToString()}.")
+
+private fun ThemeSystemFontFamilyV2.toComposeFontFamily(): FontFamily =
+    when (this) {
+        ThemeSystemFontFamilyV2.DEFAULT -> FontFamily.Default
+        ThemeSystemFontFamilyV2.SANS_SERIF -> FontFamily.SansSerif
+        ThemeSystemFontFamilyV2.SERIF -> FontFamily.Serif
+        ThemeSystemFontFamilyV2.MONOSPACE -> FontFamily.Monospace
+        ThemeSystemFontFamilyV2.CURSIVE -> FontFamily.Cursive
+    }
+
+private fun ThemeShapesV2.scaledBy(scale: Float): ThemeShapesV2 =
+    copy(
+        extraSmallDp = (extraSmallDp * scale).coerceIn(0f, 96f),
+        smallDp = (smallDp * scale).coerceIn(0f, 96f),
+        mediumDp = (mediumDp * scale).coerceIn(0f, 96f),
+        largeDp = (largeDp * scale).coerceIn(0f, 96f),
+        extraLargeDp = (extraLargeDp * scale).coerceIn(0f, 96f),
+    )
+
+private fun ThemeComponentSkinV2.scaleFrameGeometry(scale: Float): ThemeComponentSkinV2 =
+    copy(
+        normal = normal.scaleFrameGeometry(scale),
+        disabled = disabled?.scaleFrameGeometry(scale),
+        selected = selected?.scaleFrameGeometry(scale),
+        focused = focused?.scaleFrameGeometry(scale),
+        error = error?.scaleFrameGeometry(scale),
+    )
+
+private fun ThemeComponentStateSkinV2.scaleFrameGeometry(scale: Float): ThemeComponentStateSkinV2 =
+    copy(frame = frame.scaledBy(scale))
+
+private fun ThemeComponentFrameSpecV2.scaledBy(scale: Float): ThemeComponentFrameSpecV2 =
+    when (this) {
+        ThemeComponentFrameSpecV2.None -> this
+        is ThemeComponentFrameSpecV2.RoundRect -> copy(cornerRadiusDp = (cornerRadiusDp * scale).coerceIn(0f, 96f))
+        is ThemeComponentFrameSpecV2.CutCorners -> copy(cutSizeDp = (cutSizeDp * scale).coerceIn(0.5f, 48f))
+        is ThemeComponentFrameSpecV2.HudNotched ->
+            copy(
+                cutSizeDp = (cutSizeDp * scale).coerceIn(0.5f, 48f),
+                notchDepthDp = (notchDepthDp * scale).coerceIn(0.5f, 48f),
+            )
+
+        is ThemeComponentFrameSpecV2.CornerBrackets ->
+            copy(
+                cornerCutDp = (cornerCutDp * scale).coerceIn(0f, 48f),
+                bracketLengthDp = (bracketLengthDp * scale).coerceIn(4f, 96f),
+            )
+
+        is ThemeComponentFrameSpecV2.SegmentedRail ->
+            copy(
+                cornerCutDp = (cornerCutDp * scale).coerceIn(0f, 48f),
+                railInsetDp = (railInsetDp * scale).coerceIn(0f, 48f),
+                segmentLengthDp = (segmentLengthDp * scale).coerceIn(4f, 160f),
+            )
+    }
+
+private fun ThemeComponentSkinV2.withContentInsets(
+    insets: ThemeParameterValueV2.InsetsValue,
+): ThemeComponentSkinV2 {
+    val resolved =
+        ThemeComponentInsetsV2(
+            startDp = insets.startDp,
+            topDp = insets.topDp,
+            endDp = insets.endDp,
+            bottomDp = insets.bottomDp,
+        )
+    fun ThemeComponentStateSkinV2.withInsets(): ThemeComponentStateSkinV2 = copy(contentPadding = resolved)
+    return copy(
+        normal = normal.withInsets(),
+        disabled = disabled?.withInsets(),
+        selected = selected?.withInsets(),
+        focused = focused?.withInsets(),
+        error = error?.withInsets(),
+    )
+}
 
 private fun ThemeMaterialColorSchemeV2.accentPaletteTokens(seedArgb: Long): Map<String, ThemeSceneTokenValueV1.ColorToken> {
     val seedHsl = FloatArray(3)
@@ -377,15 +979,11 @@ private fun ThemeMaterialColorSchemeV2.toColorScheme(
 
 private fun com.ai.assistance.operit.data.theme.packages.ThemeTypographyV2.toTypography(
     userFontScale: Float,
+    fontFamily: FontFamily?,
 ): Typography {
     val baseline = createCustomTypography(userFontScale)
-    val resolvedFamily =
-        when (this.family) {
-            ThemeSystemFontFamilyV2.DEFAULT -> FontFamily.Default
-            ThemeSystemFontFamilyV2.SANS_SERIF -> FontFamily.SansSerif
-            ThemeSystemFontFamilyV2.SERIF -> FontFamily.Serif
-            ThemeSystemFontFamilyV2.MONOSPACE -> FontFamily.Monospace
-        }
+    val declaredFamily = family.toComposeFontFamily()
+    val resolvedFamily = fontFamily ?: declaredFamily
     fun TextStyle.withTheme(scale: Float): TextStyle =
         copy(
             fontFamily = resolvedFamily,

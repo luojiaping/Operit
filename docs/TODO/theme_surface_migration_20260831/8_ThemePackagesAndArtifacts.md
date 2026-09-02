@@ -1,5 +1,7 @@
 # 主题包与归档
 
+> [SUPERSEDED] schema 3 artifact 描述已被 [schema 4 验收](../theme_parameter_contract_rebuild_20260901/5_TestingAndAcceptance.md) 取代。
+
 ## 默认主题
 
 `operit.default` 继续作为 APK 内置的精确 `.otheme` 归档。它必须为所有 surface 和 component skin 提供可见、可用、非赛博化的默认视觉，并通过与外部导入包相同的 validator、SHA-256 lock 和链接流程。

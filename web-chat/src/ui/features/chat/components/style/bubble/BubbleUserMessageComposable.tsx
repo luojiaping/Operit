@@ -5,6 +5,7 @@ import {
   effectiveUserDisplayContent,
   effectiveUserDisplayName
 } from '../../../util/chatUtils';
+import { resolveThemeFontFamily } from '../../../util/chatTheme';
 import type {
   WebChatMessage,
   WebMessageAttachment,
@@ -162,6 +163,9 @@ export function BubbleUserMessageComposable({
   ]
     .filter(Boolean)
     .join(' ');
+  const userFontStyle = {
+    fontFamily: resolveThemeFontFamily(theme?.bubble.user_font, 'OperitThemeUserBubbleFont')
+  };
   const showWideHeader = wideLayout && (showAvatar || userName);
 
   if (wideLayout) {
@@ -201,7 +205,7 @@ export function BubbleUserMessageComposable({
           glassVariant={glassVariant}
           themeMode={theme?.theme_mode}
         >
-          <div className="chat-message-content user-message-plain">
+          <div className="chat-message-content user-message-plain" style={userFontStyle}>
             <div className="plain-text-block">{content}</div>
           </div>
         </BubbleImageBackgroundSurface>
@@ -238,7 +242,7 @@ export function BubbleUserMessageComposable({
             glassVariant={glassVariant}
             themeMode={theme?.theme_mode}
           >
-            <div className="chat-message-content user-message-plain">
+            <div className="chat-message-content user-message-plain" style={userFontStyle}>
               <div className="plain-text-block">{content}</div>
             </div>
           </BubbleImageBackgroundSurface>

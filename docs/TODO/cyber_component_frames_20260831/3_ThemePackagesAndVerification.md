@@ -1,5 +1,7 @@
 # 主题包与验证
 
+> [SUPERSEDED] 当前 Cyber Grid package 使用 schema 4，并精确依赖当前 default schema-4 artifact。参见 [schema 4 验收](../theme_parameter_contract_rebuild_20260901/5_TestingAndAcceptance.md)。
+
 ## 主题源
 
 默认主题在新 contract 中为所有组件写入 `round_rect` frame。赛博主题为聊天组件写入各自的异形 frame，并删除不再由场景引用的 `header_frame`、`composer_frame` 声明和资源。

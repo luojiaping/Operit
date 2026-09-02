@@ -51,6 +51,7 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -87,8 +88,8 @@ import com.ai.assistance.operit.data.theme.packages.ThemePackageRuntimeLinkerV2
 import com.ai.assistance.operit.data.theme.packages.ThemePackageSelectionRepositoryV2
 import com.ai.assistance.operit.data.theme.packages.ThemePackageCoordinateV2
 import com.ai.assistance.operit.data.theme.packages.ThemeParameterControlV2
-import com.ai.assistance.operit.data.theme.packages.ThemeParameterDefaultV2
 import com.ai.assistance.operit.data.theme.packages.ThemeParameterDefinitionV2
+import com.ai.assistance.operit.data.theme.packages.ThemeParameterSectionV2
 import com.ai.assistance.operit.data.theme.packages.ThemeParameterValueV2
 import com.ai.assistance.operit.data.theme.packages.ThemeRuntimeRepositoryV2
 import com.ai.assistance.operit.ui.theme.ThemeComponentStateV2
@@ -102,7 +103,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-private const val THEME_STAGE_IMAGE_MAX_BYTES = 24 * 1024 * 1024
+private const val THEME_RESOURCE_MAX_BYTES = 48 * 1024 * 1024
 private const val TAG = "ThemePackages"
 
 @Composable
@@ -124,8 +125,8 @@ fun ThemePackagesScreen(
     var installed by remember { mutableStateOf<List<PublishedThemeInstallationV2>>(emptyList()) }
     var busy by remember { mutableStateOf(false) }
     var showThemePicker by remember { mutableStateOf(false) }
-    var pendingImageParameterId by rememberSaveable { mutableStateOf<String?>(null) }
-    var pendingImageCoordinateKey by rememberSaveable { mutableStateOf<String?>(null) }
+    var pendingResourceParameterId by rememberSaveable { mutableStateOf<String?>(null) }
+    var pendingResourceCoordinateKey by rememberSaveable { mutableStateOf<String?>(null) }
     var colorDialogDefinition by remember { mutableStateOf<ThemeParameterDefinitionV2?>(null) }
 
     fun reload() {
@@ -146,10 +147,17 @@ fun ThemePackagesScreen(
             ThemePackageRuntimeLinkerV2.resolveParameters(activeInstance, activeRuntime)
         }
     val activeDefinitions =
-        remember(activeRuntime) {
+        remember(activeRuntime, resolvedParameters) {
             activeRuntime.parameterDefinitions.values.filter { definition ->
-                activeRuntime.parameterOwners[definition.id] == activeRuntime.coordinate
-            }.sortedBy { definition -> definition.id }
+                activeRuntime.parameterOwners[definition.id] == activeRuntime.coordinate &&
+                    resolvedParameters.isUserVisible(definition)
+            }.sortedWith(
+                compareBy<ThemeParameterDefinitionV2>(
+                    { definition -> requireNotNull(definition.section).ordinal },
+                    ThemeParameterDefinitionV2::order,
+                    ThemeParameterDefinitionV2::id,
+                ),
+            )
         }
 
     val importLauncher =
@@ -176,26 +184,26 @@ fun ThemePackagesScreen(
             }
         }
 
-    val imageLauncher =
+    val resourceLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-            val parameterId = pendingImageParameterId
-            val expectedCoordinateKey = pendingImageCoordinateKey
-            pendingImageParameterId = null
-            pendingImageCoordinateKey = null
+            val parameterId = pendingResourceParameterId
+            val expectedCoordinateKey = pendingResourceCoordinateKey
+            pendingResourceParameterId = null
+            pendingResourceCoordinateKey = null
             if (uri == null || parameterId == null || expectedCoordinateKey == null) {
                 return@rememberLauncherForActivityResult
             }
             if (activeInstance.reference.coordinate.selectionKey() != expectedCoordinateKey) {
                 scope.launch {
-                    snackbar.showSnackbar(context.getString(R.string.theme_packages_image_selection_expired))
+                    snackbar.showSnackbar(context.getString(R.string.theme_packages_resource_selection_expired))
                 }
                 return@rememberLauncherForActivityResult
             }
             val definition = activeRuntime.parameterDefinitions[parameterId]
-            val control = definition?.control as? ThemeParameterControlV2.ImagePicker
-            if (control == null) {
+            val resourceControl = definition?.control as? ThemeParameterControlV2
+            if (definition == null || resourceControl?.resourceMimeTypes() == null) {
                 scope.launch {
-                    snackbar.showSnackbar(context.getString(R.string.theme_packages_image_selection_expired))
+                    snackbar.showSnackbar(context.getString(R.string.theme_packages_resource_selection_expired))
                 }
                 return@rememberLauncherForActivityResult
             }
@@ -203,17 +211,18 @@ fun ThemePackagesScreen(
                 val message =
                     try {
                         withContext(Dispatchers.IO) {
-                            validateThemeImageUri(context, uri, control)
+                            validateThemeResourceUri(context, uri, resourceControl)
                         }
-                        installer.replaceActiveImageParameter(
+                        installer.replaceActiveResourceParameter(
                             expectedCoordinate = activeInstance.reference.coordinate,
                             parameterId = definition.id,
                             uri = uri,
+                            value = definition.resourceValue(uri.toString()),
                         )
-                        context.getString(R.string.theme_packages_background_selected)
+                        context.getString(R.string.theme_packages_resource_selected)
                     } catch (error: Throwable) {
-                        AppLogger.e(TAG, "Theme background selection failed.", error)
-                        error.message ?: context.getString(R.string.theme_packages_background_invalid)
+                        AppLogger.e(TAG, "Theme resource selection failed.", error)
+                        error.message ?: context.getString(R.string.theme_packages_resource_invalid)
                     }
                 snackbar.showSnackbar(message)
             }
@@ -272,8 +281,8 @@ fun ThemePackagesScreen(
             onParameterClear = { definition ->
                 scope.launch {
                     try {
-                        if (definition.control is ThemeParameterControlV2.ImagePicker) {
-                            installer.clearActiveImageParameter(
+                        if (definition.control.resourceMimeTypes() != null) {
+                            installer.clearActiveResourceParameter(
                                 expectedCoordinate = activeInstance.reference.coordinate,
                                 parameterId = definition.id,
                             )
@@ -292,12 +301,13 @@ fun ThemePackagesScreen(
                     }
                 }
             },
-            onOpenImagePicker = { definition ->
-                val control = definition.control as? ThemeParameterControlV2.ImagePicker
-                    ?: error("Theme image picker requested for a non-image parameter.")
-                pendingImageParameterId = definition.id
-                pendingImageCoordinateKey = activeInstance.reference.coordinate.selectionKey()
-                imageLauncher.launch(control.mimeTypes.toTypedArray())
+            onOpenResourcePicker = { definition ->
+                val mimeTypes = requireNotNull(definition.control.resourceMimeTypes()) {
+                    "Theme resource picker requested for a non-resource parameter."
+                }
+                pendingResourceParameterId = definition.id
+                pendingResourceCoordinateKey = activeInstance.reference.coordinate.selectionKey()
+                resourceLauncher.launch(mimeTypes.toTypedArray())
             },
             onOpenColorDialog = { definition -> colorDialogDefinition = definition },
             modifier =
@@ -356,7 +366,7 @@ fun ThemePackagesScreen(
                 scope.launch {
                     try {
                         val defaultArgb =
-                            (definition.defaultValue as? ThemeParameterDefaultV2.ColorValue)?.argb
+                            (definition.defaultValue as? ThemeParameterValueV2.ColorValue)?.argb
                         if (argb == defaultArgb) {
                             clearActiveParameter(
                                 context = context,
@@ -402,7 +412,7 @@ internal fun ThemePackagesContent(
     onInputStyleChange: (GlobalInputStyle) -> Unit,
     onParameterChange: (ThemeParameterDefinitionV2, ThemeParameterValueV2) -> Unit,
     onParameterClear: (ThemeParameterDefinitionV2) -> Unit,
-    onOpenImagePicker: (ThemeParameterDefinitionV2) -> Unit,
+    onOpenResourcePicker: (ThemeParameterDefinitionV2) -> Unit,
     onOpenColorDialog: (ThemeParameterDefinitionV2) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -457,17 +467,16 @@ internal fun ThemePackagesContent(
                 value = presentation.fontScale,
                 onValueCommitted = onFontScaleChange,
             )
-            definitions.forEach { definition ->
-                ThemeParameterControl(
-                    definition = definition,
-                    value = resolvedValues[definition.id],
-                    hasOverride = definition.id in overriddenIds,
-                    onValueChange = { changed -> onParameterChange(definition, changed) },
-                    onClear = { onParameterClear(definition) },
-                    onOpenImagePicker = { onOpenImagePicker(definition) },
-                    onOpenColorDialog = { onOpenColorDialog(definition) },
-                )
-            }
+            ThemeParameterSectionControls(
+                definitions = definitions,
+                section = ThemeParameterSectionV2.APPEARANCE,
+                resolvedValues = resolvedValues,
+                overriddenIds = overriddenIds,
+                onParameterChange = onParameterChange,
+                onParameterClear = onParameterClear,
+                onOpenResourcePicker = onOpenResourcePicker,
+                onOpenColorDialog = onOpenColorDialog,
+            )
         }
 
         ThemeSettingsSection(title = stringResource(R.string.theme_packages_section_conversation)) {
@@ -475,14 +484,80 @@ internal fun ThemePackagesContent(
                 selected = presentation.chatStyle,
                 onSelected = onChatStyleChange,
             )
+            ThemeParameterSectionControls(
+                definitions = definitions,
+                section = ThemeParameterSectionV2.CONVERSATION,
+                resolvedValues = resolvedValues,
+                overriddenIds = overriddenIds,
+                onParameterChange = onParameterChange,
+                onParameterClear = onParameterClear,
+                onOpenResourcePicker = onOpenResourcePicker,
+                onOpenColorDialog = onOpenColorDialog,
+            )
+        }
+
+        val composerDefinitions = definitions.filter { definition -> definition.section == ThemeParameterSectionV2.COMPOSER }
+        ThemeSettingsSection(title = stringResource(R.string.theme_packages_section_composer)) {
             ThemeInputStyleControl(
                 selected = presentation.inputStyle,
                 onSelected = onInputStyleChange,
             )
+            ThemeParameterSectionControls(
+                definitions = composerDefinitions,
+                section = ThemeParameterSectionV2.COMPOSER,
+                resolvedValues = resolvedValues,
+                overriddenIds = overriddenIds,
+                onParameterChange = onParameterChange,
+                onParameterClear = onParameterClear,
+                onOpenResourcePicker = onOpenResourcePicker,
+                onOpenColorDialog = onOpenColorDialog,
+            )
+        }
+
+        val appChromeDefinitions = definitions.filter { definition -> definition.section == ThemeParameterSectionV2.APP_CHROME }
+        if (appChromeDefinitions.isNotEmpty()) {
+            ThemeSettingsSection(title = stringResource(R.string.theme_packages_section_app_chrome)) {
+                ThemeParameterSectionControls(
+                    definitions = appChromeDefinitions,
+                    section = ThemeParameterSectionV2.APP_CHROME,
+                    resolvedValues = resolvedValues,
+                    overriddenIds = overriddenIds,
+                    onParameterChange = onParameterChange,
+                    onParameterClear = onParameterClear,
+                    onOpenResourcePicker = onOpenResourcePicker,
+                    onOpenColorDialog = onOpenColorDialog,
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(24.dp))
     }
+}
+
+@Composable
+private fun ThemeParameterSectionControls(
+    definitions: List<ThemeParameterDefinitionV2>,
+    section: ThemeParameterSectionV2,
+    resolvedValues: Map<String, ThemeParameterValueV2>,
+    overriddenIds: Set<String>,
+    onParameterChange: (ThemeParameterDefinitionV2, ThemeParameterValueV2) -> Unit,
+    onParameterClear: (ThemeParameterDefinitionV2) -> Unit,
+    onOpenResourcePicker: (ThemeParameterDefinitionV2) -> Unit,
+    onOpenColorDialog: (ThemeParameterDefinitionV2) -> Unit,
+) {
+    definitions
+        .filter { definition -> definition.section == section }
+        .forEach { definition ->
+            ThemeParameterControl(
+                definition = definition,
+                value = resolvedValues[definition.id],
+                hasOverride = definition.id in overriddenIds,
+                onValueChange = { changed -> onParameterChange(definition, changed) },
+                onClear = { onParameterClear(definition) },
+                onOpenResourcePicker = { onOpenResourcePicker(definition) },
+                onOpenColorDialog = { onOpenColorDialog(definition) },
+            )
+        }
 }
 
 @Composable
@@ -681,7 +756,7 @@ private fun ThemeParameterControl(
     hasOverride: Boolean,
     onValueChange: (ThemeParameterValueV2) -> Unit,
     onClear: () -> Unit,
-    onOpenImagePicker: () -> Unit,
+    onOpenResourcePicker: () -> Unit,
     onOpenColorDialog: () -> Unit,
 ) {
     val onReset = onClear.takeIf { hasOverride }
@@ -689,7 +764,7 @@ private fun ThemeParameterControl(
         is ThemeParameterControlV2.ColorPalette -> {
             val color = value as? ThemeParameterValueV2.ColorValue
                 ?: error("Theme color control received a non-color value.")
-            val defaultArgb = (definition.defaultValue as? ThemeParameterDefaultV2.ColorValue)?.argb
+            val defaultArgb = (definition.defaultValue as? ThemeParameterValueV2.ColorValue)?.argb
             ThemeColorControl(
                 title = definition.label.resolve(Locale.getDefault().language),
                 description = definition.description?.resolve(Locale.getDefault().language),
@@ -707,18 +782,155 @@ private fun ThemeParameterControl(
             )
         }
 
-        is ThemeParameterControlV2.ImagePicker -> {
+        ThemeParameterControlV2.Toggle -> {
+            val selected = (value as? ThemeParameterValueV2.BooleanValue)?.value
+                ?: error("Theme toggle control received a non-boolean value.")
+            val default = (definition.defaultValue as? ThemeParameterValueV2.BooleanValue)?.value
+            ThemeToggleControl(
+                title = definition.label.resolve(Locale.getDefault().language),
+                description = definition.description?.resolve(Locale.getDefault().language),
+                checked = selected,
+                onCheckedChange = { changed ->
+                    if (changed == default) {
+                        onClear()
+                    } else {
+                        onValueChange(ThemeParameterValueV2.BooleanValue(changed))
+                    }
+                },
+                onReset = onReset,
+            )
+        }
+
+        is ThemeParameterControlV2.Choice -> {
+            val selected = (value as? ThemeParameterValueV2.OptionValue)?.value
+                ?: error("Theme choice control received a non-option value.")
+            val default = (definition.defaultValue as? ThemeParameterValueV2.OptionValue)?.value
+            ThemeControlLabel(
+                text = definition.label.resolve(Locale.getDefault().language),
+                description = definition.description?.resolve(Locale.getDefault().language),
+                onReset = onReset,
+            )
+            ThemeChoiceSelector(
+                selected = selected,
+                options =
+                    control.options.map { option ->
+                        ThemeChoiceOption(
+                            value = option.id,
+                            label = option.label.resolve(Locale.getDefault().language),
+                        )
+                    },
+                onSelected = { selectedOption ->
+                    if (selectedOption == default) {
+                        onClear()
+                    } else {
+                        onValueChange(ThemeParameterValueV2.OptionValue(selectedOption))
+                    }
+                },
+            )
+        }
+
+        is ThemeParameterControlV2.Slider -> {
+            val selected = (value as? ThemeParameterValueV2.FloatValue)?.value
+                ?: error("Theme slider control received a non-numeric value.")
+            val default = (definition.defaultValue as? ThemeParameterValueV2.FloatValue)?.value
+            ThemeParameterSliderControl(
+                title = definition.label.resolve(Locale.getDefault().language),
+                description = definition.description?.resolve(Locale.getDefault().language),
+                control = control,
+                value = selected,
+                onValueCommitted = { changed ->
+                    if (changed == default) {
+                        onClear()
+                    } else {
+                        onValueChange(ThemeParameterValueV2.FloatValue(changed))
+                    }
+                },
+                onReset = onReset,
+            )
+        }
+
+        is ThemeParameterControlV2.ImagePicker,
+        is ThemeParameterControlV2.VideoPicker,
+        is ThemeParameterControlV2.FontPicker
+        -> {
             val uri = (value as? ThemeParameterValueV2.ImageUriValue)?.uri
-            ThemeImageControl(
+                ?: (value as? ThemeParameterValueV2.VideoUriValue)?.uri
+                ?: (value as? ThemeParameterValueV2.FontUriValue)?.uri
+            ThemeResourceControl(
                 title = definition.label.resolve(Locale.getDefault().language),
                 description = definition.description?.resolve(Locale.getDefault().language),
                 uri = uri,
-                onPick = onOpenImagePicker,
+                showPreview = control is ThemeParameterControlV2.ImagePicker,
+                actionLabel =
+                    stringResource(
+                        when (control) {
+                            is ThemeParameterControlV2.ImagePicker -> R.string.theme_packages_pick_image
+                            is ThemeParameterControlV2.VideoPicker -> R.string.theme_packages_pick_video
+                            is ThemeParameterControlV2.FontPicker -> R.string.theme_packages_pick_font
+                            else -> error("Theme resource control must be image, video, or font.")
+                        },
+                    ),
+                onPick = onOpenResourcePicker,
                 onClear = onReset,
             )
         }
+
+        is ThemeParameterControlV2.ColorPairPalette,
+        ThemeParameterControlV2.AuthorValue
+        -> error("Theme package exposes a parameter control that is not valid for the user settings surface.")
     }
 }
+
+@Composable
+private fun ThemeToggleControl(
+    title: String,
+    description: String?,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    onReset: (() -> Unit)?,
+) {
+    ThemeControlLabel(text = title, description = description, onReset = onReset)
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+        horizontalArrangement = Arrangement.End,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Switch(checked = checked, onCheckedChange = onCheckedChange)
+    }
+}
+
+@Composable
+private fun ThemeParameterSliderControl(
+    title: String,
+    description: String?,
+    control: ThemeParameterControlV2.Slider,
+    value: Float,
+    onValueCommitted: (Float) -> Unit,
+    onReset: (() -> Unit)?,
+) {
+    var localValue by remember(value) { mutableFloatStateOf(value) }
+    ThemeControlLabel(
+        text = title,
+        description = description,
+        value = "${(localValue * 100).roundToInt()}%",
+        onReset = onReset,
+    )
+    Slider(
+        value = localValue,
+        onValueChange = { changed -> localValue = snapThemeParameterSliderValue(changed, control) },
+        onValueChangeFinished = { onValueCommitted(localValue) },
+        valueRange = control.minimum..control.maximum,
+        steps = ((control.maximum - control.minimum) / control.step).roundToInt().minus(1).coerceAtLeast(0),
+        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+    )
+}
+
+internal fun snapThemeParameterSliderValue(
+    value: Float,
+    control: ThemeParameterControlV2.Slider,
+): Float =
+    (control.minimum + ((value - control.minimum) / control.step).roundToInt() * control.step)
+        .coerceIn(control.minimum, control.maximum)
 
 @Composable
 @OptIn(ExperimentalLayoutApi::class)
@@ -764,10 +976,12 @@ private fun ThemeColorControl(
 }
 
 @Composable
-private fun ThemeImageControl(
+private fun ThemeResourceControl(
     title: String,
     description: String?,
     uri: String?,
+    showPreview: Boolean,
+    actionLabel: String,
     onPick: () -> Unit,
     onClear: (() -> Unit)?,
 ) {
@@ -776,7 +990,7 @@ private fun ThemeImageControl(
         modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (uri != null) {
+        if (uri != null && showPreview) {
             AsyncImage(
                 model = uri,
                 contentDescription = null,
@@ -787,7 +1001,7 @@ private fun ThemeImageControl(
         TextButton(onClick = onPick) {
             Icon(imageVector = Icons.Default.Image, contentDescription = null)
             Spacer(modifier = Modifier.width(6.dp))
-            Text(stringResource(R.string.theme_packages_pick_image))
+            Text(actionLabel)
         }
     }
 }
@@ -993,40 +1207,76 @@ private suspend fun clearActiveParameter(
     )
 }
 
-private fun validateThemeImageUri(
+private fun ThemeParameterControlV2.resourceMimeTypes(): List<String>? =
+    when (this) {
+        is ThemeParameterControlV2.ImagePicker -> mimeTypes
+        is ThemeParameterControlV2.VideoPicker -> mimeTypes
+        is ThemeParameterControlV2.FontPicker -> mimeTypes
+        else -> null
+    }
+
+private fun ThemeParameterDefinitionV2.resourceValue(uri: String): ThemeParameterValueV2 =
+    when (control) {
+        is ThemeParameterControlV2.ImagePicker -> ThemeParameterValueV2.ImageUriValue(uri)
+        is ThemeParameterControlV2.VideoPicker -> ThemeParameterValueV2.VideoUriValue(uri)
+        is ThemeParameterControlV2.FontPicker -> ThemeParameterValueV2.FontUriValue(uri)
+        else -> error("Theme parameter $id is not a resource parameter.")
+    }
+
+private fun validateThemeResourceUri(
     context: Context,
     uri: Uri,
-    control: ThemeParameterControlV2.ImagePicker,
+    control: ThemeParameterControlV2,
 ) {
     val mimeType = context.contentResolver.getType(uri)?.lowercase(Locale.ROOT)
-    require(mimeType in control.mimeTypes) {
-        context.getString(R.string.theme_packages_background_invalid)
+    require(mimeType in requireNotNull(control.resourceMimeTypes())) {
+        context.getString(R.string.theme_packages_resource_invalid)
     }
     val bytes =
-        context.contentResolver.openInputStream(uri)?.use(::readBoundedThemeImage)
-            ?: throw IllegalArgumentException(context.getString(R.string.theme_packages_background_invalid))
-    val bitmap =
-        ImageBitmapLimiter.decodeDownsampledBitmap(bytes)
-            ?: throw IllegalArgumentException(context.getString(R.string.theme_packages_background_invalid))
-    bitmap.recycle()
+        context.contentResolver.openInputStream(uri)?.use(::readBoundedThemeResource)
+            ?: throw IllegalArgumentException(context.getString(R.string.theme_packages_resource_invalid))
+    when (control) {
+        is ThemeParameterControlV2.ImagePicker -> {
+            val bitmap =
+                ImageBitmapLimiter.decodeDownsampledBitmap(bytes)
+                    ?: throw IllegalArgumentException(context.getString(R.string.theme_packages_resource_invalid))
+            bitmap.recycle()
+        }
+
+        is ThemeParameterControlV2.VideoPicker ->
+            require(bytes.isThemeVideo()) { context.getString(R.string.theme_packages_resource_invalid) }
+
+        is ThemeParameterControlV2.FontPicker ->
+            require(bytes.isThemeFont()) { context.getString(R.string.theme_packages_resource_invalid) }
+
+        else -> error("Theme resource validation requires an image, video, or font picker.")
+    }
 }
 
 private fun ThemePackageCoordinateV2.selectionKey(): String =
     "${packageId.value}|${version.value}|${archiveSha256.value}"
 
-private fun readBoundedThemeImage(input: java.io.InputStream): ByteArray {
+private fun readBoundedThemeResource(input: java.io.InputStream): ByteArray {
     val output = ByteArrayOutputStream()
     val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
     while (true) {
         val read = input.read(buffer)
         if (read < 0) break
-        require(output.size() + read <= THEME_STAGE_IMAGE_MAX_BYTES) {
-            "Theme background image exceeds the ${THEME_STAGE_IMAGE_MAX_BYTES / 1024 / 1024} MB limit."
+        require(output.size() + read <= THEME_RESOURCE_MAX_BYTES) {
+            "Theme resource exceeds the ${THEME_RESOURCE_MAX_BYTES / 1024 / 1024} MB limit."
         }
         output.write(buffer, 0, read)
     }
     return output.toByteArray()
 }
+
+private fun ByteArray.isThemeVideo(): Boolean =
+    (size >= 12 && this[4] == 'f'.code.toByte() && this[5] == 't'.code.toByte() && this[6] == 'y'.code.toByte() && this[7] == 'p'.code.toByte()) ||
+        (size >= 4 && this[0] == 0x1A.toByte() && this[1] == 0x45.toByte() && this[2] == 0xDF.toByte() && this[3] == 0xA3.toByte())
+
+private fun ByteArray.isThemeFont(): Boolean =
+    (size >= 4 && this[0] == 0x00.toByte() && this[1] == 0x01.toByte() && this[2] == 0x00.toByte() && this[3] == 0x00.toByte()) ||
+        (size >= 4 && this[0] == 'O'.code.toByte() && this[1] == 'T'.code.toByte() && this[2] == 'T'.code.toByte() && this[3] == 'O'.code.toByte())
 
 private fun parseOpaqueArgb(raw: String): Long? {
     val normalized = raw.trim()

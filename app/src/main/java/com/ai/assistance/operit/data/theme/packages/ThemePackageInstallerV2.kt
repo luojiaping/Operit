@@ -11,16 +11,13 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 
 internal class ThemePackageInstallExceptionV2(
     message: String,
     cause: Throwable? = null,
 ) : IllegalStateException(message, cause)
 
-/** Installs only fully linked V2 packages into immutable content-addressed directories. */
+/** Installs only fully linked schema-4 packages into immutable content-addressed directories. */
 internal class ThemePackageInstallerV2 private constructor(
     private val context: Context,
 ) {
@@ -58,7 +55,7 @@ internal class ThemePackageInstallerV2 private constructor(
                     } catch (error: Throwable) {
                         ThemePackagePublicationV2.uninstall(installedRoot, coordinate)
                         throw ThemePackageInstallExceptionV2(
-                            "Theme package does not form a complete linked schema 3 presentation: ${error.message}",
+                            "Theme package does not form a complete linked schema 4 presentation: ${error.message}",
                             error,
                         )
                     }
@@ -109,24 +106,38 @@ internal class ThemePackageInstallerV2 private constructor(
                 selectionRepository.replaceSelection(
                     ThemeInstanceV2(reference = ThemePackageReferenceV2(coordinate)),
                 )
-                selectionRepository.reconcileThemeImageGrants()
+                selectionRepository.reconcileThemeResourceGrants()
             }
         }
     }
 
-    suspend fun replaceActiveImageParameter(
+    suspend fun replaceActiveResourceParameter(
         expectedCoordinate: ThemePackageCoordinateV2,
         parameterId: String,
         uri: Uri,
+        value: ThemeParameterValueV2,
     ) {
         mutationMutex.withLock {
             withContext(Dispatchers.IO) {
+                require(value.resourceUri() == uri.toString()) {
+                    "Theme resource parameter $parameterId must match the granted URI."
+                }
                 check(ThemeRuntimeRepositoryV2.isLinked(expectedCoordinate)) {
-                    "Theme package is unavailable for image parameter update: ${expectedCoordinate.packageId.value}"
+                    "Theme package is unavailable for resource parameter update: ${expectedCoordinate.packageId.value}"
+                }
+                val runtime = ThemeRuntimeRepositoryV2.require(expectedCoordinate)
+                val definition = requireNotNull(runtime.parameterDefinitions[parameterId]) {
+                    "Theme package does not declare resource parameter $parameterId."
+                }
+                require(runtime.parameterOwners[parameterId] == expectedCoordinate) {
+                    "Theme package cannot update inherited resource parameter $parameterId."
+                }
+                require(definition.type.isUri() && value.matches(definition.type)) {
+                    "Theme parameter $parameterId does not accept the selected resource type."
                 }
                 val selectionRepository = ThemePackageSelectionRepositoryV2.getInstance(context)
                 check(selectionRepository.currentSelection().reference.coordinate == expectedCoordinate) {
-                    "Theme selection changed before image parameter $parameterId was written."
+                    "Theme selection changed before resource parameter $parameterId was written."
                 }
                 try {
                     val alreadyPersisted =
@@ -135,40 +146,47 @@ internal class ThemePackageInstallerV2 private constructor(
                         }
                     val themeOwnsGrant =
                         if (alreadyPersisted) {
-                            selectionRepository.hasThemeImageGrantOwnership(uri.toString())
+                            selectionRepository.hasThemeResourceGrantOwnership(uri.toString())
                         } else {
-                            selectionRepository.markPendingImageGrant(uri.toString())
+                            selectionRepository.markPendingResourceGrant(uri.toString())
                             context.contentResolver.takePersistableUriPermission(
                                 uri,
                                 Intent.FLAG_GRANT_READ_URI_PERMISSION,
                             )
                             true
                         }
-                    selectionRepository.replaceImageParameter(
+                    selectionRepository.replaceResourceParameter(
                         expectedCoordinate = expectedCoordinate,
                         parameterId = parameterId,
-                        value = ThemeParameterValueV2.ImageUriValue(uri.toString()),
+                        value = value,
                         trackUriOwnership = themeOwnsGrant,
                     )
                 } finally {
-                    selectionRepository.reconcileThemeImageGrants()
+                    selectionRepository.reconcileThemeResourceGrants()
                 }
             }
         }
     }
 
-    suspend fun clearActiveImageParameter(
+    suspend fun clearActiveResourceParameter(
         expectedCoordinate: ThemePackageCoordinateV2,
         parameterId: String,
     ) {
         mutationMutex.withLock {
             withContext(Dispatchers.IO) {
+                val runtime = ThemeRuntimeRepositoryV2.require(expectedCoordinate)
+                val definition = requireNotNull(runtime.parameterDefinitions[parameterId]) {
+                    "Theme package does not declare resource parameter $parameterId."
+                }
+                require(runtime.parameterOwners[parameterId] == expectedCoordinate && definition.type.isUri()) {
+                    "Theme package cannot reset resource parameter $parameterId."
+                }
                 val selectionRepository = ThemePackageSelectionRepositoryV2.getInstance(context)
-                selectionRepository.clearImageParameter(
+                selectionRepository.clearResourceParameter(
                     expectedCoordinate = expectedCoordinate,
                     parameterId = parameterId,
                 )
-                selectionRepository.reconcileThemeImageGrants()
+                selectionRepository.reconcileThemeResourceGrants()
             }
         }
     }
@@ -177,11 +195,6 @@ internal class ThemePackageInstallerV2 private constructor(
 
     fun find(coordinate: ThemePackageCoordinateV2): PublishedThemeInstallationV2? =
         catalog().installations.firstOrNull { installation -> installation.coordinate == coordinate }
-
-    fun clearUnpublishedSchema2Installations() {
-        File(context.filesDir, LEGACY_V1_INSTALLED_ROOT).deleteRecursively()
-        clearUnpublishedSchema2ThemeInstallations(installedRoot)
-    }
 
     private fun stage(archive: File): File {
         stagingRoot.mkdirs()
@@ -193,9 +206,8 @@ internal class ThemePackageInstallerV2 private constructor(
     }
 
     companion object {
-        private const val INSTALLED_ROOT = "theme-packages/v2/installed"
-        private const val STAGING_ROOT = "theme-packages/v2/staging"
-        private const val LEGACY_V1_INSTALLED_ROOT = "theme-packages/installed"
+        private const val INSTALLED_ROOT = "theme-packages/v4/installed"
+        private const val STAGING_ROOT = "theme-packages/v4/staging"
 
         @Volatile
         private var instance: ThemePackageInstallerV2? = null
@@ -212,28 +224,15 @@ internal class ThemePackageInstallerV2 private constructor(
     }
 }
 
-internal fun clearUnpublishedSchema2ThemeInstallations(installedRoot: File) {
-    if (!installedRoot.isDirectory) return
-    installedRoot.walkBottomUp()
-        .filter { file -> file.name == THEME_PACKAGE_MANIFEST_ENTRY_V2 && file.isFile }
-        .forEach { manifestFile ->
-            val schemaVersion =
-                try {
-                    Json.parseToJsonElement(manifestFile.readText(Charsets.UTF_8))
-                        .jsonObject["schemaVersion"]
-                        ?.jsonPrimitive
-                        ?.content
-                        ?.toIntOrNull()
-                } catch (_: Throwable) {
-                    null
-                }
-            if (schemaVersion == 2) {
-                requireNotNull(manifestFile.parentFile).deleteRecursively()
-            }
-        }
-}
-
 internal fun requiresThemeActivation(
     current: ThemeInstanceV2,
     target: ThemePackageCoordinateV2,
 ): Boolean = current.reference.coordinate != target
+
+private fun ThemeParameterValueV2.resourceUri(): String =
+    when (this) {
+        is ThemeParameterValueV2.ImageUriValue -> uri
+        is ThemeParameterValueV2.VideoUriValue -> uri
+        is ThemeParameterValueV2.FontUriValue -> uri
+        else -> error("Theme resource parameter value must contain a content URI.")
+    }

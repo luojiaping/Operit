@@ -7,6 +7,8 @@ status: implementation_in_progress
 
 # 主题包可调设置
 
+> [SUPERSEDED] 此前 schema 3 的 color/image-only 方案已被 [全量主题参数契约与精简设置页](../theme_parameter_contract_rebuild_20260901/) 取代。当前开发基线为 schema 4；本目录仅保留历史记录。
+
 ## 背景
 
 当前 V2 参数只完成声明、持久化和类型校验。默认主题没有任何参数，主题设置页仅对历史 `primary_color` 与 `background_image` ID 做硬编码分支，运行时也不会把参数投影到 token、Material 色板或 scene。因此没有导入外部包时，用户几乎无法调整视觉。

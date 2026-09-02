@@ -5402,6 +5402,8 @@
     <string name="theme_packages_section_theme">主题</string>
     <string name="theme_packages_section_appearance">外观</string>
     <string name="theme_packages_section_conversation">对话</string>
+    <string name="theme_packages_section_composer">输入</string>
+    <string name="theme_packages_section_app_chrome">应用栏</string>
     <string name="theme_packages_picker_title">选择主题</string>
     <string name="theme_packages_close">关闭</string>
     <string name="theme_packages_import">导入主题包（.otheme）</string>
@@ -5414,8 +5416,13 @@
     <string name="theme_packages_uninstalled">已卸载</string>
     <string name="theme_packages_uninstall_failed">卸载失败</string>
     <string name="theme_packages_pick_image">选择图片</string>
+    <string name="theme_packages_pick_video">选择视频</string>
+    <string name="theme_packages_pick_font">选择字体</string>
     <string name="theme_packages_background_selected">背景图片已更新</string>
     <string name="theme_packages_background_invalid">无法使用该背景图片</string>
+    <string name="theme_packages_resource_selected">主题资源已更新</string>
+    <string name="theme_packages_resource_invalid">无法使用所选主题资源</string>
+    <string name="theme_packages_resource_selection_expired">主题已切换，请重新选择主题资源</string>
     <string name="theme_packages_image_selection_expired">主题已切换，请重新选择背景图片</string>
     <string name="theme_packages_clear">清除</string>
     <string name="theme_packages_reset">恢复主题默认值</string>
@@ -5447,9 +5454,6 @@
     <string name="global_presentation_show_message_token_stats">显示 Token 统计</string>
     <string name="global_presentation_show_message_timing_stats">显示耗时统计</string>
     <string name="global_presentation_show_message_timestamp">显示时间戳</string>
-    <string name="global_presentation_bubble_show_avatar">气泡显示头像</string>
-    <string name="global_presentation_bubble_wide_layout">气泡宽布局</string>
-    <string name="global_presentation_cursor_user_bubble_follow_theme">用户气泡颜色跟随主题</string>
     <string name="ui_accessibility_mode">无障碍适配模式</string>
     <string name="ui_accessibility_mode_description">为 TalkBack 等无障碍用户优化 UI 自动化行为，优先给出可朗读的操作步骤，谨慎执行自动点击。</string>
     <string name="experimental_virtual_display">实验性虚拟屏幕</string>

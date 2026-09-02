@@ -70,6 +70,7 @@ internal fun ThemeSceneV1(
     textResolver: ThemeSceneTextResolverV1,
     darkTheme: Boolean,
     stageImage: ResolvedThemeStageImageV2? = null,
+    stageUnderlay: (@Composable () -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     Box(
@@ -82,6 +83,7 @@ internal fun ThemeSceneV1(
                         ?: Modifier,
                 ),
     ) {
+        stageUnderlay?.invoke()
         stageImage?.let { image ->
             AsyncImage(
                 model = image.uri,

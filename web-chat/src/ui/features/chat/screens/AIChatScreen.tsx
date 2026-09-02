@@ -14,10 +14,21 @@ export function AIChatScreen() {
     }),
     [chatThemeStyle]
   );
-  const backdropImageStyle = useMemo(
+  const backdropMedia = viewModel.theme?.background.media;
+  const backdropVideo = backdropMedia?.type === 'video' ? backdropMedia : null;
+  const backdropMediaImageStyle = useMemo(
     () => ({
-      backgroundImage: String(chatThemeStyle['--chat-background-image'] ?? 'none'),
-      opacity: String(chatThemeStyle['--chat-background-opacity'] ?? '0')
+      backgroundImage: String(chatThemeStyle['--chat-media-background-image'] ?? 'none'),
+      filter: `blur(${String(chatThemeStyle['--chat-media-background-blur'] ?? '0px')})`,
+      opacity: String(chatThemeStyle['--chat-media-background-opacity'] ?? '0')
+    }),
+    [chatThemeStyle]
+  );
+  const backdropStageImageStyle = useMemo(
+    () => ({
+      backgroundImage: String(chatThemeStyle['--chat-stage-background-image'] ?? 'none'),
+      backgroundSize: String(chatThemeStyle['--chat-stage-background-size'] ?? 'cover'),
+      opacity: String(chatThemeStyle['--chat-stage-background-opacity'] ?? '0')
     }),
     [chatThemeStyle]
   );
@@ -52,7 +63,23 @@ export function AIChatScreen() {
         className="chat-glass-backdrop-source"
         style={backdropBaseStyle}
       >
-        <div className="chat-glass-backdrop-image" style={backdropImageStyle} />
+        {backdropVideo !== null && backdropVideo.asset_url ? (
+          <video
+            aria-hidden="true"
+            autoPlay
+            className="chat-glass-backdrop-video"
+            loop={backdropVideo.loop}
+            muted={backdropVideo.muted}
+            playsInline
+            src={backdropVideo.asset_url}
+            style={{
+              filter: `blur(${String(chatThemeStyle['--chat-media-background-blur'] ?? '0px')})`,
+              opacity: String(chatThemeStyle['--chat-media-background-opacity'] ?? '0')
+            }}
+          />
+        ) : null}
+        <div className="chat-glass-backdrop-media-image" style={backdropMediaImageStyle} />
+        <div className="chat-glass-backdrop-stage-image" style={backdropStageImageStyle} />
         <div className="chat-glass-backdrop-tint" style={backdropTintStyle} />
       </div>
 

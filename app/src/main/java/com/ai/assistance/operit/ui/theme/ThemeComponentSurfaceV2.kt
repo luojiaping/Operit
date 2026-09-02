@@ -13,6 +13,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.unit.dp
 import com.ai.assistance.operit.data.theme.packages.ThemeComponentIdV2
+import com.ai.assistance.operit.data.theme.packages.ThemeComponentCatalogV2
+import com.ai.assistance.operit.data.theme.packages.ThemePresentationTargetV2
 
 /** Draws one package-owned component skin while leaving interaction and semantics to the caller. */
 @Composable
@@ -24,9 +26,36 @@ internal fun ThemeComponentSurfaceV2(
     clipContent: Boolean = true,
     content: @Composable () -> Unit,
 ) {
+    val runtime = LocalThemePackageUiRuntimeV2.current
+    val skin = runtime.componentSkin(component, state)
+    val packageModifier =
+        if (component == ThemeComponentCatalogV2.NAVIGATION) {
+            modifier
+                .liquidGlass(
+                    enabled =
+                        requireNotNull(
+                            runtime.booleanPresentation(
+                                ThemePresentationTargetV2.CHROME_NAVIGATION_BUTTON_LIQUID_GLASS,
+                            ),
+                        ),
+                    shape = skin.frame.glassShape(),
+                    containerColor = skin.container,
+                ).waterGlass(
+                    enabled =
+                        requireNotNull(
+                            runtime.booleanPresentation(
+                                ThemePresentationTargetV2.CHROME_NAVIGATION_WATER_GLASS,
+                            ),
+                        ),
+                    shape = skin.frame.toComposeShape(),
+                    containerColor = skin.container,
+                )
+        } else {
+            modifier
+        }
     ThemeComponentSurfaceV2(
-        skin = LocalThemePackageUiRuntimeV2.current.componentSkin(component, state),
-        modifier = modifier,
+        skin = skin,
+        modifier = packageModifier,
         applyContentPadding = applyContentPadding,
         clipContent = clipContent,
         content = content,

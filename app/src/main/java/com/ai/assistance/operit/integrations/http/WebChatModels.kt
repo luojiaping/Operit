@@ -265,12 +265,38 @@ data class WebThemePalette(
 
 @Serializable
 data class WebThemeBackground(
+    @SerialName("stage")
+    val stage: WebThemeStageBackground? = null,
+    @SerialName("media")
+    val media: WebThemeMediaBackground? = null,
+)
+
+@Serializable
+data class WebThemeStageBackground(
+    @SerialName("asset_url")
+    val assetUrl: String,
+    @SerialName("fit")
+    val fit: String,
+    @SerialName("opacity")
+    val opacity: Float,
+)
+
+@Serializable
+data class WebThemeMediaBackground(
     @SerialName("type")
     val type: String,
     @SerialName("asset_url")
-    val assetUrl: String? = null,
+    val assetUrl: String,
     @SerialName("opacity")
-    val opacity: Float = 0.0f
+    val opacity: Float,
+    @SerialName("blur_enabled")
+    val blurEnabled: Boolean,
+    @SerialName("blur_radius_dp")
+    val blurRadiusDp: Float,
+    @SerialName("muted")
+    val muted: Boolean,
+    @SerialName("loop")
+    val loop: Boolean,
 )
 
 @Serializable
@@ -345,10 +371,22 @@ data class WebBubbleTheme(
     val userPaddingLeft: Float,
     @SerialName("user_padding_right")
     val userPaddingRight: Float,
+    @SerialName("user_padding_top")
+    val userPaddingTop: Float,
+    @SerialName("user_padding_bottom")
+    val userPaddingBottom: Float,
     @SerialName("assistant_padding_left")
     val assistantPaddingLeft: Float,
     @SerialName("assistant_padding_right")
     val assistantPaddingRight: Float,
+    @SerialName("assistant_padding_top")
+    val assistantPaddingTop: Float,
+    @SerialName("assistant_padding_bottom")
+    val assistantPaddingBottom: Float,
+    @SerialName("user_font")
+    val userFont: WebFontTheme,
+    @SerialName("assistant_font")
+    val assistantFont: WebFontTheme,
     @SerialName("user_image")
     val userImage: WebBubbleImageTheme,
     @SerialName("assistant_image")
@@ -362,7 +400,25 @@ data class WebBubbleImageTheme(
     @SerialName("asset_url")
     val assetUrl: String? = null,
     @SerialName("render_mode")
-    val renderMode: String? = null
+    val renderMode: String? = null,
+    @SerialName("crop_left")
+    val cropLeft: Float = 0f,
+    @SerialName("crop_top")
+    val cropTop: Float = 0f,
+    @SerialName("crop_right")
+    val cropRight: Float = 1f,
+    @SerialName("crop_bottom")
+    val cropBottom: Float = 1f,
+    @SerialName("repeat_start")
+    val repeatStart: Float = 0f,
+    @SerialName("repeat_end")
+    val repeatEnd: Float = 1f,
+    @SerialName("repeat_y_start")
+    val repeatYStart: Float = 0f,
+    @SerialName("repeat_y_end")
+    val repeatYEnd: Float = 1f,
+    @SerialName("scale")
+    val scale: Float = 1f,
 )
 
 @Serializable

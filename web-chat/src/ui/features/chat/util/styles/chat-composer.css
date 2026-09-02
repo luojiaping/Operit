@@ -1825,12 +1825,12 @@
 }
 
 .glass-surface-local-image {
-  background-image: var(--chat-background-image);
+  background-image: var(--chat-stage-background-image);
   background-position: center;
   background-repeat: no-repeat;
-  background-size: cover;
+  background-size: var(--chat-stage-background-size);
   background-attachment: fixed;
-  opacity: var(--chat-background-opacity);
+  opacity: var(--chat-stage-background-opacity);
 }
 
 .glass-surface-local-tint {

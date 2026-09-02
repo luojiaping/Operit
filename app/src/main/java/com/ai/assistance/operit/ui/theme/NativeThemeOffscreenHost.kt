@@ -26,11 +26,18 @@ internal suspend fun buildActiveThemePackageRuntimeV2(
         ThemePackageSelectionRepositoryV2.getInstance(context).selectionFlow.first()
     val linked = ThemeRuntimeRepositoryV2.require(instance.reference.coordinate)
     val parameters = ThemePackageRuntimeLinkerV2.resolveParameters(instance, linked)
-    return createThemePackageUiRuntimeV2(
+    val baseRuntime = createThemePackageUiRuntimeV2(
         linked = linked,
         parameters = parameters,
         darkTheme = resolveThemeDarkMode(presentation, systemDarkTheme),
         userFontScale = presentation.fontScale,
+    )
+    return createThemePackageUiRuntimeV2(
+        linked = linked,
+        parameters = parameters,
+        darkTheme = baseRuntime.darkTheme,
+        userFontScale = presentation.fontScale,
+        presentationFonts = resolveThemePackageFontFamiliesV2(context, baseRuntime),
     )
 }
 

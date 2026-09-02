@@ -9,7 +9,6 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Assistant
@@ -42,6 +41,7 @@ import com.ai.assistance.operit.data.preferences.DisplayPreferencesManager
 import com.ai.assistance.operit.data.preferences.CharacterCardManager
 import com.ai.assistance.operit.data.preferences.ToolCollapseMode
 import com.ai.assistance.operit.data.theme.packages.ThemeComponentCatalogV2
+import com.ai.assistance.operit.data.theme.packages.ThemePresentationTargetV2
 import androidx.compose.foundation.Image
 import coil.compose.AsyncImage
 import coil.compose.rememberAsyncImagePainter
@@ -55,7 +55,7 @@ import com.ai.assistance.operit.util.markdown.MarkdownProcessorType
 import com.ai.assistance.operit.ui.theme.LocalGlobalPresentation
 import com.ai.assistance.operit.ui.theme.LocalThemePackageUiRuntimeV2
 import com.ai.assistance.operit.ui.theme.ProvideAiMarkdownTextLayoutSettings
-import com.ai.assistance.operit.ui.theme.ThemeComponentSurfaceV2
+import com.ai.assistance.operit.ui.theme.ThemeBubbleMessageSurfaceV2
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
 
@@ -88,8 +88,11 @@ fun BubbleAiMessageComposable(
     val displayPreferencesManager = remember { DisplayPreferencesManager.getInstance(context) }
     val characterCardManager = remember { CharacterCardManager.getInstance(context) }
     val presentation = LocalGlobalPresentation.current
-    val bubbleShowAvatar = presentation.bubbleShowAvatar
-    val bubbleWideLayoutEnabled = presentation.bubbleWideLayoutEnabled
+    val themeRuntime = LocalThemePackageUiRuntimeV2.current
+    val bubbleShowAvatar =
+        requireNotNull(themeRuntime.booleanPresentation(ThemePresentationTargetV2.BUBBLE_SHOW_AVATAR))
+    val bubbleWideLayoutEnabled =
+        requireNotNull(themeRuntime.booleanPresentation(ThemePresentationTargetV2.BUBBLE_WIDE_LAYOUT))
     val showThinkingProcess = presentation.showThinkingProcess
     val showStatusTags = presentation.showStatusTags
     val effectiveShowThinkingProcess = if (forceShowThinkingProcess) true else showThinkingProcess
@@ -99,7 +102,7 @@ fun BubbleAiMessageComposable(
     val showRoleName = presentation.showRoleName
     val toolCollapseMode by displayPreferencesManager.toolCollapseMode.collectAsState(initial = ToolCollapseMode.ALL)
     val messageSkin =
-        LocalThemePackageUiRuntimeV2.current.componentSkin(ThemeComponentCatalogV2.MESSAGE_ASSISTANT)
+        themeRuntime.bubbleMessageSkin(ThemeComponentCatalogV2.MESSAGE_ASSISTANT)
     val textColor = messageSkin.content
     val backgroundColor = messageSkin.container
 
@@ -123,7 +126,7 @@ fun BubbleAiMessageComposable(
         }
     }.collectAsState(initial = null)
 
-    val avatarShape = CircleShape
+    val avatarShape = themeRuntime.avatarShape()
     val roleNameText = if (showRoleName && message.roleName.isNotEmpty()) message.roleName else ""
     val metadataText = buildString {
         if (showModelName && message.modelName.isNotEmpty()) {
@@ -356,7 +359,8 @@ fun BubbleAiMessageComposable(
                         }
                     }
 
-                    ThemeComponentSurfaceV2(
+                    ThemeBubbleMessageSurfaceV2(
+                        component = ThemeComponentCatalogV2.MESSAGE_ASSISTANT,
                         skin = messageSkin,
                         modifier = bubbleModifier,
                     ) {
@@ -517,7 +521,8 @@ fun BubbleAiMessageComposable(
                         }
                     }
 
-                    ThemeComponentSurfaceV2(
+                    ThemeBubbleMessageSurfaceV2(
+                        component = ThemeComponentCatalogV2.MESSAGE_ASSISTANT,
                         skin = messageSkin,
                         modifier = bubbleModifier,
                     ) {

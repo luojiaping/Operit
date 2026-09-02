@@ -18,6 +18,8 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
 
 internal class ThemePackageArchiveValidationExceptionV2(
     message: String,
@@ -30,7 +32,7 @@ internal data class ThemePackageValidatedArchiveV2(
 )
 
 /**
- * Rejects malformed schema 3 archives before installation. This is intentionally strict: no manifest,
+ * Rejects malformed schema 4 archives before installation. This is intentionally strict: no manifest,
  * asset, scene, token, or presentation data is repaired at import time.
  */
 internal object ThemePackageArchiveValidatorV2 {
@@ -92,16 +94,105 @@ internal object ThemePackageArchiveValidatorV2 {
     private fun decodeManifest(zip: ZipFile, entry: ZipEntry): ThemePackageManifestV2 =
         try {
             zip.getInputStream(entry).use { input ->
-                MANIFEST_JSON.decodeFromString<ThemePackageManifestV2>(
-                    input.readBytes().toString(Charsets.UTF_8),
-                )
+                val source = input.readBytes().toString(Charsets.UTF_8)
+                validateExplicitPresentationBehavior(MANIFEST_JSON.parseToJsonElement(source).jsonObject)
+                MANIFEST_JSON.decodeFromString<ThemePackageManifestV2>(source)
             }
         } catch (error: Throwable) {
             throw ThemePackageArchiveValidationExceptionV2(
-                "Theme package manifest is not a valid schema 3 theme manifest: ${error.message}",
+                "Theme package manifest is not a valid schema 4 theme manifest: ${error.message}",
                 error,
             )
         }
+
+    private fun validateExplicitPresentationBehavior(manifest: JsonObject) {
+        val presentation = manifest["presentation"]?.jsonObject
+            ?: throw ThemePackageArchiveValidationExceptionV2(
+                "Theme package must declare presentation with an explicit behavior object.",
+            )
+        val behavior = presentation["behavior"]?.jsonObject
+            ?: throw ThemePackageArchiveValidationExceptionV2(
+                "Theme package presentation must declare an explicit behavior object.",
+            )
+        behavior.requireExactly(
+            "Theme presentation behavior",
+            setOf("background", "typography", "conversation", "composer", "chrome"),
+        )
+        behavior.requiredObject("background").requireExactly(
+            "Theme background behavior",
+            setOf("enabled", "mediaType", "opacity", "blurEnabled", "blurRadiusDp", "videoMuted", "videoLoop"),
+        )
+        behavior.requiredObject("typography").requireExactly(
+            "Theme typography behavior",
+            setOf("useCustomFont", "family", "scale"),
+        )
+        behavior.requiredObject("conversation").requireExactly(
+            "Theme conversation behavior",
+            setOf(
+                "cursorUserBubbleFollowTheme",
+                "cursorUserBubbleLiquidGlass",
+                "cursorUserBubbleWaterGlass",
+                "cursorUserBubbleColorArgb",
+                "bubbleShowAvatar",
+                "bubbleWideLayout",
+                "bubbleUserLiquidGlass",
+                "bubbleUserWaterGlass",
+                "bubbleAssistantLiquidGlass",
+                "bubbleAssistantWaterGlass",
+                "bubbleImageRenderMode",
+                "bubbleUserRoundedCorners",
+                "bubbleAssistantRoundedCorners",
+                "bubbleUserColorArgb",
+                "bubbleAssistantColorArgb",
+                "bubbleUserTextColorArgb",
+                "bubbleAssistantTextColorArgb",
+                "bubbleUserUseCustomFont",
+                "bubbleUserFontFamily",
+                "bubbleAssistantUseCustomFont",
+                "bubbleAssistantFontFamily",
+                "avatarShape",
+                "avatarCornerRadiusDp",
+            ),
+        )
+        behavior.requiredObject("composer").requireExactly(
+            "Theme Composer behavior",
+            setOf("transparent", "floating", "liquidGlass", "waterGlass"),
+        )
+        behavior.requiredObject("chrome").requireExactly(
+            "Theme chrome behavior",
+            setOf(
+                "statusBarHidden",
+                "statusBarTransparent",
+                "statusBarColorArgb",
+                "toolbarTransparent",
+                "toolbarColorArgb",
+                "navigationWaterGlass",
+                "navigationButtonLiquidGlass",
+                "navigationBackgroundColorArgb",
+                "navigationAccentColorArgb",
+                "chatHeaderTransparent",
+                "chatHeaderOverlayMode",
+                "appBarContentColorMode",
+                "chatHeaderHistoryIconColorArgb",
+                "chatHeaderPipIconColorArgb",
+            ),
+        )
+    }
+
+    private fun JsonObject.requiredObject(name: String): JsonObject =
+        this[name]?.jsonObject
+            ?: throw ThemePackageArchiveValidationExceptionV2("Theme presentation behavior has no $name object.")
+
+    private fun JsonObject.requireExactly(
+        name: String,
+        expected: Set<String>,
+    ) {
+        if (keys != expected) {
+            throw ThemePackageArchiveValidationExceptionV2(
+                "$name must declare exactly: ${expected.sorted().joinToString()}.",
+            )
+        }
+    }
 
     private fun validateEntries(zip: ZipFile) {
         val entries = zip.entries().toList()

@@ -110,9 +110,24 @@ export interface WebChatMessageLocatorPreview {
 export type HistoryDisplayMode = 'BY_CHARACTER_CARD' | 'BY_FOLDER' | 'CURRENT_CHARACTER_ONLY';
 
 export interface WebThemeBackground {
-  type: string;
-  asset_url?: string | null;
+  stage?: WebThemeStageBackground | null;
+  media?: WebThemeMediaBackground | null;
+}
+
+export interface WebThemeStageBackground {
+  asset_url: string;
+  fit: string;
   opacity: number;
+}
+
+export interface WebThemeMediaBackground {
+  type: string;
+  asset_url: string;
+  opacity: number;
+  blur_enabled: boolean;
+  blur_radius_dp: number;
+  muted: boolean;
+  loop: boolean;
 }
 
 export interface WebThemePalette {
@@ -155,6 +170,15 @@ export interface WebBubbleImageTheme {
   enabled: boolean;
   asset_url?: string | null;
   render_mode?: string | null;
+  crop_left: number;
+  crop_top: number;
+  crop_right: number;
+  crop_bottom: number;
+  repeat_start: number;
+  repeat_end: number;
+  repeat_y_start: number;
+  repeat_y_end: number;
+  scale: number;
 }
 
 export interface WebBubbleTheme {
@@ -176,8 +200,14 @@ export interface WebBubbleTheme {
   assistant_rounded: boolean;
   user_padding_left: number;
   user_padding_right: number;
+  user_padding_top: number;
+  user_padding_bottom: number;
   assistant_padding_left: number;
   assistant_padding_right: number;
+  assistant_padding_top: number;
+  assistant_padding_bottom: number;
+  user_font: WebFontTheme;
+  assistant_font: WebFontTheme;
   user_image: WebBubbleImageTheme;
   assistant_image: WebBubbleImageTheme;
 }

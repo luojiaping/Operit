@@ -40,6 +40,8 @@ import com.ai.assistance.operit.ui.features.chat.components.ChatStyle
 import com.ai.assistance.operit.ui.features.chat.components.style.bubble.BubbleStyleChatMessage
 import com.ai.assistance.operit.ui.features.chat.components.style.cursor.CursorStyleChatMessage
 import com.ai.assistance.operit.ui.theme.NativeThemeOffscreenHost
+import com.ai.assistance.operit.ui.theme.ThemePackageSurfaceBackdropV2
+import com.ai.assistance.operit.data.theme.packages.ThemeSurfaceCatalogV2
 import com.ai.assistance.operit.ui.theme.buildActiveThemePackageRuntimeV2
 
 import kotlinx.coroutines.Dispatchers
@@ -72,12 +74,6 @@ object MessageImageGenerator {
         context: Context,
         messages: List<ChatMessage>,
         chatStyle: ChatStyle = ChatStyle.CURSOR,
-        cursorUserBubbleLiquidGlass: Boolean = false,
-        cursorUserBubbleWaterGlass: Boolean = false,
-        bubbleUserBubbleLiquidGlass: Boolean = false,
-        bubbleUserBubbleWaterGlass: Boolean = false,
-        bubbleAiBubbleLiquidGlass: Boolean = false,
-        bubbleAiBubbleWaterGlass: Boolean = false,
         initialThinkingExpanded: Boolean = false,
         expandThinkToolsGroups: Boolean = false,
         includeBackground: Boolean = true,
@@ -139,6 +135,13 @@ object MessageImageGenerator {
                                     .width(widthDp)
                                     .wrapContentHeight()
                             ) {
+                                    if (includeBackground) {
+                                        ThemePackageSurfaceBackdropV2(
+                                            runtime = packageRuntime,
+                                            surface = ThemeSurfaceCatalogV2.CHAT_MAIN,
+                                            modifier = Modifier.matchParentSize(),
+                                        )
+                                    }
                                     Column(
                                         modifier = Modifier
                                             .fillMaxWidth()

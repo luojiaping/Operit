@@ -18,7 +18,7 @@ internal data class PublishedThemeCatalogV2(
     val brokenInstallations: List<String>,
 )
 
-/** Publishes validated schema 3 archives by exact content coordinate into an immutable installation. */
+/** Publishes validated schema 4 archives by exact content coordinate into an immutable installation. */
 internal object ThemePackagePublicationV2 {
     private val manifestJson = Json {
         ignoreUnknownKeys = false

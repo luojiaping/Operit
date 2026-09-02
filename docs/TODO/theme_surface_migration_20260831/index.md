@@ -7,6 +7,8 @@ status: implementation_in_progress
 
 # 全 UI 主题 Surface 分批迁移
 
+> [SUPERSEDED] schema 3 package document 已由 [schema 4 参数契约](../theme_parameter_contract_rebuild_20260901/) 取代；本目录的表面迁移记录仍保留，但其中 schema 3 artifact 描述不再是当前基线。
+
 ## 背景
 
 V2 主题包已经声明 37 个日常 surface 和 16 个组件 skin，但运行时只实际渲染 `app.shell` 与 `chat.main`。其余 `TEMPLATE`、`HOST_SHELL` 和通用 component skin 大多没有真实消费端，因此赛博主题在聊天页外主要只表现为 Material 色板变化。

@@ -63,7 +63,7 @@ import androidx.compose.ui.window.Dialog
 import com.ai.assistance.operit.R
 import com.ai.assistance.operit.data.model.ChatMessage
 import com.ai.assistance.operit.data.model.ChatMessageDisplayMode
-import com.ai.assistance.operit.data.theme.packages.ThemeComponentCatalogV2
+import com.ai.assistance.operit.data.theme.packages.ThemePresentationTargetV2
 import com.ai.assistance.operit.ui.features.chat.components.attachments.AttachmentViewerDialog
 import com.ai.assistance.operit.ui.features.chat.components.attachments.ChatAttachment
 import com.ai.assistance.operit.ui.features.chat.components.style.common.HiddenUserMessagePlaceholderContent
@@ -74,6 +74,10 @@ import com.ai.assistance.operit.util.ChatMarkupRegex
 import com.ai.assistance.operit.ui.theme.LocalThemePackageUiRuntimeV2
 import com.ai.assistance.operit.ui.theme.ResolvedThemeComponentFrameV2
 import com.ai.assistance.operit.ui.theme.ThemeComponentSurfaceV2
+import com.ai.assistance.operit.ui.theme.glassShape
+import com.ai.assistance.operit.ui.theme.liquidGlass
+import com.ai.assistance.operit.ui.theme.toComposeShape
+import com.ai.assistance.operit.ui.theme.waterGlass
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -120,8 +124,8 @@ fun UserMessageComposable(
     val imageLinks = parseResult.imageLinks
     val proxySenderName = if (isHiddenPlaceholder) null else parseResult.proxySenderName
     val isProxySender = !proxySenderName.isNullOrBlank()
-    val userSkin =
-        LocalThemePackageUiRuntimeV2.current.componentSkin(ThemeComponentCatalogV2.MESSAGE_USER)
+    val themeRuntime = LocalThemePackageUiRuntimeV2.current
+    val userSkin = themeRuntime.cursorUserMessageSkin()
     val messageSkin =
         if (isHiddenPlaceholder) {
             userSkin.copy(
@@ -242,6 +246,25 @@ fun UserMessageComposable(
                         } else {
                             Modifier.fillMaxWidth()
                         }
+                    )
+                    .liquidGlass(
+                        enabled =
+                            requireNotNull(
+                                themeRuntime.booleanPresentation(
+                                    ThemePresentationTargetV2.CURSOR_USER_BUBBLE_LIQUID_GLASS,
+                                ),
+                            ),
+                        shape = messageSkin.frame.glassShape(),
+                        containerColor = messageSkin.container,
+                    ).waterGlass(
+                        enabled =
+                            requireNotNull(
+                                themeRuntime.booleanPresentation(
+                                    ThemePresentationTargetV2.CURSOR_USER_BUBBLE_WATER_GLASS,
+                                ),
+                            ),
+                        shape = messageSkin.frame.toComposeShape(),
+                        containerColor = messageSkin.container,
                     ),
         ) {
             Column(modifier = Modifier

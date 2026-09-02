@@ -17,6 +17,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -29,9 +30,11 @@ import com.ai.assistance.operit.data.preferences.ActivePromptManager
 import com.ai.assistance.operit.data.model.ActivePrompt
 import com.ai.assistance.operit.data.preferences.UserPreferencesManager
 import com.ai.assistance.operit.data.theme.packages.ThemeComponentCatalogV2
+import com.ai.assistance.operit.data.theme.packages.ThemePresentationTargetV2
 import com.ai.assistance.operit.ui.features.chat.viewmodel.ChatViewModel
 import com.ai.assistance.operit.ui.floating.FloatingMode
 import com.ai.assistance.operit.ui.theme.ThemeComponentSurfaceV2
+import com.ai.assistance.operit.ui.theme.LocalThemePackageUiRuntimeV2
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.flowOf
 
@@ -127,9 +130,27 @@ fun ChatScreenHeader(
 
 
     val launchFloatingWindow = useFloatingWindowLauncher(actualViewModel, permissionLauncher)
+    val themeRuntime = LocalThemePackageUiRuntimeV2.current
+    val headerUsesOverlay =
+        requireNotNull(
+            themeRuntime.optionPresentation(ThemePresentationTargetV2.CHROME_CHAT_HEADER_OVERLAY_MODE),
+        ) == "overlay"
+    val headerSkin =
+        themeRuntime.componentSkin(ThemeComponentCatalogV2.SECTION).let { skin ->
+            if (
+                headerUsesOverlay ||
+                    requireNotNull(
+                        themeRuntime.booleanPresentation(ThemePresentationTargetV2.CHROME_CHAT_HEADER_TRANSPARENT),
+                    )
+            ) {
+                skin.copy(container = Color.Transparent)
+            } else {
+                skin
+            }
+        }
 
     ThemeComponentSurfaceV2(
-            component = ThemeComponentCatalogV2.SECTION,
+            skin = headerSkin,
             modifier = modifier.fillMaxWidth(),
             applyContentPadding = false,
     ) {
@@ -147,6 +168,14 @@ fun ChatScreenHeader(
                 runningTaskCount = activeStreamingChatIds.size,
                 activeCharacterName = activeCharacterGroup?.name ?: activeCharacterCard?.name ?: "",
                 activeCharacterAvatarUri = activeCharacterAvatarUri,
+                historyIconColor =
+                    themeRuntime.colorPresentation(
+                        ThemePresentationTargetV2.CHROME_CHAT_HEADER_HISTORY_ICON_COLOR,
+                    ),
+                pipIconColor =
+                    themeRuntime.colorPresentation(
+                        ThemePresentationTargetV2.CHROME_CHAT_HEADER_PIP_ICON_COLOR,
+                    ),
                 onCharacterClick = onCharacterSwitcherClick
         )
 

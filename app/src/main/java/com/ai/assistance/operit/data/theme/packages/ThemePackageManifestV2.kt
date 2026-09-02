@@ -10,8 +10,9 @@ import kotlinx.serialization.Serializable
 
 private val MEMBER_ID_PATTERN_V2 = Regex("^[a-z][a-z0-9_]*$")
 private val SHA256_PATTERN_V2 = Regex("^[0-9a-f]{64}$")
+private val THEME_SYSTEM_FONT_OPTION_IDS = setOf("default", "sans_serif", "serif", "monospace", "cursive")
 
-internal const val THEME_PACKAGE_SCHEMA_VERSION = 3
+internal const val THEME_PACKAGE_SCHEMA_VERSION = 4
 internal const val THEME_PACKAGE_MANIFEST_ENTRY_V2 = "operit-theme.json"
 internal const val THEME_PACKAGE_EXTENSION_V2 = "otheme"
 internal const val THEME_PACKAGE_ZIP_COMMENT_V2 = "Operit Theme Package"
@@ -87,22 +88,40 @@ internal data class ThemePackageAttributionV2(
 @Serializable
 internal enum class ThemeParameterTypeV2 {
     COLOR,
+    COLOR_PAIR,
+    BOOLEAN,
+    OPTION,
+    FLOAT,
     IMAGE_URI,
+    VIDEO_URI,
+    FONT_URI,
+    IMAGE_LAYOUT,
+    INSETS,
+    CORNER_RADIUS,
 }
 
 @Serializable
-internal sealed interface ThemeParameterDefaultV2 {
-    @Serializable
-    @SerialName("color")
-    data class ColorValue(val argb: Long) : ThemeParameterDefaultV2 {
-        init {
-            require(argb in 0..0xFFFFFFFFL) { "Color default must be ARGB within 0..0xffffffff." }
-        }
-    }
+internal enum class ThemeParameterVisibilityV2 {
+    USER,
+    AUTHOR,
+}
 
-    @Serializable
-    @SerialName("unset")
-    data object Unset : ThemeParameterDefaultV2
+@Serializable
+internal enum class ThemeParameterSectionV2 {
+    APPEARANCE,
+    CONVERSATION,
+    COMPOSER,
+    APP_CHROME,
+}
+
+@Serializable
+internal data class ThemeParameterChoiceV2(
+    val id: String,
+    val label: ThemePackageLocalizedTextV2,
+) {
+    init {
+        ThemeParameterIdV2(id)
+    }
 }
 
 /** Declares the compact native control used to edit one package-owned value. */
@@ -131,6 +150,65 @@ internal sealed interface ThemeParameterControlV2 {
     }
 
     @Serializable
+    @SerialName("color_pair_palette")
+    data class ColorPairPalette(
+        val lightPresetArgb: List<Long> = emptyList(),
+        val darkPresetArgb: List<Long> = emptyList(),
+        val allowCustom: Boolean = true,
+    ) : ThemeParameterControlV2 {
+        init {
+            val colors = lightPresetArgb + darkPresetArgb
+            require(colors.all { argb -> argb in 0..0xFFFFFFFFL }) {
+                "Theme color pair palette values must be ARGB within 0..0xffffffff."
+            }
+            require(lightPresetArgb.distinct().size == lightPresetArgb.size) {
+                "Theme light color pair palette entries must be unique."
+            }
+            require(darkPresetArgb.distinct().size == darkPresetArgb.size) {
+                "Theme dark color pair palette entries must be unique."
+            }
+            require(colors.isNotEmpty() || allowCustom) {
+                "Theme color pair palette must provide a preset or allow custom colors."
+            }
+        }
+    }
+
+    @Serializable
+    @SerialName("toggle")
+    data object Toggle : ThemeParameterControlV2
+
+    @Serializable
+    @SerialName("choice")
+    data class Choice(
+        val options: List<ThemeParameterChoiceV2>,
+    ) : ThemeParameterControlV2 {
+        init {
+            require(options.isNotEmpty()) { "Theme choice control must declare options." }
+            require(options.map { option -> option.id }.distinct().size == options.size) {
+                "Theme choice options must have unique IDs."
+            }
+        }
+    }
+
+    @Serializable
+    @SerialName("slider")
+    data class Slider(
+        val minimum: Float,
+        val maximum: Float,
+        val step: Float,
+    ) : ThemeParameterControlV2 {
+        init {
+            require(minimum.isFinite() && maximum.isFinite() && step.isFinite()) {
+                "Theme slider bounds must be finite."
+            }
+            require(minimum < maximum) { "Theme slider minimum must be lower than maximum." }
+            require(step > 0f && step <= maximum - minimum) {
+                "Theme slider step must fit within its range."
+            }
+        }
+    }
+
+    @Serializable
     @SerialName("image_picker")
     data class ImagePicker(
         val mimeTypes: List<String> = DEFAULT_IMAGE_MIME_TYPES,
@@ -150,9 +228,164 @@ internal sealed interface ThemeParameterControlV2 {
             private val ALLOWED_IMAGE_MIME_TYPES = DEFAULT_IMAGE_MIME_TYPES.toSet()
         }
     }
+
+    @Serializable
+    @SerialName("video_picker")
+    data class VideoPicker(
+        val mimeTypes: List<String> = DEFAULT_VIDEO_MIME_TYPES,
+    ) : ThemeParameterControlV2 {
+        init {
+            require(mimeTypes.isNotEmpty()) { "Theme video picker must declare MIME types." }
+            require(mimeTypes.all(ALLOWED_VIDEO_MIME_TYPES::contains)) {
+                "Theme video picker declares an unsupported MIME type."
+            }
+            require(mimeTypes.distinct().size == mimeTypes.size) {
+                "Theme video picker MIME types must be unique."
+            }
+        }
+
+        companion object {
+            val DEFAULT_VIDEO_MIME_TYPES = listOf("video/mp4", "video/webm")
+            private val ALLOWED_VIDEO_MIME_TYPES = DEFAULT_VIDEO_MIME_TYPES.toSet()
+        }
+    }
+
+    @Serializable
+    @SerialName("font_picker")
+    data class FontPicker(
+        val mimeTypes: List<String> = DEFAULT_FONT_MIME_TYPES,
+    ) : ThemeParameterControlV2 {
+        init {
+            require(mimeTypes.isNotEmpty()) { "Theme font picker must declare MIME types." }
+            require(mimeTypes.all(ALLOWED_FONT_MIME_TYPES::contains)) {
+                "Theme font picker declares an unsupported MIME type."
+            }
+            require(mimeTypes.distinct().size == mimeTypes.size) {
+                "Theme font picker MIME types must be unique."
+            }
+        }
+
+        companion object {
+            val DEFAULT_FONT_MIME_TYPES = listOf("font/ttf", "font/otf")
+            private val ALLOWED_FONT_MIME_TYPES = DEFAULT_FONT_MIME_TYPES.toSet()
+        }
+    }
+
+    /** Author values remain part of the package contract but never render in application settings. */
+    @Serializable
+    @SerialName("author_value")
+    data object AuthorValue : ThemeParameterControlV2
 }
 
-/** A parameter may only affect an explicit visual target owned by the declaring theme package. */
+@Serializable
+internal sealed interface ThemeParameterConditionV2 {
+    val parameterId: String
+
+    @Serializable
+    @SerialName("boolean_equals")
+    data class BooleanEquals(
+        override val parameterId: String,
+        val expected: Boolean,
+    ) : ThemeParameterConditionV2 {
+        init {
+            ThemeParameterIdV2(parameterId)
+        }
+    }
+
+    @Serializable
+    @SerialName("option_equals")
+    data class OptionEquals(
+        override val parameterId: String,
+        val expected: String,
+    ) : ThemeParameterConditionV2 {
+        init {
+            ThemeParameterIdV2(parameterId)
+            ThemeParameterIdV2(expected)
+        }
+    }
+
+    @Serializable
+    @SerialName("resource_present")
+    data class ResourcePresent(
+        override val parameterId: String,
+    ) : ThemeParameterConditionV2 {
+        init {
+            ThemeParameterIdV2(parameterId)
+        }
+    }
+}
+
+/** Targets cover the full development baseline without exposing an untyped visual-property map. */
+@Serializable
+internal enum class ThemePresentationTargetV2(
+    val valueType: ThemeParameterTypeV2,
+    val optionIds: Set<String> = emptySet(),
+) {
+    TYPOGRAPHY_USE_CUSTOM_FONT(ThemeParameterTypeV2.BOOLEAN),
+    TYPOGRAPHY_FAMILY(ThemeParameterTypeV2.OPTION, THEME_SYSTEM_FONT_OPTION_IDS),
+    TYPOGRAPHY_FONT_URI(ThemeParameterTypeV2.FONT_URI),
+    TYPOGRAPHY_SCALE(ThemeParameterTypeV2.FLOAT),
+    BACKGROUND_USE_IMAGE(ThemeParameterTypeV2.BOOLEAN),
+    BACKGROUND_MEDIA_TYPE(ThemeParameterTypeV2.OPTION, setOf("none", "image", "video")),
+    BACKGROUND_IMAGE_URI(ThemeParameterTypeV2.IMAGE_URI),
+    BACKGROUND_VIDEO_URI(ThemeParameterTypeV2.VIDEO_URI),
+    BACKGROUND_OPACITY(ThemeParameterTypeV2.FLOAT),
+    BACKGROUND_BLUR_ENABLED(ThemeParameterTypeV2.BOOLEAN),
+    BACKGROUND_BLUR_RADIUS(ThemeParameterTypeV2.FLOAT),
+    BACKGROUND_VIDEO_MUTED(ThemeParameterTypeV2.BOOLEAN),
+    BACKGROUND_VIDEO_LOOP(ThemeParameterTypeV2.BOOLEAN),
+    CURSOR_USER_BUBBLE_FOLLOW_THEME(ThemeParameterTypeV2.BOOLEAN),
+    CURSOR_USER_BUBBLE_LIQUID_GLASS(ThemeParameterTypeV2.BOOLEAN),
+    CURSOR_USER_BUBBLE_WATER_GLASS(ThemeParameterTypeV2.BOOLEAN),
+    CURSOR_USER_BUBBLE_COLOR(ThemeParameterTypeV2.COLOR),
+    BUBBLE_SHOW_AVATAR(ThemeParameterTypeV2.BOOLEAN),
+    BUBBLE_WIDE_LAYOUT(ThemeParameterTypeV2.BOOLEAN),
+    BUBBLE_USER_LIQUID_GLASS(ThemeParameterTypeV2.BOOLEAN),
+    BUBBLE_USER_WATER_GLASS(ThemeParameterTypeV2.BOOLEAN),
+    BUBBLE_ASSISTANT_LIQUID_GLASS(ThemeParameterTypeV2.BOOLEAN),
+    BUBBLE_ASSISTANT_WATER_GLASS(ThemeParameterTypeV2.BOOLEAN),
+    BUBBLE_IMAGE_RENDER_MODE(ThemeParameterTypeV2.OPTION, setOf("tiled_nine_slice", "nine_patch")),
+    BUBBLE_USER_ROUNDED_CORNERS(ThemeParameterTypeV2.BOOLEAN),
+    BUBBLE_ASSISTANT_ROUNDED_CORNERS(ThemeParameterTypeV2.BOOLEAN),
+    BUBBLE_USER_COLOR(ThemeParameterTypeV2.COLOR),
+    BUBBLE_ASSISTANT_COLOR(ThemeParameterTypeV2.COLOR),
+    BUBBLE_USER_TEXT_COLOR(ThemeParameterTypeV2.COLOR),
+    BUBBLE_ASSISTANT_TEXT_COLOR(ThemeParameterTypeV2.COLOR),
+    BUBBLE_USER_USE_CUSTOM_FONT(ThemeParameterTypeV2.BOOLEAN),
+    BUBBLE_USER_FONT_FAMILY(ThemeParameterTypeV2.OPTION, THEME_SYSTEM_FONT_OPTION_IDS),
+    BUBBLE_USER_FONT_URI(ThemeParameterTypeV2.FONT_URI),
+    BUBBLE_ASSISTANT_USE_CUSTOM_FONT(ThemeParameterTypeV2.BOOLEAN),
+    BUBBLE_ASSISTANT_FONT_FAMILY(ThemeParameterTypeV2.OPTION, THEME_SYSTEM_FONT_OPTION_IDS),
+    BUBBLE_ASSISTANT_FONT_URI(ThemeParameterTypeV2.FONT_URI),
+    BUBBLE_USER_IMAGE_URI(ThemeParameterTypeV2.IMAGE_URI),
+    BUBBLE_ASSISTANT_IMAGE_URI(ThemeParameterTypeV2.IMAGE_URI),
+    BUBBLE_USER_IMAGE_LAYOUT(ThemeParameterTypeV2.IMAGE_LAYOUT),
+    BUBBLE_ASSISTANT_IMAGE_LAYOUT(ThemeParameterTypeV2.IMAGE_LAYOUT),
+    BUBBLE_USER_CONTENT_INSETS(ThemeParameterTypeV2.INSETS),
+    BUBBLE_ASSISTANT_CONTENT_INSETS(ThemeParameterTypeV2.INSETS),
+    AVATAR_SHAPE(ThemeParameterTypeV2.OPTION, setOf("circle", "square", "rounded")),
+    AVATAR_CORNER_RADIUS(ThemeParameterTypeV2.CORNER_RADIUS),
+    COMPOSER_TRANSPARENT(ThemeParameterTypeV2.BOOLEAN),
+    COMPOSER_FLOATING(ThemeParameterTypeV2.BOOLEAN),
+    COMPOSER_LIQUID_GLASS(ThemeParameterTypeV2.BOOLEAN),
+    COMPOSER_WATER_GLASS(ThemeParameterTypeV2.BOOLEAN),
+    CHROME_STATUS_BAR_HIDDEN(ThemeParameterTypeV2.BOOLEAN),
+    CHROME_STATUS_BAR_TRANSPARENT(ThemeParameterTypeV2.BOOLEAN),
+    CHROME_STATUS_BAR_COLOR(ThemeParameterTypeV2.COLOR),
+    CHROME_TOOLBAR_TRANSPARENT(ThemeParameterTypeV2.BOOLEAN),
+    CHROME_TOOLBAR_COLOR(ThemeParameterTypeV2.COLOR),
+    CHROME_NAVIGATION_WATER_GLASS(ThemeParameterTypeV2.BOOLEAN),
+    CHROME_NAVIGATION_BUTTON_LIQUID_GLASS(ThemeParameterTypeV2.BOOLEAN),
+    CHROME_NAVIGATION_BACKGROUND_COLOR(ThemeParameterTypeV2.COLOR),
+    CHROME_NAVIGATION_ACCENT_COLOR(ThemeParameterTypeV2.COLOR),
+    CHROME_CHAT_HEADER_TRANSPARENT(ThemeParameterTypeV2.BOOLEAN),
+    CHROME_CHAT_HEADER_OVERLAY_MODE(ThemeParameterTypeV2.OPTION, setOf("none", "overlay")),
+    CHROME_APP_BAR_CONTENT_COLOR_MODE(ThemeParameterTypeV2.OPTION, setOf("auto", "light", "dark")),
+    CHROME_CHAT_HEADER_HISTORY_ICON_COLOR(ThemeParameterTypeV2.COLOR),
+    CHROME_CHAT_HEADER_PIP_ICON_COLOR(ThemeParameterTypeV2.COLOR),
+}
+
+/** A parameter may only affect an explicit target declared by the active theme package. */
 @Serializable
 internal sealed interface ThemeParameterEffectV2 {
     @Serializable
@@ -174,6 +407,20 @@ internal sealed interface ThemeParameterEffectV2 {
     }
 
     @Serializable
+    @SerialName("token_color_pair")
+    data class TokenColorPair(
+        val tokenIds: List<String>,
+    ) : ThemeParameterEffectV2 {
+        init {
+            require(tokenIds.isNotEmpty()) { "Theme token color pair effect must target a token." }
+            require(tokenIds.distinct().size == tokenIds.size) {
+                "Theme token color pair effect targets must be unique."
+            }
+            tokenIds.forEach(::ThemeSceneTokenIdV1)
+        }
+    }
+
+    @Serializable
     @SerialName("stage_image")
     data class StageImage(
         val surfaceIds: List<String>,
@@ -189,21 +436,74 @@ internal sealed interface ThemeParameterEffectV2 {
             require(opacity in 0f..1f) { "Theme stage image opacity must be within [0, 1]." }
         }
     }
+
+    @Serializable
+    @SerialName("typography_scale")
+    data object TypographyScale : ThemeParameterEffectV2
+
+    @Serializable
+    @SerialName("shape_scale")
+    data object ShapeScale : ThemeParameterEffectV2
+
+    @Serializable
+    @SerialName("component_frame_scale")
+    data class ComponentFrameScale(
+        val componentIds: List<String>,
+    ) : ThemeParameterEffectV2 {
+        init {
+            require(componentIds.isNotEmpty()) { "Theme component frame scale must target a component." }
+            require(componentIds.distinct().size == componentIds.size) {
+                "Theme component frame scale targets must be unique."
+            }
+            componentIds.forEach(::ThemeComponentIdV2)
+        }
+    }
+
+    @Serializable
+    @SerialName("component_content_insets")
+    data class ComponentContentInsets(
+        val componentIds: List<String>,
+    ) : ThemeParameterEffectV2 {
+        init {
+            require(componentIds.isNotEmpty()) { "Theme component inset effect must target a component." }
+            require(componentIds.distinct().size == componentIds.size) {
+                "Theme component inset effect targets must be unique."
+            }
+            componentIds.forEach(::ThemeComponentIdV2)
+        }
+    }
+
+    @Serializable
+    @SerialName("presentation")
+    data class Presentation(
+        val targets: List<ThemePresentationTargetV2>,
+    ) : ThemeParameterEffectV2 {
+        init {
+            require(targets.isNotEmpty()) { "Theme presentation effect must target a presentation value." }
+            require(targets.distinct().size == targets.size) {
+                "Theme presentation effect targets must be unique."
+            }
+        }
+    }
 }
 
 @Serializable
 internal data class ThemeParameterDefinitionV2(
     val id: String,
     val type: ThemeParameterTypeV2,
-    val defaultValue: ThemeParameterDefaultV2 = ThemeParameterDefaultV2.Unset,
+    val defaultValue: ThemeParameterValueV2? = null,
     val label: ThemePackageLocalizedTextV2,
     val description: ThemePackageLocalizedTextV2? = null,
     val control: ThemeParameterControlV2,
     val effects: List<ThemeParameterEffectV2>,
+    val visibility: ThemeParameterVisibilityV2 = ThemeParameterVisibilityV2.AUTHOR,
+    val section: ThemeParameterSectionV2? = null,
+    val order: Int = 0,
+    val visibleWhen: List<ThemeParameterConditionV2> = emptyList(),
 ) {
     init {
         ThemeParameterIdV2(id)
-        require(defaultValue.matches(type)) {
+        require(defaultValue == null || defaultValue.matches(type)) {
             "Theme parameter $id declares type $type with a mismatched default value."
         }
         require(control.matches(type)) {
@@ -213,19 +513,54 @@ internal data class ThemeParameterDefinitionV2(
         require(effects.all { effect -> effect.matches(type) }) {
             "Theme parameter $id declares an effect incompatible with type $type."
         }
-        if (type == ThemeParameterTypeV2.IMAGE_URI) {
-            require(defaultValue == ThemeParameterDefaultV2.Unset) {
-                "Theme image URI parameter $id must not declare a package default."
+        effects.filterIsInstance<ThemeParameterEffectV2.Presentation>().forEach { effect ->
+            effect.targets.forEach { target ->
+                require(target.valueType == type) {
+                    "Theme parameter $id cannot apply $type to presentation target $target."
+                }
+                if (type == ThemeParameterTypeV2.OPTION) {
+                    val choice = control as? ThemeParameterControlV2.Choice
+                    require(choice != null && choice.options.all { option -> option.id in target.optionIds }) {
+                        "Theme parameter $id declares an option outside presentation target $target."
+                    }
+                }
             }
+        }
+        if (type.isUri()) {
+            require(defaultValue == null) { "Theme URI parameter $id must not declare a package default." }
         }
         val palette = control as? ThemeParameterControlV2.ColorPalette
         if (palette != null) {
-            val colorDefault = defaultValue as? ThemeParameterDefaultV2.ColorValue
+            val colorDefault = defaultValue as? ThemeParameterValueV2.ColorValue
             require(colorDefault != null) {
                 "Theme color palette parameter $id must declare a color default."
             }
             require(colorDefault.argb ushr 24 == 0xFFL) {
                 "Theme color palette parameter $id must use an opaque default color."
+            }
+        }
+        val choices = control as? ThemeParameterControlV2.Choice
+        if (choices != null) {
+            val optionDefault = defaultValue as? ThemeParameterValueV2.OptionValue
+            require(optionDefault != null && choices.options.any { option -> option.id == optionDefault.value }) {
+                "Theme choice parameter $id must declare one of its options as the default."
+            }
+        }
+        if (visibility == ThemeParameterVisibilityV2.USER) {
+            require(section != null) { "User-visible theme parameter $id must declare a section." }
+            require(control !is ThemeParameterControlV2.AuthorValue) {
+                "User-visible theme parameter $id cannot use an author-only control."
+            }
+            require(control.supportsUserSettingsSurface()) {
+                "User-visible theme parameter $id declares a control outside the compact settings surface."
+            }
+            require(defaultValue != null || type.isUri()) {
+                "User-visible non-resource theme parameter $id must declare a default value."
+            }
+        } else {
+            require(section == null) { "Author-only theme parameter $id cannot declare a settings section." }
+            require(control is ThemeParameterControlV2.AuthorValue) {
+                "Author-only theme parameter $id must use the author-only control."
             }
         }
     }
@@ -237,6 +572,157 @@ internal enum class ThemeSystemFontFamilyV2 {
     SANS_SERIF,
     SERIF,
     MONOSPACE,
+    CURSIVE,
+}
+
+@Serializable
+internal enum class ThemeBackgroundMediaTypeV2 {
+    NONE,
+    IMAGE,
+    VIDEO,
+}
+
+@Serializable
+internal enum class ThemeBubbleImageRenderModeV2 {
+    TILED_NINE_SLICE,
+    NINE_PATCH,
+}
+
+@Serializable
+internal enum class ThemeAvatarShapeV2 {
+    CIRCLE,
+    SQUARE,
+    ROUNDED,
+}
+
+@Serializable
+internal enum class ThemeChatHeaderOverlayModeV2 {
+    NONE,
+    OVERLAY,
+}
+
+@Serializable
+internal enum class ThemeChromeContentColorModeV2 {
+    AUTO,
+    LIGHT,
+    DARK,
+}
+
+/** Static package behavior and explicit defaults for values that are not component-skin geometry. */
+@Serializable
+internal data class ThemePackagePresentationBehaviorV2(
+    val background: ThemeBackgroundPresentationV2 = ThemeBackgroundPresentationV2(),
+    val typography: ThemeTypographyPresentationV2 = ThemeTypographyPresentationV2(),
+    val conversation: ThemeConversationPresentationV2 = ThemeConversationPresentationV2(),
+    val composer: ThemeComposerPresentationV2 = ThemeComposerPresentationV2(),
+    val chrome: ThemeChromePresentationV2 = ThemeChromePresentationV2(),
+)
+
+@Serializable
+internal data class ThemeBackgroundPresentationV2(
+    val enabled: Boolean = false,
+    val mediaType: ThemeBackgroundMediaTypeV2 = ThemeBackgroundMediaTypeV2.NONE,
+    val opacity: Float = 0.22f,
+    val blurEnabled: Boolean = false,
+    val blurRadiusDp: Float = 0f,
+    val videoMuted: Boolean = true,
+    val videoLoop: Boolean = true,
+) {
+    init {
+        require(opacity in 0f..1f) { "Theme background opacity must be within [0, 1]." }
+        require(blurRadiusDp in 0f..96f) { "Theme background blur radius must be within [0, 96] dp." }
+        require(!enabled || mediaType != ThemeBackgroundMediaTypeV2.NONE) {
+            "An enabled theme background must declare image or video media."
+        }
+    }
+}
+
+@Serializable
+internal data class ThemeTypographyPresentationV2(
+    val useCustomFont: Boolean = false,
+    val family: ThemeSystemFontFamilyV2 = ThemeSystemFontFamilyV2.DEFAULT,
+    val scale: Float = 1f,
+) {
+    init {
+        require(scale in 0.5f..2f) { "Theme typography presentation scale must be within [0.5, 2]." }
+    }
+}
+
+@Serializable
+internal data class ThemeConversationPresentationV2(
+    val cursorUserBubbleFollowTheme: Boolean = true,
+    val cursorUserBubbleLiquidGlass: Boolean = false,
+    val cursorUserBubbleWaterGlass: Boolean = false,
+    val cursorUserBubbleColorArgb: Long? = null,
+    val bubbleShowAvatar: Boolean = true,
+    val bubbleWideLayout: Boolean = false,
+    val bubbleUserLiquidGlass: Boolean = false,
+    val bubbleUserWaterGlass: Boolean = false,
+    val bubbleAssistantLiquidGlass: Boolean = false,
+    val bubbleAssistantWaterGlass: Boolean = false,
+    val bubbleImageRenderMode: ThemeBubbleImageRenderModeV2 = ThemeBubbleImageRenderModeV2.TILED_NINE_SLICE,
+    val bubbleUserRoundedCorners: Boolean = true,
+    val bubbleAssistantRoundedCorners: Boolean = true,
+    val bubbleUserColorArgb: Long? = null,
+    val bubbleAssistantColorArgb: Long? = null,
+    val bubbleUserTextColorArgb: Long? = null,
+    val bubbleAssistantTextColorArgb: Long? = null,
+    val bubbleUserUseCustomFont: Boolean = false,
+    val bubbleUserFontFamily: ThemeSystemFontFamilyV2 = ThemeSystemFontFamilyV2.DEFAULT,
+    val bubbleAssistantUseCustomFont: Boolean = false,
+    val bubbleAssistantFontFamily: ThemeSystemFontFamilyV2 = ThemeSystemFontFamilyV2.DEFAULT,
+    val avatarShape: ThemeAvatarShapeV2 = ThemeAvatarShapeV2.CIRCLE,
+    val avatarCornerRadiusDp: Float = 0f,
+) {
+    init {
+        listOfNotNull(
+            cursorUserBubbleColorArgb,
+            bubbleUserColorArgb,
+            bubbleAssistantColorArgb,
+            bubbleUserTextColorArgb,
+            bubbleAssistantTextColorArgb,
+        ).forEach { argb -> require(argb in 0..0xFFFFFFFFL) { "Theme conversation color must be ARGB." } }
+        require(avatarCornerRadiusDp in 0f..96f) {
+            "Theme avatar corner radius must be within [0, 96] dp."
+        }
+    }
+}
+
+@Serializable
+internal data class ThemeComposerPresentationV2(
+    val transparent: Boolean = false,
+    val floating: Boolean = false,
+    val liquidGlass: Boolean = false,
+    val waterGlass: Boolean = false,
+)
+
+@Serializable
+internal data class ThemeChromePresentationV2(
+    val statusBarHidden: Boolean = false,
+    val statusBarTransparent: Boolean = false,
+    val statusBarColorArgb: Long? = null,
+    val toolbarTransparent: Boolean = false,
+    val toolbarColorArgb: Long? = null,
+    val navigationWaterGlass: Boolean = false,
+    val navigationButtonLiquidGlass: Boolean = false,
+    val navigationBackgroundColorArgb: Long? = null,
+    val navigationAccentColorArgb: Long? = null,
+    val chatHeaderTransparent: Boolean = false,
+    val chatHeaderOverlayMode: ThemeChatHeaderOverlayModeV2 = ThemeChatHeaderOverlayModeV2.NONE,
+    val appBarContentColorMode: ThemeChromeContentColorModeV2 = ThemeChromeContentColorModeV2.AUTO,
+    val chatHeaderHistoryIconColorArgb: Long? = null,
+    val chatHeaderPipIconColorArgb: Long? = null,
+) {
+    init {
+        listOfNotNull(
+            statusBarColorArgb,
+            toolbarColorArgb,
+            navigationBackgroundColorArgb,
+            navigationAccentColorArgb,
+            chatHeaderHistoryIconColorArgb,
+            chatHeaderPipIconColorArgb,
+        ).forEach { argb -> require(argb in 0..0xFFFFFFFFL) { "Theme chrome color must be ARGB." } }
+    }
 }
 
 @Serializable
@@ -600,6 +1086,7 @@ internal data class ThemeSurfaceImplementationV2(
 internal data class ThemePackagePresentationPatchV2(
     val material: ThemeMaterialProjectionV2? = null,
     val componentSkins: Map<String, ThemeComponentSkinV2> = emptyMap(),
+    val behavior: ThemePackagePresentationBehaviorV2,
 ) {
     init {
         componentSkins.keys.forEach(::ThemeComponentIdV2)
@@ -623,7 +1110,7 @@ internal data class ThemePackageManifestV2(
     val tokens: ThemeSceneTokenSetV1 = ThemeSceneTokenSetV1(),
     val scenes: List<ThemeSceneDefinitionV1> = emptyList(),
     val surfaces: List<ThemeSurfaceImplementationV2> = emptyList(),
-    val presentation: ThemePackagePresentationPatchV2 = ThemePackagePresentationPatchV2(),
+    val presentation: ThemePackagePresentationPatchV2,
 ) {
     init {
         require(schemaVersion == THEME_PACKAGE_SCHEMA_VERSION) {
@@ -647,6 +1134,7 @@ internal data class ThemePackageManifestV2(
                 "Theme surface ${surface.surfaceId} references a missing scene ${surface.sceneId}."
             }
         }
+        validateParameterConditions(parameters)
     }
 
     fun coordinateFor(archiveSha256: ThemeArchiveSha256V2): ThemePackageCoordinateV2 =
@@ -660,22 +1148,92 @@ internal data class ThemePackageManifestV2(
         parameters.firstOrNull { it.id == id }
 }
 
-internal fun ThemeParameterDefaultV2.matches(type: ThemeParameterTypeV2): Boolean =
-    when (type) {
-        ThemeParameterTypeV2.COLOR -> this is ThemeParameterDefaultV2.ColorValue || this is ThemeParameterDefaultV2.Unset
-        ThemeParameterTypeV2.IMAGE_URI -> this is ThemeParameterDefaultV2.Unset
+private fun validateParameterConditions(parameters: List<ThemeParameterDefinitionV2>) {
+    val definitions = parameters.associateBy { definition -> definition.id }
+    parameters.forEach { definition ->
+        definition.visibleWhen.forEach { condition ->
+            val dependency = definitions[condition.parameterId]
+                ?: throw IllegalArgumentException(
+                    "Theme parameter ${definition.id} depends on unknown parameter ${condition.parameterId}.",
+                )
+            when (condition) {
+                is ThemeParameterConditionV2.BooleanEquals ->
+                    require(dependency.type == ThemeParameterTypeV2.BOOLEAN) {
+                        "Theme parameter ${definition.id} has a boolean condition on non-boolean ${dependency.id}."
+                    }
+
+                is ThemeParameterConditionV2.OptionEquals -> {
+                    require(dependency.type == ThemeParameterTypeV2.OPTION) {
+                        "Theme parameter ${definition.id} has an option condition on non-option ${dependency.id}."
+                    }
+                    val choice = dependency.control as? ThemeParameterControlV2.Choice
+                    require(choice?.options?.any { option -> option.id == condition.expected } == true) {
+                        "Theme parameter ${definition.id} depends on unknown option ${condition.expected}."
+                    }
+                }
+
+                is ThemeParameterConditionV2.ResourcePresent ->
+                    require(dependency.type.isUri()) {
+                        "Theme parameter ${definition.id} has a resource condition on non-resource ${dependency.id}."
+                    }
+            }
+        }
     }
+}
+
+internal fun ThemeParameterValueV2.matches(type: ThemeParameterTypeV2): Boolean =
+    when (type) {
+        ThemeParameterTypeV2.COLOR -> this is ThemeParameterValueV2.ColorValue
+        ThemeParameterTypeV2.COLOR_PAIR -> this is ThemeParameterValueV2.ColorPairValue
+        ThemeParameterTypeV2.BOOLEAN -> this is ThemeParameterValueV2.BooleanValue
+        ThemeParameterTypeV2.OPTION -> this is ThemeParameterValueV2.OptionValue
+        ThemeParameterTypeV2.FLOAT -> this is ThemeParameterValueV2.FloatValue
+        ThemeParameterTypeV2.IMAGE_URI -> this is ThemeParameterValueV2.ImageUriValue
+        ThemeParameterTypeV2.VIDEO_URI -> this is ThemeParameterValueV2.VideoUriValue
+        ThemeParameterTypeV2.FONT_URI -> this is ThemeParameterValueV2.FontUriValue
+        ThemeParameterTypeV2.IMAGE_LAYOUT -> this is ThemeParameterValueV2.ImageLayoutValue
+        ThemeParameterTypeV2.INSETS -> this is ThemeParameterValueV2.InsetsValue
+        ThemeParameterTypeV2.CORNER_RADIUS -> this is ThemeParameterValueV2.CornerRadiusValue
+    }
+
+internal fun ThemeParameterTypeV2.isUri(): Boolean =
+    this == ThemeParameterTypeV2.IMAGE_URI ||
+        this == ThemeParameterTypeV2.VIDEO_URI ||
+        this == ThemeParameterTypeV2.FONT_URI
 
 internal fun ThemeParameterControlV2.matches(type: ThemeParameterTypeV2): Boolean =
     when (this) {
         is ThemeParameterControlV2.ColorPalette -> type == ThemeParameterTypeV2.COLOR
+        is ThemeParameterControlV2.ColorPairPalette -> type == ThemeParameterTypeV2.COLOR_PAIR
+        ThemeParameterControlV2.Toggle -> type == ThemeParameterTypeV2.BOOLEAN
+        is ThemeParameterControlV2.Choice -> type == ThemeParameterTypeV2.OPTION
+        is ThemeParameterControlV2.Slider -> type == ThemeParameterTypeV2.FLOAT
         is ThemeParameterControlV2.ImagePicker -> type == ThemeParameterTypeV2.IMAGE_URI
+        is ThemeParameterControlV2.VideoPicker -> type == ThemeParameterTypeV2.VIDEO_URI
+        is ThemeParameterControlV2.FontPicker -> type == ThemeParameterTypeV2.FONT_URI
+        ThemeParameterControlV2.AuthorValue -> true
     }
+
+internal fun ThemeParameterControlV2.supportsUserSettingsSurface(): Boolean =
+    this is ThemeParameterControlV2.ColorPalette ||
+        this is ThemeParameterControlV2.Toggle ||
+        this is ThemeParameterControlV2.Choice ||
+        this is ThemeParameterControlV2.Slider ||
+        this is ThemeParameterControlV2.ImagePicker ||
+        this is ThemeParameterControlV2.VideoPicker ||
+        this is ThemeParameterControlV2.FontPicker
 
 internal fun ThemeParameterEffectV2.matches(type: ThemeParameterTypeV2): Boolean =
     when (this) {
         ThemeParameterEffectV2.AccentPalette,
         is ThemeParameterEffectV2.TokenColor -> type == ThemeParameterTypeV2.COLOR
 
+        is ThemeParameterEffectV2.TokenColorPair -> type == ThemeParameterTypeV2.COLOR_PAIR
         is ThemeParameterEffectV2.StageImage -> type == ThemeParameterTypeV2.IMAGE_URI
+        ThemeParameterEffectV2.TypographyScale,
+        ThemeParameterEffectV2.ShapeScale,
+        is ThemeParameterEffectV2.ComponentFrameScale -> type == ThemeParameterTypeV2.FLOAT
+
+        is ThemeParameterEffectV2.ComponentContentInsets -> type == ThemeParameterTypeV2.INSETS
+        is ThemeParameterEffectV2.Presentation -> targets.all { target -> target.valueType == type }
     }

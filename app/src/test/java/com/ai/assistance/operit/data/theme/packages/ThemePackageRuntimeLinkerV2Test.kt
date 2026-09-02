@@ -16,6 +16,7 @@ import com.ai.assistance.operit.ui.theme.scene.ThemeSceneTokenValueV1
 import com.ai.assistance.operit.ui.theme.scene.ThemeSceneVersionV1
 import java.io.File
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -122,6 +123,7 @@ class ThemePackageRuntimeLinkerV2Test {
             presentation =
                 ThemePackagePresentationPatchV2(
                     material = materialProjection(),
+                    behavior = ThemePackagePresentationBehaviorV2(),
                     componentSkins =
                         ThemeComponentCatalogV2.requiredComponents.associate { component ->
                             component.value to
@@ -138,11 +140,10 @@ class ThemePackageRuntimeLinkerV2Test {
                 ),
             parameters =
                 listOf(
-                    ThemeParameterDefinitionV2(
+                    userParameter(
                         id = "accent_color",
                         type = ThemeParameterTypeV2.COLOR,
-                        defaultValue = ThemeParameterDefaultV2.ColorValue(0xFF6750A4),
-                        label = ThemePackageLocalizedTextV2(values = mapOf("*" to "Primary")),
+                        defaultValue = ThemeParameterValueV2.ColorValue(0xFF6750A4),
                         control =
                             ThemeParameterControlV2.ColorPalette(
                                 presetArgb = listOf(0xFF6750A4),
@@ -156,6 +157,26 @@ class ThemePackageRuntimeLinkerV2Test {
                             ),
                     ),
                 ),
+        )
+
+    private fun userParameter(
+        id: String,
+        type: ThemeParameterTypeV2,
+        control: ThemeParameterControlV2,
+        effects: List<ThemeParameterEffectV2>,
+        defaultValue: ThemeParameterValueV2? = null,
+        visibleWhen: List<ThemeParameterConditionV2> = emptyList(),
+    ): ThemeParameterDefinitionV2 =
+        ThemeParameterDefinitionV2(
+            id = id,
+            type = type,
+            defaultValue = defaultValue,
+            label = ThemePackageLocalizedTextV2(values = mapOf("*" to id)),
+            control = control,
+            effects = effects,
+            visibility = ThemeParameterVisibilityV2.USER,
+            section = ThemeParameterSectionV2.APPEARANCE,
+            visibleWhen = visibleWhen,
         )
 
     private fun materialProjection(): ThemeMaterialProjectionV2 =
@@ -361,6 +382,7 @@ class ThemePackageRuntimeLinkerV2Test {
                 surfaces = emptyList(),
                 presentation =
                     ThemePackagePresentationPatchV2(
+                        behavior = ThemePackagePresentationBehaviorV2(),
                         componentSkins =
                             mapOf(
                                 ThemeComponentCatalogV2.STATUS.value to componentSkin("color.status"),
@@ -508,7 +530,7 @@ class ThemePackageRuntimeLinkerV2Test {
                             sceneId = "chat.main",
                         ),
                     ),
-                presentation = ThemePackagePresentationPatchV2(),
+                presentation = ThemePackagePresentationPatchV2(behavior = ThemePackagePresentationBehaviorV2()),
                 parameters = emptyList(),
             )
         val child = installation(childManifest, tmp.newFolder("asset-child"))
@@ -528,7 +550,7 @@ class ThemePackageRuntimeLinkerV2Test {
     fun missingMaterialProjectionIsRejected() {
         val manifest =
             completeManifest().copy(
-                presentation = ThemePackagePresentationPatchV2(),
+                presentation = ThemePackagePresentationPatchV2(behavior = ThemePackagePresentationBehaviorV2()),
             )
         val installation = installation(manifest, tmp.newFolder("no-material"))
 
@@ -563,7 +585,7 @@ class ThemePackageRuntimeLinkerV2Test {
                             sceneId = "app.shell",
                         ),
                     ),
-                presentation = ThemePackagePresentationPatchV2(),
+                presentation = ThemePackagePresentationPatchV2(behavior = ThemePackagePresentationBehaviorV2()),
                 parameters = emptyList(),
             )
         val child = installation(childManifest, tmp.newFolder("child"))
@@ -633,6 +655,395 @@ class ThemePackageRuntimeLinkerV2Test {
     }
 
     @Test
+    fun visibilityConditionsRequireMatchingBooleanAndOptionValues() {
+        val useBackground =
+            userParameter(
+                id = "use_background",
+                type = ThemeParameterTypeV2.BOOLEAN,
+                defaultValue = ThemeParameterValueV2.BooleanValue(true),
+                control = ThemeParameterControlV2.Toggle,
+                effects =
+                    listOf(
+                        ThemeParameterEffectV2.Presentation(
+                            targets = listOf(ThemePresentationTargetV2.BACKGROUND_USE_IMAGE),
+                        ),
+                    ),
+            )
+        val backgroundMode =
+            userParameter(
+                id = "background_mode",
+                type = ThemeParameterTypeV2.OPTION,
+                defaultValue = ThemeParameterValueV2.OptionValue("image"),
+                control =
+                    ThemeParameterControlV2.Choice(
+                        options =
+                            listOf(
+                                ThemeParameterChoiceV2(
+                                    id = "image",
+                                    label = ThemePackageLocalizedTextV2(values = mapOf("*" to "Image")),
+                                ),
+                                ThemeParameterChoiceV2(
+                                    id = "none",
+                                    label = ThemePackageLocalizedTextV2(values = mapOf("*" to "None")),
+                                ),
+                            ),
+                    ),
+                effects =
+                    listOf(
+                        ThemeParameterEffectV2.Presentation(
+                            targets = listOf(ThemePresentationTargetV2.BACKGROUND_MEDIA_TYPE),
+                        ),
+                    ),
+            )
+        val backgroundImage =
+            userParameter(
+                id = "background_image",
+                type = ThemeParameterTypeV2.IMAGE_URI,
+                control = ThemeParameterControlV2.ImagePicker(),
+                effects =
+                    listOf(
+                        ThemeParameterEffectV2.StageImage(
+                            surfaceIds = listOf(ThemeSurfaceCatalogV2.APP_SHELL.value),
+                        ),
+                    ),
+                visibleWhen =
+                    listOf(
+                        ThemeParameterConditionV2.BooleanEquals("use_background", true),
+                        ThemeParameterConditionV2.OptionEquals("background_mode", "image"),
+                    ),
+            )
+        val manifest =
+            completeManifest().copy(
+                parameters = listOf(useBackground, backgroundMode, backgroundImage),
+            )
+        val installation = installation(manifest, tmp.newFolder("visibility-conditions"))
+        val linked =
+            ThemePackageRuntimeLinkerV2.link(
+                installation,
+                PublishedThemeCatalogV2(listOf(installation), emptyList()),
+            )
+
+        val visible =
+            ThemePackageRuntimeLinkerV2.resolveParameters(
+                ThemeInstanceV2(reference = ThemePackageReferenceV2(installation.coordinate)),
+                linked,
+            )
+        assertTrue(visible.isUserVisible(backgroundImage))
+        val runtime =
+            createThemePackageUiRuntimeV2(
+                linked = linked,
+                parameters = visible,
+                darkTheme = false,
+                userFontScale = 1f,
+            )
+        assertEquals(
+            ThemeParameterValueV2.BooleanValue(true),
+            runtime.presentationValue(ThemePresentationTargetV2.BACKGROUND_USE_IMAGE),
+        )
+        assertEquals(
+            ThemeParameterValueV2.OptionValue("image"),
+            runtime.presentationValue(ThemePresentationTargetV2.BACKGROUND_MEDIA_TYPE),
+        )
+
+        val hiddenByBoolean =
+            ThemePackageRuntimeLinkerV2.resolveParameters(
+                ThemeInstanceV2(
+                    reference = ThemePackageReferenceV2(installation.coordinate),
+                    parameterValues =
+                        mapOf("use_background" to ThemeParameterValueV2.BooleanValue(false)),
+                ),
+                linked,
+            )
+        assertFalse(hiddenByBoolean.isUserVisible(backgroundImage))
+
+        val hiddenByOption =
+            ThemePackageRuntimeLinkerV2.resolveParameters(
+                ThemeInstanceV2(
+                    reference = ThemePackageReferenceV2(installation.coordinate),
+                    parameterValues =
+                        mapOf("background_mode" to ThemeParameterValueV2.OptionValue("none")),
+                ),
+                linked,
+            )
+        assertFalse(hiddenByOption.isUserVisible(backgroundImage))
+    }
+
+    @Test
+    fun resourcePresentConditionShowsDependentControlOnlyAfterSelection() {
+        val image =
+            userParameter(
+                id = "background_image",
+                type = ThemeParameterTypeV2.IMAGE_URI,
+                control = ThemeParameterControlV2.ImagePicker(),
+                effects =
+                    listOf(
+                        ThemeParameterEffectV2.StageImage(
+                            surfaceIds = listOf(ThemeSurfaceCatalogV2.APP_SHELL.value),
+                        ),
+                    ),
+            )
+        val opacity =
+            userParameter(
+                id = "background_opacity",
+                type = ThemeParameterTypeV2.FLOAT,
+                defaultValue = ThemeParameterValueV2.FloatValue(0.22f),
+                control = ThemeParameterControlV2.Slider(minimum = 0f, maximum = 1f, step = 0.05f),
+                effects =
+                    listOf(
+                        ThemeParameterEffectV2.Presentation(
+                            targets = listOf(ThemePresentationTargetV2.BACKGROUND_OPACITY),
+                        ),
+                    ),
+                visibleWhen = listOf(ThemeParameterConditionV2.ResourcePresent("background_image")),
+            )
+        val manifest = completeManifest().copy(parameters = listOf(image, opacity))
+        val installation = installation(manifest, tmp.newFolder("resource-condition"))
+        val linked =
+            ThemePackageRuntimeLinkerV2.link(
+                installation,
+                PublishedThemeCatalogV2(listOf(installation), emptyList()),
+            )
+
+        val empty =
+            ThemePackageRuntimeLinkerV2.resolveParameters(
+                ThemeInstanceV2(reference = ThemePackageReferenceV2(installation.coordinate)),
+                linked,
+            )
+        assertFalse(empty.isUserVisible(opacity))
+
+        val selected =
+            ThemePackageRuntimeLinkerV2.resolveParameters(
+                ThemeInstanceV2(
+                    reference = ThemePackageReferenceV2(installation.coordinate),
+                    parameterValues =
+                        mapOf(
+                            "background_image" to ThemeParameterValueV2.ImageUriValue("content://theme/background"),
+                        ),
+                ),
+                linked,
+            )
+        assertTrue(selected.isUserVisible(opacity))
+    }
+
+    @Test
+    fun enabledBackgroundWithoutASelectedResourceDoesNotCreateMedia() {
+        val base = completeManifest()
+        val manifest =
+            base.copy(
+                presentation =
+                    base.presentation.copy(
+                        behavior =
+                            ThemePackagePresentationBehaviorV2(
+                                background =
+                                    ThemeBackgroundPresentationV2(
+                                        enabled = true,
+                                        mediaType = ThemeBackgroundMediaTypeV2.IMAGE,
+                                    ),
+                            ),
+                    ),
+                parameters =
+                    listOf(
+                        userParameter(
+                            id = "background_image",
+                            type = ThemeParameterTypeV2.IMAGE_URI,
+                            control = ThemeParameterControlV2.ImagePicker(),
+                            effects =
+                                listOf(
+                                    ThemeParameterEffectV2.Presentation(
+                                        targets = listOf(ThemePresentationTargetV2.BACKGROUND_IMAGE_URI),
+                                    ),
+                                ),
+                        ),
+                    ),
+            )
+        val installation = installation(manifest, tmp.newFolder("empty-background-media"))
+        val linked =
+            ThemePackageRuntimeLinkerV2.link(
+                installation,
+                PublishedThemeCatalogV2(listOf(installation), emptyList()),
+            )
+        val parameters =
+            ThemePackageRuntimeLinkerV2.resolveParameters(
+                ThemeInstanceV2(reference = ThemePackageReferenceV2(installation.coordinate)),
+                linked,
+            )
+        val runtime =
+            createThemePackageUiRuntimeV2(
+                linked = linked,
+                parameters = parameters,
+                darkTheme = false,
+                userFontScale = 1f,
+            )
+
+        assertEquals(null, runtime.backgroundMedia())
+    }
+
+    @Test
+    fun userVisibleNonResourceParameterRequiresADefaultValue() {
+        assertThrows(IllegalArgumentException::class.java) {
+            userParameter(
+                id = "missing_toggle_default",
+                type = ThemeParameterTypeV2.BOOLEAN,
+                control = ThemeParameterControlV2.Toggle,
+                effects =
+                    listOf(
+                        ThemeParameterEffectV2.Presentation(
+                            targets = listOf(ThemePresentationTargetV2.COMPOSER_TRANSPARENT),
+                        ),
+                    ),
+            )
+        }
+    }
+
+    @Test
+    fun floatSliderRejectsOutOfRangeValuesAndScalesOwnedFrames() {
+        val component = ThemeComponentCatalogV2.DIALOG
+        val base = completeManifest()
+        val dialogSkin =
+            base.presentation.componentSkins.getValue(component.value).let { skin ->
+                skin.copy(
+                    normal =
+                        skin.normal.copy(
+                            frame = ThemeComponentFrameSpecV2.RoundRect(cornerRadiusDp = 8f),
+                        ),
+                )
+            }
+        val scale =
+            userParameter(
+                id = "dialog_frame_scale",
+                type = ThemeParameterTypeV2.FLOAT,
+                defaultValue = ThemeParameterValueV2.FloatValue(1.25f),
+                control = ThemeParameterControlV2.Slider(minimum = 0.5f, maximum = 1.5f, step = 0.25f),
+                effects =
+                    listOf(
+                        ThemeParameterEffectV2.ComponentFrameScale(
+                            componentIds = listOf(component.value),
+                        ),
+                    ),
+            )
+        val manifest =
+            base.copy(
+                presentation =
+                    base.presentation.copy(
+                        componentSkins = base.presentation.componentSkins + (component.value to dialogSkin),
+                    ),
+                parameters = listOf(scale),
+            )
+        val installation = installation(manifest, tmp.newFolder("float-slider"))
+        val linked =
+            ThemePackageRuntimeLinkerV2.link(
+                installation,
+                PublishedThemeCatalogV2(listOf(installation), emptyList()),
+            )
+
+        val defaults =
+            ThemePackageRuntimeLinkerV2.resolveParameters(
+                ThemeInstanceV2(reference = ThemePackageReferenceV2(installation.coordinate)),
+                linked,
+            )
+        assertEquals(ThemeParameterValueV2.FloatValue(1.25f), defaults.value("dialog_frame_scale"))
+        val runtime =
+            createThemePackageUiRuntimeV2(
+                linked = linked,
+                parameters = defaults,
+                darkTheme = false,
+                userFontScale = 1f,
+            )
+        val frame = runtime.componentSkins.getValue(component).normal.frame as ThemeComponentFrameSpecV2.RoundRect
+        assertEquals(10f, frame.cornerRadiusDp)
+
+        assertThrows(ThemePackageLinkExceptionV2::class.java) {
+            ThemePackageRuntimeLinkerV2.resolveParameters(
+                ThemeInstanceV2(
+                    reference = ThemePackageReferenceV2(installation.coordinate),
+                    parameterValues =
+                        mapOf("dialog_frame_scale" to ThemeParameterValueV2.FloatValue(1.75f)),
+                ),
+                linked,
+            )
+        }
+    }
+
+    @Test
+    fun childParameterCannotScaleAnInheritedComponentFrame() {
+        val base = installation(completeManifest("author.frame_base"), tmp.newFolder("frame-base"))
+        val childParameter =
+            userParameter(
+                id = "dialog_frame_scale",
+                type = ThemeParameterTypeV2.FLOAT,
+                defaultValue = ThemeParameterValueV2.FloatValue(1.25f),
+                control = ThemeParameterControlV2.Slider(minimum = 0.5f, maximum = 2f, step = 0.25f),
+                effects =
+                    listOf(
+                        ThemeParameterEffectV2.ComponentFrameScale(
+                            componentIds = listOf(ThemeComponentCatalogV2.DIALOG.value),
+                        ),
+                    ),
+            )
+        val childManifest =
+            completeManifest("author.frame_child").copy(
+                basis = base.coordinate,
+                scenes = emptyList(),
+                surfaces = emptyList(),
+                presentation = ThemePackagePresentationPatchV2(behavior = ThemePackagePresentationBehaviorV2()),
+                parameters = listOf(childParameter),
+            )
+        val child = installation(childManifest, tmp.newFolder("frame-child"))
+
+        val error =
+            assertThrows(ThemePackageLinkExceptionV2::class.java) {
+                ThemePackageRuntimeLinkerV2.link(
+                    child,
+                    PublishedThemeCatalogV2(listOf(base, child), emptyList()),
+                )
+            }
+
+        assertTrue(error.message!!.contains("inherited component skin ${ThemeComponentCatalogV2.DIALOG.value}"))
+    }
+
+    @Test
+    fun presentationTargetHasOnlyOneActivePackageOwner() {
+        val first =
+            userParameter(
+                id = "first_background_toggle",
+                type = ThemeParameterTypeV2.BOOLEAN,
+                defaultValue = ThemeParameterValueV2.BooleanValue(true),
+                control = ThemeParameterControlV2.Toggle,
+                effects =
+                    listOf(
+                        ThemeParameterEffectV2.Presentation(
+                            targets = listOf(ThemePresentationTargetV2.BACKGROUND_USE_IMAGE),
+                        ),
+                    ),
+            )
+        val second =
+            userParameter(
+                id = "second_background_toggle",
+                type = ThemeParameterTypeV2.BOOLEAN,
+                defaultValue = ThemeParameterValueV2.BooleanValue(false),
+                control = ThemeParameterControlV2.Toggle,
+                effects =
+                    listOf(
+                        ThemeParameterEffectV2.Presentation(
+                            targets = listOf(ThemePresentationTargetV2.BACKGROUND_USE_IMAGE),
+                        ),
+                    ),
+            )
+        val manifest = completeManifest().copy(parameters = listOf(first, second))
+        val installation = installation(manifest, tmp.newFolder("presentation-target-owner"))
+
+        val error =
+            assertThrows(ThemePackageLinkExceptionV2::class.java) {
+                ThemePackageRuntimeLinkerV2.link(
+                    installation,
+                    PublishedThemeCatalogV2(listOf(installation), emptyList()),
+                )
+            }
+
+        assertTrue(error.message!!.contains(ThemePresentationTargetV2.BACKGROUND_USE_IMAGE.name))
+    }
+
+    @Test
     fun parameterColorEffectPatchesTheRuntimeTokenProjection() {
         val installation = installation(completeManifest(), tmp.newFolder("parameter-presentation"))
         val linked =
@@ -661,14 +1072,14 @@ class ThemePackageRuntimeLinkerV2Test {
     }
 
     @Test
-    fun inheritedParameterEffectsDoNotApplyToTheActiveChildPackage() {
+    fun inheritedParameterOverridesAreRejectedForTheActiveChildPackage() {
         val base = installation(completeManifest("author.parameter_base"), tmp.newFolder("parameter-base"))
         val childManifest =
             completeManifest("author.parameter_child").copy(
                 basis = base.coordinate,
                 scenes = emptyList(),
                 surfaces = emptyList(),
-                presentation = ThemePackagePresentationPatchV2(),
+                presentation = ThemePackagePresentationPatchV2(behavior = ThemePackagePresentationBehaviorV2()),
                 parameters = emptyList(),
             )
         val child = installation(childManifest, tmp.newFolder("parameter-child"))
@@ -677,35 +1088,28 @@ class ThemePackageRuntimeLinkerV2Test {
                 child,
                 PublishedThemeCatalogV2(listOf(base, child), emptyList()),
             )
-        val parameters =
-            ThemePackageRuntimeLinkerV2.resolveParameters(
-                ThemeInstanceV2(
-                    reference = ThemePackageReferenceV2(child.coordinate),
-                    parameterValues = mapOf("accent_color" to ThemeParameterValueV2.ColorValue(0xFF00FF00)),
-                ),
-                linked,
-            )
+        val error =
+            assertThrows(ThemePackageLinkExceptionV2::class.java) {
+                ThemePackageRuntimeLinkerV2.resolveParameters(
+                    ThemeInstanceV2(
+                        reference = ThemePackageReferenceV2(child.coordinate),
+                        parameterValues = mapOf("accent_color" to ThemeParameterValueV2.ColorValue(0xFF00FF00)),
+                    ),
+                    linked,
+                )
+            }
 
-        val runtime =
-            createThemePackageUiRuntimeV2(
-                linked = linked,
-                parameters = parameters,
-                darkTheme = false,
-                userFontScale = 1f,
-            )
-
-        assertEquals(0xFF111111.toInt(), runtime.colorScheme.primary.toArgb())
+        assertTrue(error.message!!.contains("inherited parameter: accent_color"))
     }
 
     @Test
     fun childParameterCannotTargetAnInheritedToken() {
         val base = installation(completeManifest("author.ownership_base"), tmp.newFolder("ownership-base"))
         val childParameter =
-            ThemeParameterDefinitionV2(
+            userParameter(
                 id = "child_color",
                 type = ThemeParameterTypeV2.COLOR,
-                defaultValue = ThemeParameterDefaultV2.ColorValue(0xFF00FF00),
-                label = ThemePackageLocalizedTextV2(values = mapOf("*" to "Child color")),
+                defaultValue = ThemeParameterValueV2.ColorValue(0xFF00FF00),
                 control = ThemeParameterControlV2.ColorPalette(presetArgb = listOf(0xFF00FF00)),
                 effects =
                     listOf(
@@ -717,7 +1121,7 @@ class ThemePackageRuntimeLinkerV2Test {
                 basis = base.coordinate,
                 scenes = emptyList(),
                 surfaces = emptyList(),
-                presentation = ThemePackagePresentationPatchV2(),
+                presentation = ThemePackagePresentationPatchV2(behavior = ThemePackagePresentationBehaviorV2()),
                 parameters = listOf(childParameter),
             )
         val child = installation(childManifest, tmp.newFolder("ownership-child"))
@@ -736,10 +1140,9 @@ class ThemePackageRuntimeLinkerV2Test {
     @Test
     fun stageImageEffectRejectsTemplateSurface() {
         val imageParameter =
-            ThemeParameterDefinitionV2(
+            userParameter(
                 id = "background_image",
                 type = ThemeParameterTypeV2.IMAGE_URI,
-                label = ThemePackageLocalizedTextV2(values = mapOf("*" to "Background")),
                 control = ThemeParameterControlV2.ImagePicker(),
                 effects =
                     listOf(
@@ -765,10 +1168,9 @@ class ThemePackageRuntimeLinkerV2Test {
     @Test
     fun stageImageEffectCreatesAnActiveSceneOverlay() {
         val imageParameter =
-            ThemeParameterDefinitionV2(
+            userParameter(
                 id = "background_image",
                 type = ThemeParameterTypeV2.IMAGE_URI,
-                label = ThemePackageLocalizedTextV2(values = mapOf("*" to "Background")),
                 control = ThemeParameterControlV2.ImagePicker(),
                 effects =
                     listOf(

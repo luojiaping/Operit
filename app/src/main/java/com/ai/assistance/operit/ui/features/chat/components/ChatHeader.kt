@@ -14,6 +14,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -40,10 +41,12 @@ fun ChatHeader(
         modifier: Modifier = Modifier,
         onLaunchFloatingWindow: () -> Unit = {},
         isFloatingMode: Boolean = false,
-        runningTaskCount: Int = 0,
-        activeCharacterName: String,
-        activeCharacterAvatarUri: String?,
-        onCharacterClick: () -> Unit
+         runningTaskCount: Int = 0,
+         activeCharacterName: String,
+         activeCharacterAvatarUri: String?,
+         historyIconColor: Color? = null,
+         pipIconColor: Color? = null,
+         onCharacterClick: () -> Unit
 ) {
         val displayCharacterName = activeCharacterName.toChatHeaderName()
         val headerContentColor = LocalContentColor.current
@@ -71,7 +74,7 @@ fun ChatHeader(
                                                 imageVector = Icons.Default.History,
                                                 contentDescription =
                                                         if (showChatHistorySelector) stringResource(R.string.hide_history) else stringResource(R.string.show_history),
-                                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                                tint = historyIconColor ?: MaterialTheme.colorScheme.onPrimaryContainer,
                                                 modifier = Modifier.size(20.dp)
                                         )
                                         Text(
@@ -103,7 +106,7 @@ fun ChatHeader(
                                                 imageVector = Icons.Default.History,
                                                 contentDescription =
                                                         if (showChatHistorySelector) stringResource(R.string.hide_history) else stringResource(R.string.show_history),
-                                                tint = LocalContentColor.current,
+                                                tint = historyIconColor ?: LocalContentColor.current,
                                                 modifier = Modifier.size(20.dp)
                                         )
                                 }
@@ -129,7 +132,7 @@ fun ChatHeader(
                                         imageVector = Icons.Default.PictureInPicture,
                                         contentDescription =
                                                 if (isFloatingMode) stringResource(R.string.close_floating_window) else stringResource(R.string.open_floating_window),
-                                        tint = LocalContentColor.current,
+                                        tint = pipIconColor ?: LocalContentColor.current,
                                         modifier = Modifier.size(20.dp)
                                 )
                         }

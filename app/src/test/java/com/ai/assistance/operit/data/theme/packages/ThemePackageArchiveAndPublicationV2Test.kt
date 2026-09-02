@@ -29,7 +29,7 @@ class ThemePackageArchiveAndPublicationV2Test {
     private val json = Json {
         ignoreUnknownKeys = false
         encodeDefaults = true
-        explicitNulls = false
+        explicitNulls = true
     }
 
     private val pngBytes =
@@ -80,6 +80,7 @@ class ThemePackageArchiveAndPublicationV2Test {
             packageId = "author.sample",
             version = "1.0.0",
             displayName = ThemePackageLocalizedTextV2(values = mapOf("*" to "Sample")),
+            presentation = ThemePackagePresentationPatchV2(behavior = ThemePackagePresentationBehaviorV2()),
             tokens = tokenSet,
             scenes = listOf(chatMainScene()),
             surfaces =
@@ -183,7 +184,10 @@ class ThemePackageArchiveAndPublicationV2Test {
     @Test
     fun unknownManifestFieldIsRejected() {
         val archive =
-            writeArchive(minimalManifest(), rawManifestJson = "{\"schemaVersion\":3,\"extra\":true}")
+            writeArchive(
+                minimalManifest(),
+                rawManifestJson = "{\"schemaVersion\":$THEME_PACKAGE_SCHEMA_VERSION,\"extra\":true}",
+            )
 
         assertThrows(ThemePackageArchiveValidationExceptionV2::class.java) {
             ThemePackageArchiveValidatorV2.validate(archive)
@@ -249,7 +253,10 @@ class ThemePackageArchiveAndPublicationV2Test {
     fun futureSchemaVersionIsRejected() {
         val rawManifest =
             json.encodeToString(minimalManifest())
-                .replace("\"schemaVersion\":3", "\"schemaVersion\":4")
+                .replace(
+                    "\"schemaVersion\":$THEME_PACKAGE_SCHEMA_VERSION",
+                    "\"schemaVersion\":${THEME_PACKAGE_SCHEMA_VERSION + 1}",
+                )
         val archive = writeArchive(minimalManifest(), rawManifestJson = rawManifest)
 
         assertThrows(ThemePackageArchiveValidationExceptionV2::class.java) {
@@ -310,6 +317,7 @@ class ThemePackageArchiveAndPublicationV2Test {
             minimalManifest().copy(
                 presentation =
                     ThemePackagePresentationPatchV2(
+                        behavior = ThemePackagePresentationBehaviorV2(),
                         componentSkins = mapOf(ThemeComponentCatalogV2.INPUT.value to inputSkin),
                     ),
             )
@@ -338,6 +346,7 @@ class ThemePackageArchiveAndPublicationV2Test {
             minimalManifest().copy(
                 presentation =
                     ThemePackagePresentationPatchV2(
+                        behavior = ThemePackagePresentationBehaviorV2(),
                         componentSkins = mapOf(ThemeComponentCatalogV2.STATUS.value to statusSkin),
                     ),
             )
@@ -423,6 +432,7 @@ class ThemePackageArchiveAndPublicationV2Test {
             minimalManifest().copy(
                 presentation =
                     ThemePackagePresentationPatchV2(
+                        behavior = ThemePackagePresentationBehaviorV2(),
                         material =
                             ThemeMaterialProjectionV2(
                                 colors =

@@ -2,13 +2,13 @@
 
 This directory contains only release artifacts that must ship inside the APK.
 
-`operit-default-v2.otheme` is copied byte-for-byte from the `operit-theme-default` `2.2.0` schema 3 development artifact while the V2 surface contract is under active development.
+`operit-default-v4.otheme` is copied byte-for-byte from the `operit-theme-default` `3.0.0` schema 4 development artifact while the package surface contract is under active development.
 
 - Package ID: `operit.default`
-- Version: `2.2.0`
-- Schema: 3 (`operit-theme.json` schemaVersion 3)
-- SHA-256: `dba4169c8e1636c5f2d85749f7770b8657d99217764563aac0302137e37ef4fd`
-- Source artifact: `operit-default-2.2.0.otheme`
+- Version: `3.0.0`
+- Schema: 4 (`operit-theme.json` schemaVersion 4)
+- SHA-256: `5a96abf521ec22a8c486ccb5b4d7f561a4bed4f6f90dfe742647024eb79db91f`
+- Source artifact: `operit-default-3.0.0.otheme`
 
 The package source, manifest and release workflow live only in the external repository. Replace this development artifact with the byte-identical upstream Release archive before publishing, then retain the exact SHA-256 lock in `ThemePackageDefaultV2`.
 

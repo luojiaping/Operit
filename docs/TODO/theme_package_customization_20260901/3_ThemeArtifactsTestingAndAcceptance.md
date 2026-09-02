@@ -1,5 +1,7 @@
 # 主题包、测试与验收
 
+> [SUPERSEDED] schema 3 artifact 记录已由 [schema 4 参数契约验收](../theme_parameter_contract_rebuild_20260901/5_TestingAndAcceptance.md) 取代。本文件仅保留历史构建信息。
+
 ## 主题源
 
 默认与 Cyber Grid package document 同步升级 schema 3、版本 2.2.0。默认包声明 `accent_color` 与 `background_image`；Cyber Grid 不继承 default 的活动 effect，继续由自己的 scene、token 和 component frame 定义视觉。

@@ -77,10 +77,111 @@ internal sealed interface ThemeParameterValueV2 {
     }
 
     @Serializable
+    @SerialName("color_pair")
+    data class ColorPairValue(
+        val lightArgb: Long,
+        val darkArgb: Long,
+    ) : ThemeParameterValueV2 {
+        init {
+            require(lightArgb in 0..0xFFFFFFFFL) { "Theme light color must be ARGB within 0..0xffffffff." }
+            require(darkArgb in 0..0xFFFFFFFFL) { "Theme dark color must be ARGB within 0..0xffffffff." }
+        }
+    }
+
+    @Serializable
+    @SerialName("boolean")
+    data class BooleanValue(val value: Boolean) : ThemeParameterValueV2
+
+    @Serializable
+    @SerialName("option")
+    data class OptionValue(val value: String) : ThemeParameterValueV2 {
+        init {
+            require(MEMBER_ID_PATTERN_V2.matches(value)) { "Theme option value must be a member ID: $value" }
+        }
+    }
+
+    @Serializable
+    @SerialName("float")
+    data class FloatValue(val value: Float) : ThemeParameterValueV2 {
+        init {
+            require(value.isFinite()) { "Theme numeric value must be finite." }
+        }
+    }
+
+    @Serializable
     @SerialName("image_uri")
     data class ImageUriValue(val uri: String) : ThemeParameterValueV2 {
         init {
             require(uri.startsWith("content://")) { "Theme image URIs must use content://." }
+        }
+    }
+
+    @Serializable
+    @SerialName("video_uri")
+    data class VideoUriValue(val uri: String) : ThemeParameterValueV2 {
+        init {
+            require(uri.startsWith("content://")) { "Theme video URIs must use content://." }
+        }
+    }
+
+    @Serializable
+    @SerialName("font_uri")
+    data class FontUriValue(val uri: String) : ThemeParameterValueV2 {
+        init {
+            require(uri.startsWith("content://")) { "Theme font URIs must use content://." }
+        }
+    }
+
+    @Serializable
+    @SerialName("image_layout")
+    data class ImageLayoutValue(
+        val cropLeft: Float = 0f,
+        val cropTop: Float = 0f,
+        val cropRight: Float = 1f,
+        val cropBottom: Float = 1f,
+        val repeatStart: Float = 0f,
+        val repeatEnd: Float = 1f,
+        val repeatYStart: Float = 0f,
+        val repeatYEnd: Float = 1f,
+        val scale: Float = 1f,
+    ) : ThemeParameterValueV2 {
+        init {
+            require(cropLeft in 0f..1f && cropTop in 0f..1f) {
+                "Theme image crop start must be within [0, 1]."
+            }
+            require(cropRight in cropLeft..1f && cropBottom in cropTop..1f) {
+                "Theme image crop end must follow its start within [0, 1]."
+            }
+            require(repeatStart in 0f..1f && repeatEnd in repeatStart..1f) {
+                "Theme image horizontal repeat range must be within [0, 1]."
+            }
+            require(repeatYStart in 0f..1f && repeatYEnd in repeatYStart..1f) {
+                "Theme image vertical repeat range must be within [0, 1]."
+            }
+            require(scale in 0.1f..8f) { "Theme image scale must be within [0.1, 8]." }
+        }
+    }
+
+    @Serializable
+    @SerialName("insets")
+    data class InsetsValue(
+        val startDp: Float,
+        val topDp: Float,
+        val endDp: Float,
+        val bottomDp: Float,
+    ) : ThemeParameterValueV2 {
+        init {
+            listOf(startDp, topDp, endDp, bottomDp).forEach { value ->
+                require(value in 0f..96f) { "Theme parameter inset must be within [0, 96] dp." }
+            }
+        }
+    }
+
+    @Serializable
+    @SerialName("corner_radius")
+    data class CornerRadiusValue(val valueDp: Float) : ThemeParameterValueV2 {
+        init {
+            require(valueDp in 0f..96f) { "Theme corner radius must be within [0, 96] dp." }
         }
     }
 }

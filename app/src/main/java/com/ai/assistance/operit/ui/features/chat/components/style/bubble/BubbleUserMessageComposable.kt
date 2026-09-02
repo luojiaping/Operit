@@ -11,7 +11,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -51,6 +50,7 @@ import com.ai.assistance.operit.data.preferences.CharacterCardManager
 import com.ai.assistance.operit.data.preferences.DisplayPreferencesManager
 import com.ai.assistance.operit.data.preferences.UserPreferencesManager
 import com.ai.assistance.operit.data.theme.packages.ThemeComponentCatalogV2
+import com.ai.assistance.operit.data.theme.packages.ThemePresentationTargetV2
 import com.ai.assistance.operit.ui.features.chat.components.attachments.AttachmentViewerDialog
 import com.ai.assistance.operit.ui.features.chat.components.attachments.ChatAttachment
 import com.ai.assistance.operit.ui.features.chat.components.style.common.HiddenUserMessagePlaceholderContent
@@ -61,7 +61,7 @@ import com.ai.assistance.operit.util.ChatMarkupRegex
 import com.ai.assistance.operit.ui.theme.LocalGlobalPresentation
 import com.ai.assistance.operit.ui.theme.LocalThemePackageUiRuntimeV2
 import com.ai.assistance.operit.ui.theme.ResolvedThemeComponentFrameV2
-import com.ai.assistance.operit.ui.theme.ThemeComponentSurfaceV2
+import com.ai.assistance.operit.ui.theme.ThemeBubbleMessageSurfaceV2
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.flowOf
@@ -80,8 +80,8 @@ fun BubbleUserMessageComposable(
     val isHiddenPlaceholder =
         message.sender == "user" &&
             message.displayMode == ChatMessageDisplayMode.HIDDEN_PLACEHOLDER
-    val userSkin =
-        LocalThemePackageUiRuntimeV2.current.componentSkin(ThemeComponentCatalogV2.MESSAGE_USER)
+    val themeRuntime = LocalThemePackageUiRuntimeV2.current
+    val userSkin = themeRuntime.bubbleMessageSkin(ThemeComponentCatalogV2.MESSAGE_USER)
     val messageSkin =
         if (isHiddenPlaceholder) {
             userSkin.copy(
@@ -98,8 +98,10 @@ fun BubbleUserMessageComposable(
     val displayPreferencesManager = remember { DisplayPreferencesManager.getInstance(context) }
     val characterCardManager = remember { CharacterCardManager.getInstance(context) }
     val presentation = LocalGlobalPresentation.current
-    val bubbleShowAvatar = presentation.bubbleShowAvatar
-    val bubbleWideLayoutEnabled = presentation.bubbleWideLayoutEnabled
+    val bubbleShowAvatar =
+        requireNotNull(themeRuntime.booleanPresentation(ThemePresentationTargetV2.BUBBLE_SHOW_AVATAR))
+    val bubbleWideLayoutEnabled =
+        requireNotNull(themeRuntime.booleanPresentation(ThemePresentationTargetV2.BUBBLE_WIDE_LAYOUT))
     val globalUserAvatarUri by displayPreferencesManager.globalUserAvatarUri.collectAsState(initial = null)
     val globalUserName by displayPreferencesManager.globalUserName.collectAsState(initial = null)
     val showUserName = presentation.showUserName
@@ -149,7 +151,7 @@ fun BubbleUserMessageComposable(
             else -> null
         }
     }
-    val avatarShape = CircleShape
+    val avatarShape = themeRuntime.avatarShape()
     val resolvedDisplayName = if (isProxySender) proxySenderName else globalUserName
     val shouldShowResolvedName = !isHiddenPlaceholder && if (isProxySender) true else showUserName
     val shouldShowAvatar = !isHiddenPlaceholder && bubbleShowAvatar
@@ -355,7 +357,8 @@ fun BubbleUserMessageComposable(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End,
                 ) {
-                    ThemeComponentSurfaceV2(
+                    ThemeBubbleMessageSurfaceV2(
+                        component = ThemeComponentCatalogV2.MESSAGE_USER,
                         skin = messageSkin,
                         modifier = bubbleModifier,
                     ) {
@@ -431,7 +434,8 @@ fun BubbleUserMessageComposable(
                             .widthIn(max = if (isHiddenPlaceholder) minOf(maxBubbleWidth, 320.dp) else maxBubbleWidth)
                             .defaultMinSize(minHeight = 44.dp)
 
-                    ThemeComponentSurfaceV2(
+                    ThemeBubbleMessageSurfaceV2(
+                        component = ThemeComponentCatalogV2.MESSAGE_USER,
                         skin = messageSkin,
                         modifier = bubbleModifier,
                     ) {

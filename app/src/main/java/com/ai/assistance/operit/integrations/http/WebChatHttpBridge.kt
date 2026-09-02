@@ -39,6 +39,9 @@ import com.ai.assistance.operit.data.preferences.GlobalPresentationSnapshot
 import com.ai.assistance.operit.data.preferences.GlobalThemeMode
 import com.ai.assistance.operit.data.preferences.ToolCollapseMode
 import com.ai.assistance.operit.data.preferences.UserPreferencesManager
+import com.ai.assistance.operit.data.theme.packages.ThemeComponentCatalogV2
+import com.ai.assistance.operit.data.theme.packages.ThemePresentationTargetV2
+import com.ai.assistance.operit.data.theme.packages.ThemeSurfaceCatalogV2
 import com.ai.assistance.operit.integrations.http.bridge.WebChatActionBridge
 import com.ai.assistance.operit.data.repository.ChatHistoryManager
 import com.ai.assistance.operit.integrations.http.bridge.WebChatInputSettingsBridge
@@ -2288,6 +2291,42 @@ class WebChatHttpBridge(
                     android.content.res.Configuration.UI_MODE_NIGHT_YES,
             )
         val colorScheme = packageRuntime.colorScheme
+        val stageImage = packageRuntime.stageImage(ThemeSurfaceCatalogV2.CHAT_MAIN)
+        val backgroundMedia = packageRuntime.backgroundMedia()
+        val stageBackground =
+            stageImage?.let { image ->
+                WebThemeStageBackground(
+                    assetUrl = requireNotNull(registerAsset(image.uri, guessMimeType(image.uri))),
+                    fit = image.fit.name.lowercase(Locale.US),
+                    opacity = image.opacity,
+                )
+            }
+        val mediaBackground =
+            backgroundMedia?.let { media ->
+                WebThemeMediaBackground(
+                    type = media.type.name.lowercase(Locale.US),
+                    assetUrl = requireNotNull(registerAsset(media.uri, guessMimeType(media.uri))),
+                    opacity = media.opacity,
+                    blurEnabled = media.blurEnabled,
+                    blurRadiusDp = media.blurRadiusDp,
+                    muted = media.videoMuted,
+                    loop = media.videoLoop,
+                )
+            }
+        val userMessageSkin = packageRuntime.bubbleMessageSkin(ThemeComponentCatalogV2.MESSAGE_USER)
+        val assistantMessageSkin = packageRuntime.bubbleMessageSkin(ThemeComponentCatalogV2.MESSAGE_ASSISTANT)
+        val useThemeFont =
+            requireNotNull(
+                packageRuntime.booleanPresentation(ThemePresentationTargetV2.TYPOGRAPHY_USE_CUSTOM_FONT),
+            )
+        val useUserBubbleFont =
+            requireNotNull(
+                packageRuntime.booleanPresentation(ThemePresentationTargetV2.BUBBLE_USER_USE_CUSTOM_FONT),
+            )
+        val useAssistantBubbleFont =
+            requireNotNull(
+                packageRuntime.booleanPresentation(ThemePresentationTargetV2.BUBBLE_ASSISTANT_USE_CUSTOM_FONT),
+            )
         return WebThemeSnapshot(
             source = "global",
             sourceId = null,
@@ -2312,26 +2351,49 @@ class WebChatHttpBridge(
                 outlineVariantColor = composeColorToCss(colorScheme.outlineVariant)
             ),
             background = WebThemeBackground(
-                type = "none",
-                assetUrl = null,
-                opacity = 1f
+                stage = stageBackground,
+                media = mediaBackground,
             ),
             header = WebHeaderTheme(
-                transparent = false,
-                overlay = false
+                transparent =
+                    requireNotNull(
+                        packageRuntime.booleanPresentation(ThemePresentationTargetV2.CHROME_CHAT_HEADER_TRANSPARENT),
+                    ),
+                overlay =
+                    requireNotNull(
+                        packageRuntime.optionPresentation(ThemePresentationTargetV2.CHROME_CHAT_HEADER_OVERLAY_MODE),
+                    ) == "overlay",
             ),
             input = WebInputTheme(
                 style = presentation.inputStyle.value,
-                transparent = false,
-                floating = false,
-                liquidGlass = false,
-                waterGlass = false
+                transparent = requireNotNull(packageRuntime.booleanPresentation(ThemePresentationTargetV2.COMPOSER_TRANSPARENT)),
+                floating = requireNotNull(packageRuntime.booleanPresentation(ThemePresentationTargetV2.COMPOSER_FLOATING)),
+                liquidGlass = requireNotNull(packageRuntime.booleanPresentation(ThemePresentationTargetV2.COMPOSER_LIQUID_GLASS)),
+                waterGlass = requireNotNull(packageRuntime.booleanPresentation(ThemePresentationTargetV2.COMPOSER_WATER_GLASS)),
             ),
             font = WebFontTheme(
-                type = "system",
-                systemFontName = "default",
-                customFontAssetUrl = null,
-                scale = presentation.fontScale
+                type =
+                    if (useThemeFont) {
+                        "system"
+                    } else {
+                        "default"
+                    },
+                systemFontName =
+                    if (useThemeFont) {
+                        packageRuntime.optionPresentation(ThemePresentationTargetV2.TYPOGRAPHY_FAMILY)
+                    } else {
+                        "default"
+                    },
+                customFontAssetUrl =
+                    if (useThemeFont) {
+                        packageRuntime.fontUriPresentation(ThemePresentationTargetV2.TYPOGRAPHY_FONT_URI)
+                            ?.let { uri -> registerAsset(uri, guessMimeType(uri)) }
+                    } else {
+                        null
+                    },
+                scale =
+                    presentation.fontScale *
+                        requireNotNull(packageRuntime.floatPresentation(ThemePresentationTargetV2.TYPOGRAPHY_SCALE)),
             ),
             chatStyle = presentation.chatStyle.value,
             showThinkingProcess = presentation.showThinkingProcess,
@@ -2351,40 +2413,112 @@ class WebChatHttpBridge(
                     ?.takeIf { it.isNotBlank() }
             ),
             bubble = WebBubbleTheme(
-                showAvatar = presentation.bubbleShowAvatar,
-                wideLayout = presentation.bubbleWideLayoutEnabled,
-                cursorUserFollowTheme = presentation.cursorUserBubbleFollowTheme,
-                cursorUserColor = null,
-                userBubbleColor = null,
-                assistantBubbleColor = null,
-                userTextColor = null,
-                assistantTextColor = null,
-                cursorUserLiquidGlass = false,
-                cursorUserWaterGlass = false,
-                userLiquidGlass = false,
-                userWaterGlass = false,
-                assistantLiquidGlass = false,
-                assistantWaterGlass = false,
-                userRounded = true,
-                assistantRounded = true,
-                userPaddingLeft = 16f,
-                userPaddingRight = 16f,
-                assistantPaddingLeft = 16f,
-                assistantPaddingRight = 16f,
+                showAvatar = requireNotNull(packageRuntime.booleanPresentation(ThemePresentationTargetV2.BUBBLE_SHOW_AVATAR)),
+                wideLayout = requireNotNull(packageRuntime.booleanPresentation(ThemePresentationTargetV2.BUBBLE_WIDE_LAYOUT)),
+                cursorUserFollowTheme = requireNotNull(packageRuntime.booleanPresentation(ThemePresentationTargetV2.CURSOR_USER_BUBBLE_FOLLOW_THEME)),
+                cursorUserColor = packageRuntime.colorPresentation(ThemePresentationTargetV2.CURSOR_USER_BUBBLE_COLOR)?.let(::composeColorToCss),
+                userBubbleColor = composeColorToCss(userMessageSkin.container),
+                assistantBubbleColor = composeColorToCss(assistantMessageSkin.container),
+                userTextColor = composeColorToCss(userMessageSkin.content),
+                assistantTextColor = composeColorToCss(assistantMessageSkin.content),
+                cursorUserLiquidGlass = requireNotNull(packageRuntime.booleanPresentation(ThemePresentationTargetV2.CURSOR_USER_BUBBLE_LIQUID_GLASS)),
+                cursorUserWaterGlass = requireNotNull(packageRuntime.booleanPresentation(ThemePresentationTargetV2.CURSOR_USER_BUBBLE_WATER_GLASS)),
+                userLiquidGlass = requireNotNull(packageRuntime.booleanPresentation(ThemePresentationTargetV2.BUBBLE_USER_LIQUID_GLASS)),
+                userWaterGlass = requireNotNull(packageRuntime.booleanPresentation(ThemePresentationTargetV2.BUBBLE_USER_WATER_GLASS)),
+                assistantLiquidGlass = requireNotNull(packageRuntime.booleanPresentation(ThemePresentationTargetV2.BUBBLE_ASSISTANT_LIQUID_GLASS)),
+                assistantWaterGlass = requireNotNull(packageRuntime.booleanPresentation(ThemePresentationTargetV2.BUBBLE_ASSISTANT_WATER_GLASS)),
+                userRounded = requireNotNull(packageRuntime.booleanPresentation(ThemePresentationTargetV2.BUBBLE_USER_ROUNDED_CORNERS)),
+                assistantRounded = requireNotNull(packageRuntime.booleanPresentation(ThemePresentationTargetV2.BUBBLE_ASSISTANT_ROUNDED_CORNERS)),
+                userPaddingLeft = userMessageSkin.paddingStartDp,
+                userPaddingRight = userMessageSkin.paddingEndDp,
+                userPaddingTop = userMessageSkin.paddingTopDp,
+                userPaddingBottom = userMessageSkin.paddingBottomDp,
+                assistantPaddingLeft = assistantMessageSkin.paddingStartDp,
+                assistantPaddingRight = assistantMessageSkin.paddingEndDp,
+                assistantPaddingTop = assistantMessageSkin.paddingTopDp,
+                assistantPaddingBottom = assistantMessageSkin.paddingBottomDp,
+                userFont =
+                    WebFontTheme(
+                        type =
+                            if (useUserBubbleFont) {
+                                "system"
+                            } else {
+                                "default"
+                            },
+                        systemFontName =
+                            if (useUserBubbleFont) {
+                                packageRuntime.optionPresentation(ThemePresentationTargetV2.BUBBLE_USER_FONT_FAMILY)
+                            } else {
+                                "default"
+                            },
+                        customFontAssetUrl =
+                            if (useUserBubbleFont) {
+                                packageRuntime.fontUriPresentation(ThemePresentationTargetV2.BUBBLE_USER_FONT_URI)
+                                    ?.let { uri -> registerAsset(uri, guessMimeType(uri)) }
+                            } else {
+                                null
+                            },
+                        scale = 1f,
+                    ),
+                assistantFont =
+                    WebFontTheme(
+                        type =
+                            if (useAssistantBubbleFont) {
+                                "system"
+                            } else {
+                                "default"
+                            },
+                        systemFontName =
+                            if (useAssistantBubbleFont) {
+                                packageRuntime.optionPresentation(ThemePresentationTargetV2.BUBBLE_ASSISTANT_FONT_FAMILY)
+                            } else {
+                                "default"
+                            },
+                        customFontAssetUrl =
+                            if (useAssistantBubbleFont) {
+                                packageRuntime.fontUriPresentation(ThemePresentationTargetV2.BUBBLE_ASSISTANT_FONT_URI)
+                                    ?.let { uri -> registerAsset(uri, guessMimeType(uri)) }
+                            } else {
+                                null
+                            },
+                        scale = 1f,
+                    ),
                 userImage = WebBubbleImageTheme(
-                    enabled = false,
-                    assetUrl = null,
-                    renderMode = "nine_patch"
+                    enabled = packageRuntime.imageUriPresentation(ThemePresentationTargetV2.BUBBLE_USER_IMAGE_URI) != null,
+                    assetUrl =
+                        packageRuntime.imageUriPresentation(ThemePresentationTargetV2.BUBBLE_USER_IMAGE_URI)
+                            ?.let { uri -> registerAsset(uri, guessMimeType(uri)) },
+                    renderMode = packageRuntime.optionPresentation(ThemePresentationTargetV2.BUBBLE_IMAGE_RENDER_MODE),
+                    cropLeft = packageRuntime.imageLayoutPresentation(ThemePresentationTargetV2.BUBBLE_USER_IMAGE_LAYOUT)?.cropLeft ?: 0f,
+                    cropTop = packageRuntime.imageLayoutPresentation(ThemePresentationTargetV2.BUBBLE_USER_IMAGE_LAYOUT)?.cropTop ?: 0f,
+                    cropRight = packageRuntime.imageLayoutPresentation(ThemePresentationTargetV2.BUBBLE_USER_IMAGE_LAYOUT)?.cropRight ?: 1f,
+                    cropBottom = packageRuntime.imageLayoutPresentation(ThemePresentationTargetV2.BUBBLE_USER_IMAGE_LAYOUT)?.cropBottom ?: 1f,
+                    repeatStart = packageRuntime.imageLayoutPresentation(ThemePresentationTargetV2.BUBBLE_USER_IMAGE_LAYOUT)?.repeatStart ?: 0f,
+                    repeatEnd = packageRuntime.imageLayoutPresentation(ThemePresentationTargetV2.BUBBLE_USER_IMAGE_LAYOUT)?.repeatEnd ?: 1f,
+                    repeatYStart = packageRuntime.imageLayoutPresentation(ThemePresentationTargetV2.BUBBLE_USER_IMAGE_LAYOUT)?.repeatYStart ?: 0f,
+                    repeatYEnd = packageRuntime.imageLayoutPresentation(ThemePresentationTargetV2.BUBBLE_USER_IMAGE_LAYOUT)?.repeatYEnd ?: 1f,
+                    scale = packageRuntime.imageLayoutPresentation(ThemePresentationTargetV2.BUBBLE_USER_IMAGE_LAYOUT)?.scale ?: 1f,
                 ),
                 assistantImage = WebBubbleImageTheme(
-                    enabled = false,
-                    assetUrl = null,
-                    renderMode = "nine_patch"
+                    enabled = packageRuntime.imageUriPresentation(ThemePresentationTargetV2.BUBBLE_ASSISTANT_IMAGE_URI) != null,
+                    assetUrl =
+                        packageRuntime.imageUriPresentation(ThemePresentationTargetV2.BUBBLE_ASSISTANT_IMAGE_URI)
+                            ?.let { uri -> registerAsset(uri, guessMimeType(uri)) },
+                    renderMode = packageRuntime.optionPresentation(ThemePresentationTargetV2.BUBBLE_IMAGE_RENDER_MODE),
+                    cropLeft = packageRuntime.imageLayoutPresentation(ThemePresentationTargetV2.BUBBLE_ASSISTANT_IMAGE_LAYOUT)?.cropLeft ?: 0f,
+                    cropTop = packageRuntime.imageLayoutPresentation(ThemePresentationTargetV2.BUBBLE_ASSISTANT_IMAGE_LAYOUT)?.cropTop ?: 0f,
+                    cropRight = packageRuntime.imageLayoutPresentation(ThemePresentationTargetV2.BUBBLE_ASSISTANT_IMAGE_LAYOUT)?.cropRight ?: 1f,
+                    cropBottom = packageRuntime.imageLayoutPresentation(ThemePresentationTargetV2.BUBBLE_ASSISTANT_IMAGE_LAYOUT)?.cropBottom ?: 1f,
+                    repeatStart = packageRuntime.imageLayoutPresentation(ThemePresentationTargetV2.BUBBLE_ASSISTANT_IMAGE_LAYOUT)?.repeatStart ?: 0f,
+                    repeatEnd = packageRuntime.imageLayoutPresentation(ThemePresentationTargetV2.BUBBLE_ASSISTANT_IMAGE_LAYOUT)?.repeatEnd ?: 1f,
+                    repeatYStart = packageRuntime.imageLayoutPresentation(ThemePresentationTargetV2.BUBBLE_ASSISTANT_IMAGE_LAYOUT)?.repeatYStart ?: 0f,
+                    repeatYEnd = packageRuntime.imageLayoutPresentation(ThemePresentationTargetV2.BUBBLE_ASSISTANT_IMAGE_LAYOUT)?.repeatYEnd ?: 1f,
+                    scale = packageRuntime.imageLayoutPresentation(ThemePresentationTargetV2.BUBBLE_ASSISTANT_IMAGE_LAYOUT)?.scale ?: 1f,
                 )
             ),
             avatars = WebAvatarTheme(
-                shape = "circle",
-                cornerRadius = 0f,
+                shape = requireNotNull(packageRuntime.optionPresentation(ThemePresentationTargetV2.AVATAR_SHAPE)),
+                cornerRadius = requireNotNull(packageRuntime.cornerRadiusPresentation(ThemePresentationTargetV2.AVATAR_CORNER_RADIUS)),
                 userAvatarUrl = globalUserAvatarUri?.let { registerAsset(it, guessMimeType(it)) },
                 assistantAvatarUrl = assistantAvatarUri?.let { registerAsset(it, guessMimeType(it)) }
             )

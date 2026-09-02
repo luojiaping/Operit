@@ -42,6 +42,7 @@ import com.ai.assistance.operit.R
 import com.ai.assistance.operit.data.preferences.ActivePromptManager
 import com.ai.assistance.operit.data.repository.ChatHistoryManager
 import com.ai.assistance.operit.data.theme.packages.ThemeComponentCatalogV2
+import com.ai.assistance.operit.data.theme.packages.ThemePresentationTargetV2
 import com.ai.assistance.operit.data.theme.packages.ThemeSurfaceCatalogV2
 import com.ai.assistance.operit.ui.common.NavItem
 import com.ai.assistance.operit.ui.common.displays.FpsCounter
@@ -173,7 +174,13 @@ fun AppContent(
     // V2：顶栏内容色来自主题 app_bar 皮肤；旧实现固定取 onPrimary，
     // 导致任意主题主色直接决定整条顶栏与状态栏的视觉。
     val themeRuntime = LocalThemePackageUiRuntimeV2.current
-    val appBarContentColor = themeRuntime.componentSkin(ThemeComponentCatalogV2.APP_BAR).content
+    val appBarContentColor =
+        when (requireNotNull(themeRuntime.optionPresentation(ThemePresentationTargetV2.CHROME_APP_BAR_CONTENT_COLOR_MODE))) {
+            "auto" -> themeRuntime.componentSkin(ThemeComponentCatalogV2.APP_BAR).content
+            "light" -> androidx.compose.ui.graphics.Color.White
+            "dark" -> androidx.compose.ui.graphics.Color.Black
+            else -> error("Theme app bar content color mode is invalid.")
+        }
 
     // 获取聊天历史管理器
     val chatHistoryManager = ChatHistoryManager.getInstance(context)

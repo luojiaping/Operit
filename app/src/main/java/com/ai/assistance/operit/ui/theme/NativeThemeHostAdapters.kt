@@ -11,10 +11,13 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.ai.assistance.operit.data.theme.packages.ThemeComponentCatalogV2
+import com.ai.assistance.operit.data.theme.packages.ThemePresentationTargetV2
 
 internal data class NativeThemeMainWindowChromeState(
     val statusBarColor: Int,
     val lightStatusBarIcons: Boolean,
+    val statusBarHidden: Boolean,
+    val statusBarTransparent: Boolean,
     val navigationBarColor: Int,
     val navigationBarContrastEnforced: Boolean,
     val lightNavigationBarIcons: Boolean,
@@ -27,11 +30,19 @@ internal data class NativeThemeMainWindowChromeState(
 internal fun resolveNativeThemeMainWindowChromeState(
     runtime: ThemePackageUiRuntimeV2,
 ): NativeThemeMainWindowChromeState {
-    val statusBarColor = runtime.componentSkin(ThemeComponentCatalogV2.APP_BAR).container
-    val navigationBarColor = runtime.colorScheme.background
+    val statusBarTransparent =
+        runtime.booleanPresentation(ThemePresentationTargetV2.CHROME_STATUS_BAR_TRANSPARENT) == true
+    val statusBarColor =
+        runtime.colorPresentation(ThemePresentationTargetV2.CHROME_STATUS_BAR_COLOR)
+            ?: runtime.componentSkin(ThemeComponentCatalogV2.APP_BAR).container
+    val navigationBarColor =
+        runtime.colorPresentation(ThemePresentationTargetV2.CHROME_NAVIGATION_BACKGROUND_COLOR)
+            ?: runtime.colorScheme.background
     return NativeThemeMainWindowChromeState(
         statusBarColor = statusBarColor.toArgb(),
         lightStatusBarIcons = isNativeThemeColorLight(statusBarColor),
+        statusBarHidden = runtime.booleanPresentation(ThemePresentationTargetV2.CHROME_STATUS_BAR_HIDDEN) == true,
+        statusBarTransparent = statusBarTransparent,
         navigationBarColor = navigationBarColor.toArgb(),
         navigationBarContrastEnforced = true,
         lightNavigationBarIcons = !isNativeThemeColorLight(navigationBarColor),
@@ -48,8 +59,12 @@ internal fun NativeThemeMainWindowChromeHostAdapter(runtime: ThemePackageUiRunti
             WindowCompat.setDecorFitsSystemWindows(window, false)
 
             val state = resolveNativeThemeMainWindowChromeState(runtime)
-            insetsController?.show(WindowInsetsCompat.Type.statusBars())
-            window.statusBarColor = state.statusBarColor
+            if (state.statusBarHidden) {
+                insetsController?.hide(WindowInsetsCompat.Type.statusBars())
+            } else {
+                insetsController?.show(WindowInsetsCompat.Type.statusBars())
+            }
+            window.statusBarColor = if (state.statusBarTransparent) Color.Transparent.toArgb() else state.statusBarColor
             insetsController?.isAppearanceLightStatusBars = state.lightStatusBarIcons
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
