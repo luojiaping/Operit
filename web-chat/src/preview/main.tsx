@@ -195,7 +195,7 @@ function DeviceMockup({
       const rect = element.getBoundingClientRect();
       // 手机壳实体 404x866，按舞台实际尺寸整体放大（iframe 逻辑视口固定 376x816，
       // transform 缩放不损清晰度）；上限 1.4 由舞台宽高自然约束
-      const next = Math.min(1.4, (rect.height - 28) / 866, (rect.width - 20) / 408);
+      const next = Math.min(1.4, (rect.height - 12) / 866, (rect.width - 12) / 408);
       setScale(Math.max(0.35, next));
     };
     update();
