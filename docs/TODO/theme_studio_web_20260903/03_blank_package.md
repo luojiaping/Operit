@@ -26,6 +26,11 @@
 
 [DONE] 3. 派生实现 `blankPackage.createBlankPackageManifest`：basis 锁定（基础包坐标+archiveSha256）+ parameters 全量复制 + `StudioPackage` 生成；测试覆盖派生包过 `validation.ts`。
 
+## 遗留
+
+- “以已导入包为基础”选项未做（当前仅内置 default/cyber 两个基础）。
+- 编辑期间修改 packageId/version 的入口未做。
+
 ## 旧实现
 
 无。

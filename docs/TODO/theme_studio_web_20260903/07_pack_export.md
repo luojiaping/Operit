@@ -23,13 +23,13 @@
 
 ## 最小功能单元
 
-[TODO] 1. manifest 序列化器（strict 字段集/显式默认值）+ 烘焙规则（非 URI 值、URI 提示清单）。
+[DONE] 1. manifest 序列化器（strict 字段集/显式默认值）+ 烘焙规则（非 URI 值、URI 提示清单）（`exporter.ts`）。
 
-[TODO] 2. zipWriter 增强：deflate、comment、确定性顺序、UTF-8、尺寸回填；round-trip 自测（写→读→逐项比对）。
+[DONE] 2. zipWriter 增强：deflate、comment、确定性顺序、UTF-8、尺寸回填；round-trip 自测（写→读→逐项比对）（`zipWriter.ts` + `tests/exporter.test.ts`）。
 
-[TODO] 3. 导出控制器：素材写盘清单、SHA/byteSize 计算回填、`basis` 坐标写入、schemaVersion=4。
+[DONE] 3. 导出控制器：素材写盘清单、SHA/byteSize 计算回填、`basis` 坐标写入、schemaVersion=4。
 
-[TODO] 4. 导出 UI + 后台 re-validate smoke + sha256 展示。
+[IN PROGRESS] 4. 导出 UI + 后台 re-validate smoke + sha256 展示：导出按钮、sha256 展示、导出后 `smokeValidateExportedArchive` 回环自检已接；导出前 diff 摘要 UI 未接。
 
 ## 旧实现
 

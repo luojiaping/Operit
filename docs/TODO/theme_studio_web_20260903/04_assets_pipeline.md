@@ -22,13 +22,13 @@
 
 ## 最小功能单元
 
-[TODO] 1. 素材校验器（mime/头签名/大小/重复 key/路径）+ 单元测试样例集。
+[DONE] 1. 素材校验器（mime/头签名/大小/重复 key/路径）+ 单元测试样例集（`assets/validator.ts` + `tests/assets.test.ts`）。
 
-[TODO] 2. 素材库存储（IndexedDB）+ blob URL 注册表 + 生命周期（替换即 revoke）。
+[DONE] 2. 素材库存储（IndexedDB）+ blob URL 注册表 + 生命周期（替换即 revoke）（`assets/library.ts`，每次事务重开 object store）。
 
-[TODO] 3. 素材管理 UI（分类/预览/删除/替换）+ URI 控件绑定选择器。
+[IN PROGRESS] 3. 素材管理 UI（分类/预览/删除/替换）+ URI 控件绑定选择器：当前为 Workbench 内统一素材区（上传/绑定/删除/内置保护），分类视图与缩略图、视频、字体预览未完成。
 
-[TODO] 4. `StudioPackage` 内素材模型（AssetRecord: key/path/kind/mime/sha256/byteSize/blob）与校验集成。
+[DONE] 4. `StudioPackage` 内素材模型（AssetRecord: key/path/kind/mime/sha256/byteSize/blob）与校验集成。
 
 ## 旧实现
 
@@ -36,4 +36,10 @@
 
 ## 本轮进展
 
-[IN PROGRESS] 导入包素材会登记到浏览器素材库；目标 Inspector 新增统一素材区，支持图片/视频/字体上传、素材绑定、删除和内置素材保护。IndexedDB 操作改为每次事务重新取得 object store，避免跨事务复用失效句柄。
+导入包素材会登记到浏览器素材库；目标 Inspector 新增统一素材区，支持图片/视频/字体上传、素材绑定、删除和内置素材保护。IndexedDB 操作改为每次事务重新取得 object store，避免跨事务复用失效句柄。
+
+## 遗留
+
+- 素材区随 `ThemeWorkbench` 渲染，未导入包时不可见（见 index 遗留 1/5）。
+- 分类视图（IMAGE/VIDEO/FONT）、图片缩略、视频可播、字体名预览未做。
+- 替换素材时同步解除旧参数绑定未做（当前仅删除时解绑）。

@@ -21,9 +21,9 @@
 
 [DONE] 1. ZIP 读取模块 `shared/theme/zipReader.ts`：EOCD/CP 解析加固（comment-length 精确匹配、bounds 校验）、deflate、路径安全、entry/尺寸/压缩比预算。
 
-[DONE] 2. 导入控制器 `shared/theme/packageLoader.ts`：`.otheme` → strict 解码 + `validation.ts` → `StudioPackage`（含 archiveSha256 计算）；default/cyber `3.0.0` 真归档冒烟通过（55 项 vitest 含 zip 往返）。
+[DONE] 2. 导入控制器 `shared/theme/packageLoader.ts`：`.otheme` → strict 解码 + `validation.ts` → `StudioPackage`（含 archiveSha256 计算）；default/cyber `3.0.0` 真归档冒烟通过。
 
-[DONE] 3. 导入 UI `ThemeStudioEntry`：拖放/文件选择、元信息展示、错误面板（聚合+字段路径）。
+[DONE] 3. 导入 UI `ThemeStudioEntry`：文件选择、元信息展示、错误面板（聚合+字段路径）。拖放导入未实现（仅文件选择）。
 
 ## 旧实现
 

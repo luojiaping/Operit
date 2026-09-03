@@ -25,15 +25,15 @@
 
 ## 最小功能单元
 
-[TODO] 1. 值模型 sealed union + 每控件"值转换器"（控件事件 → 合法 `ThemeParameterValueV2`），禁兜底与断言规避。
+[DONE] 1. 值模型 sealed union + 每控件"值转换器"（控件事件 → 合法 `ThemeParameterValue`），禁兜底与断言规避（`editorState.ts` reducer）。
 
-[TODO] 2. 分组/排序/可见性求值（visibleWhen 三条件）+ 行组件（label/description 本地化解析、默认态标记）。
+[DONE] 2. 分组/排序/可见性求值（visibleWhen 三条件）+ 行组件（label/description 本地化解析、默认态标记）。
 
-[TODO] 3. 9 类控件 UI 组件（复用/抽取 preview 现有控件基础设施，新增 pair/layout/insets/radius）。
+[IN PROGRESS] 3. 9 类控件 UI 组件（复用/抽取 preview 现有控件基础设施，新增 pair/layout/insets/radius）：pair/layout/insets/radius 已进 AUTHOR 值编辑器；image/video/font_picker 走素材库。
 
-[TODO] 4. 工作台布局替换 `ThemeStudioPanel`：左编辑右预览（或按设备框布局），编辑项即时入 reducer → 预览桥。
+[DONE] 4. 工作台布局替换 `ThemeStudioPanel`：左手机预览、右 `ThemeWorkbench`（`ThemeStudioPanel` 仍作为未导入包时的旧简化面板保留，见遗留）。
 
-[TODO] 5. 差异摘要与重置能力。
+[IN PROGRESS] 5. 差异摘要与重置能力：单项重置/全包重置/`describeOverrides` 已有；导出前差异摘要 UI 未接。
 
 ## 旧实现
 
@@ -41,4 +41,12 @@
 
 ## 本轮进展
 
-[IN PROGRESS] 增加了按聊天组件定位的 Inspector 目标目录；USER 参数按目标过滤，AUTHOR 的 FLOAT/INSETS/IMAGE_LAYOUT/CORNER_RADIUS 等值类型可直接编辑，componentSkins 的状态、token、frame、内距和阴影参数进入同一编辑会话。
+增加了按聊天组件定位的 Inspector 目标目录；USER 参数按目标过滤，AUTHOR 的 FLOAT/INSETS/IMAGE_LAYOUT/CORNER_RADIUS 等值类型可直接编辑，componentSkins 的状态、token、frame、内距和阴影参数进入同一编辑会话。
+
+## 遗留
+
+- 未导入包时 `main.tsx` 仍渲染旧 `ThemeStudioPanel`（硬编码控件），用户首屏看不到 schema 4 工作台。
+- 目标过滤 `parameterBelongsToTarget` 基于参数 id/effects 文本匹配，参数命名偏离关键词时会漏显。
+- 内置 default/cyber 包仅 14 个参数，大量 presentation target（气泡颜色/文字颜色/玻璃/图片布局/字体/Header/导航等）未注册参数，导致对应目标无可调项。
+- 气泡/组件透明度无 schema 接口（`ThemeComponentSkin` 无 opacity 字段）。
+- componentSkins 编辑的 frame 类型/描边/非 normal 状态不会被 runtime 投影到预览（见 06 遗留）。

@@ -17,11 +17,11 @@
 
 ## 最小功能单元
 
-[TODO] 1. 设备框/壳布局修复（min-width、缩放除数、dvh、滚动条、BASE_URL）。
+[IN PROGRESS] 1. 设备框/壳布局修复：背景层 fixed→absolute 已修；min-width、缩放除数、dvh、单滚动容器、BASE_URL 相对化未完。
 
 [TODO] 2. slotRunner/templates/toolpkgLoader 契约修复（C1/M1/M2/M6/M7 收敛 + 用例）。
 
-[TODO] 3. tsconfig 纳入 tests 并保持 `npm run typecheck` 通过。
+[IN PROGRESS] 3. tsconfig 纳入 tests 并保持 `npm run typecheck` 通过。
 
 ## 旧实现
 

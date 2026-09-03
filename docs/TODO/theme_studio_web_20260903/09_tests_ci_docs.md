@@ -27,7 +27,7 @@ studio 分支已有 vitest（`npm test`，24+ 项）但 tsconfig 未纳入 tests
 
 ## 最小功能单元
 
-[TODO] 1. 测试面补齐（上述 7 块）并纳入 `npm test` 全绿。
+[IN PROGRESS] 1. 测试面补齐：shared/theme（manifest/loader/runtime/exporter/editorState/assets）已有 100+ 项 vitest；工作台交互与桥 guard 用例未完。
 
 [TODO] 2. CI 增加 typecheck 并验证。
 

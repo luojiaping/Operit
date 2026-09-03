@@ -23,11 +23,11 @@
 
 ## 最小功能单元
 
-[TODO] 1. `runtime.ts` 实现 + 逐常量对照测试（seed→20 role、behavior 映射、scale clamp、background 分派），与 app 输出真值比对。
+[DONE] 1. `runtime.ts` 实现 + 对照测试（seed→20 role、behavior 映射、scale clamp、background 分派），`tests/runtime.test.ts` 通过。
 
-[TODO] 2. iframe 内运行时接线：`PreviewApp` 接收 `{manifest, values}` 计算 snapshot，传给真实 `chatTheme.ts`；替换现有自造 snapshot。
+[DONE] 2. iframe 内运行时接线：`resolveEditorRuntimeTheme` 在父页计算（asset:// 经素材库解析为 blob URL）后过桥，iframe 内跑真实 `chatTheme.ts`。
 
-[TODO] 3. 桥重构：字段级 guard、source 过滤、pending mode 过滤、ready 重放。
+[IN PROGRESS] 3. 桥重构：目标选择/高亮双向消息（`preview-selection`/`preview-highlight`）已加；字段级 guard、source 过滤、pending mode 过滤、ready 重放未完。
 
 [TODO] 4. mockTransport 主题通道显式化 + 无主题基础态 + 删除 chat 边界修复。
 
@@ -39,4 +39,10 @@
 
 ## 本轮进展
 
-[IN PROGRESS] iframe 内的真实聊天 DOM 已加入稳定目标标识；点击后通过 `preview-selection` 通知父页并高亮目标，父页通过 `preview-highlight` 同步选中状态。runtime 已开始投影 componentSkins、组件 Insets、shape scale、字体资源和 App Chrome。
+iframe 内的真实聊天 DOM 已加入稳定目标标识；点击后通过 `preview-selection` 通知父页并高亮目标，父页通过 `preview-highlight` 同步选中状态。runtime 已开始投影 componentSkins、组件 Insets、shape scale、字体资源和 App Chrome。
+
+## 遗留
+
+- runtime 仅投影 componentSkins 的 normal 态（container/content 色、圆角、阴影、内距）；frame 类型变体（cut_corners/hud_notched/corner_brackets/segmented_rail）、border/accent 描边、disabled/selected/focused/error 状态未投影，编辑后预览不变。
+- 深浅色模式切换（当前固定 dark）未暴露。
+- 桥的 pending 缓存/mode 过滤缺陷仍在（M3/M4）。
