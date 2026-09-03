@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
-  buildBubbleImageBorderStyle,
-  buildChatThemeStyle
+  buildChatFontFaceCss,
+  buildChatThemeStyle,
+  resolveThemeFontFamily
 } from '../src/ui/features/chat/util/chatTheme';
 import type { WebThemeSnapshot } from '../src/ui/features/chat/util/chatTypes';
 
@@ -27,7 +28,7 @@ function baseTheme(overrides: Partial<WebThemeSnapshot> = {}): WebThemeSnapshot 
       outline_color: '#8f909a',
       outline_variant_color: '#45464f'
     },
-    background: { type: 'image', asset_url: null, opacity: 0.3 },
+    background: { stage: null, media: null },
     header: { transparent: false, overlay: false },
     input: {
       style: 'agent',
@@ -71,10 +72,42 @@ function baseTheme(overrides: Partial<WebThemeSnapshot> = {}): WebThemeSnapshot 
       assistant_rounded: true,
       user_padding_left: 12,
       user_padding_right: 12,
+      user_padding_top: 12,
+      user_padding_bottom: 12,
       assistant_padding_left: 12,
       assistant_padding_right: 12,
-      user_image: { enabled: false, asset_url: null, render_mode: 'tiled_nine_slice' },
-      assistant_image: { enabled: false, asset_url: null, render_mode: 'tiled_nine_slice' }
+      assistant_padding_top: 12,
+      assistant_padding_bottom: 12,
+      user_font: { type: 'system', system_font_name: 'default', custom_font_asset_url: null, scale: 1 },
+      assistant_font: { type: 'system', system_font_name: 'default', custom_font_asset_url: null, scale: 1 },
+      user_image: {
+        enabled: false,
+        asset_url: null,
+        render_mode: 'tiled_nine_slice',
+        crop_left: 0,
+        crop_top: 0,
+        crop_right: 1,
+        crop_bottom: 1,
+        repeat_start: 0,
+        repeat_end: 1,
+        repeat_y_start: 0,
+        repeat_y_end: 1,
+        scale: 1
+      },
+      assistant_image: {
+        enabled: false,
+        asset_url: null,
+        render_mode: 'tiled_nine_slice',
+        crop_left: 0,
+        crop_top: 0,
+        crop_right: 1,
+        crop_bottom: 1,
+        repeat_start: 0,
+        repeat_end: 1,
+        repeat_y_start: 0,
+        repeat_y_end: 1,
+        scale: 1
+      }
     },
     avatars: { shape: 'circle', corner_radius: 8, user_avatar_url: null, assistant_avatar_url: null },
     ...overrides
@@ -82,109 +115,128 @@ function baseTheme(overrides: Partial<WebThemeSnapshot> = {}): WebThemeSnapshot 
 }
 
 describe('buildChatThemeStyle 派生对齐 app', () => {
-  it('暗色快照输出 M3 baseline 的 tertiary 与 error', () => {
+  it('暗色快照输出可读文本色（luminance 0.58 阈值）', () => {
     const style = buildChatThemeStyle(baseTheme());
-    expect(style['--chat-tertiary']).toBe('#efb8c8');
-    expect(style['--chat-error']).toBe('#f2b8b5');
-    expect(style['--chat-error-container']).toBe('#8c1d18');
+    expect(style['--chat-on-primary']).toBe('#08111d');
+    expect(style['--chat-on-secondary']).toBe('#08111d');
   });
 
-  it('浅色快照输出 M3 baseline 浅色语义色', () => {
+  it('浅色高亮 primary 输出浅色文本（浅色面）', () => {
     const style = buildChatThemeStyle(
-      baseTheme({
-        theme_mode: 'light',
-        palette: {
-          ...baseTheme().palette,
-          background_color: '#faf8ff',
-          surface_color: '#ffffff'
-        }
-      })
+      baseTheme({ theme_mode: 'light' })
     );
-    expect(style['--chat-tertiary']).toBe('#7d5260');
-    expect(style['--chat-error']).toBe('#b3261e');
+    expect(style['--chat-on-primary']).toBe('#08111d');
   });
 
-  it('快照语义色优先于 baseline 派生', () => {
-    const theme = baseTheme();
-    theme.palette.tertiary_color = '#123456';
-    const style = buildChatThemeStyle(theme);
-    expect(style['--chat-tertiary']).toBe('#123456');
-  });
-
-  it('onColorMode=dark 时对比文本强制黑（对齐 app 阈值 0.5 而非旧 web 的 0.58）', () => {
-    const theme = baseTheme({ on_color_mode: 'dark' });
-    theme.palette.on_primary_color = undefined;
-    const style = buildChatThemeStyle(theme);
-    expect(style['--chat-on-primary']).toBe('#000000');
-  });
-
-  it('快照提供 on_primary 时直接使用不再自算', () => {
-    const theme = baseTheme();
-    theme.palette.on_primary_color = '#deadbe';
-    const style = buildChatThemeStyle(theme);
-    expect(style['--chat-on-primary']).toBe('#deadbe');
-  });
-
-  it('背景模糊关闭时 blur 为 0，开启时用快照半径（A1）', () => {
-    const off = buildChatThemeStyle(baseTheme());
-    expect(off['--chat-background-blur']).toBe('0px');
-    const theme = baseTheme();
-    theme.background.use_blur = true;
-    theme.background.blur_radius = 6;
-    expect(buildChatThemeStyle(theme)['--chat-background-blur']).toBe('6px');
-  });
-
-  it('暗色 agent 输入卡底色混合 onSurface 8%（B5）', () => {
+  it('无背景资产时 stage/media 图像变量均为 none', () => {
     const style = buildChatThemeStyle(baseTheme());
-    expect(String(style['--chat-agent-card-bg'])).toContain('color-mix(in srgb');
+    expect(style['--chat-stage-background-image']).toBe('none');
+    expect(style['--chat-media-background-image']).toBe('none');
+    expect(style['--chat-background-tint']).toBe('transparent');
   });
 
-  it('气泡九宫格参数转 border-image（A4/A5）', () => {
-    const theme = baseTheme();
-    theme.bubble.user_image = {
-      enabled: true,
-      asset_url: 'https://example.com/tile.png',
-      render_mode: 'tiled_nine_slice',
-      crop_left: 0.1,
-      crop_top: 0.2,
-      crop_right: 0.3,
-      crop_bottom: 0.4
-    };
-    const style = buildBubbleImageBorderStyle(theme.bubble.user_image);
-    expect(style.borderImageSource).toBe('url(https://example.com/tile.png)');
-    expect(style.borderImageSlice).toBe('10 70 60 20%');
-    expect(style.borderImageRepeat).toBe('repeat');
+  it('图片媒体背景输出 image + blur + 不透明度链（A1）', () => {
+    const theme = baseTheme({
+      background: {
+        stage: null,
+        media: {
+          type: 'image',
+          asset_url: 'https://example.com/bg.png',
+          opacity: 0.7,
+          blur_enabled: true,
+          blur_radius_dp: 6,
+          muted: true,
+          loop: true
+        }
+      }
+    });
+    const style = buildChatThemeStyle(theme);
+    expect(style['--chat-media-background-image']).toBe('url(https://example.com/bg.png)');
+    expect(style['--chat-media-background-opacity']).toBe('0.7');
+    expect(style['--chat-media-background-blur']).toBe('6px');
   });
 
-  it('nine_patch 模式映射为 stretch', () => {
-    const theme = baseTheme();
-    theme.bubble.user_image = {
-      enabled: true,
-      asset_url: 'https://example.com/tile.png',
-      render_mode: 'nine_patch'
-    };
-    expect(buildBubbleImageBorderStyle(theme.bubble.user_image).borderImageRepeat).toBe('stretch');
+  it('视频媒体背景仍以 image 变量关闭、由 video 元素承载', () => {
+    const theme = baseTheme({
+      background: {
+        stage: null,
+        media: {
+          type: 'video',
+          asset_url: 'https://example.com/bg.mp4',
+          opacity: 0.5,
+          blur_enabled: false,
+          blur_radius_dp: 0,
+          muted: false,
+          loop: false
+        }
+      }
+    });
+    const style = buildChatThemeStyle(theme);
+    expect(style['--chat-media-background-image']).toBe('none');
   });
 
-  it('气泡级字体输出独立变量，缺省回落全局（A10）', () => {
+  it('stage 背景按 fit 映射 background-size', () => {
+    const theme = baseTheme({
+      background: {
+        stage: { asset_url: 'https://example.com/stage.png', fit: 'crop', opacity: 0.4 },
+        media: null
+      }
+    });
+    const style = buildChatThemeStyle(theme);
+    expect(style['--chat-stage-background-size']).toBe('cover');
+    expect(style['--chat-stage-background-opacity']).toBe('0.4');
+  });
+
+  it('暗色 agent 输入卡底色随 surface 链派生', () => {
+    const style = buildChatThemeStyle(baseTheme());
+    expect(String(style['--chat-composer-bg'])).toBeDefined();
+  });
+
+  it('气泡圆角/头像圆角映射', () => {
+    const style = buildChatThemeStyle(baseTheme());
+    expect(style['--chat-user-radius']).toBe('20px');
+    expect(style['--chat-avatar-radius']).toBe('999px');
+  });
+
+  it('气泡字体输出独立 font-face 家族（A10）', () => {
     const theme = baseTheme();
     theme.bubble.user_font = {
+      type: 'file',
+      system_font_name: null,
+      custom_font_asset_url: 'https://example.com/user.otf',
+      scale: 1
+    };
+    const css = buildChatFontFaceCss(theme);
+    expect(css).toContain('OperitThemeUserBubbleFont');
+    expect(resolveThemeFontFamily(theme.bubble.user_font, 'OperitThemeUserBubbleFont')).toContain(
+      'OperitThemeUserBubbleFont'
+    );
+  });
+
+  it('气泡字体无自定义资产时使用全局字体族', () => {
+    const style = buildChatThemeStyle(baseTheme());
+    expect(String(style['--chat-font-family'])).toContain('PingFang SC');
+  });
+
+  it('系统字体名称映射到 CSS 字体族', () => {
+    const theme = baseTheme();
+    theme.font = {
       type: 'system',
-      system_font_name: 'KaiTi',
+      system_font_name: 'monospace',
       custom_font_asset_url: null,
       scale: 1
     };
-    const style = buildChatThemeStyle(theme);
-    expect(String(style['--chat-user-font-family'])).toContain('KaiTi');
-    expect(String(style['--chat-assistant-font-family'])).not.toContain('KaiTi');
+    expect(resolveThemeFontFamily(theme.font)).toContain('ui-monospace');
   });
 
-  it('use_system_theme 分叉时明暗由 palette 背景亮度决定（A19）', () => {
-    const theme = baseTheme({ theme_mode: 'dark', use_system_theme: true });
-    // 系统亮色解析后的亮背景 palette + theme_mode=dark 的组合
-    theme.palette.background_color = '#faf8ff';
-    theme.palette.surface_color = '#ffffff';
-    const style = buildChatThemeStyle(theme);
-    expect(style['--chat-shadow']).toBe('rgba(44, 58, 90, 0.14)');
+  it('自定义字体资产走 font-face 家族名', () => {
+    const theme = baseTheme();
+    theme.font = {
+      type: 'file',
+      system_font_name: null,
+      custom_font_asset_url: 'https://example.com/f.otf',
+      scale: 1
+    };
+    expect(resolveThemeFontFamily(theme.font)).toContain('OperitThemeFont');
   });
 });

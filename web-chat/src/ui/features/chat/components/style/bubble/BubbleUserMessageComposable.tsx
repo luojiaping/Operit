@@ -1,12 +1,11 @@
 import { MessageAttachmentTag } from '../../attachments';
-import { MessageFooterBar } from '../../MessageFooterBar';
-import { PersonIcon } from '../../../util/chatIcons';
 import { BubbleImageBackgroundSurface } from './BubbleImageBackgroundSurface';
 import {
   bubbleImageStyle,
   effectiveUserDisplayContent,
   effectiveUserDisplayName
 } from '../../../util/chatUtils';
+import { resolveThemeFontFamily } from '../../../util/chatTheme';
 import type {
   WebChatMessage,
   WebMessageAttachment,
@@ -26,13 +25,8 @@ function UserBubbleAvatar({
   }
 
   return (
-    <div
-      aria-label={name || 'User'}
-      className="bubble-avatar bubble-avatar-large bubble-avatar-fallback is-user"
-      role="img"
-    >
-      {/* B11：对齐 app 的矢量图标 fallback，tint primary，不再用首字母 */}
-      <PersonIcon size={22} />
+    <div className="bubble-avatar bubble-avatar-large bubble-avatar-fallback">
+      {name.slice(0, 1) || 'U'}
     </div>
   );
 }
@@ -169,11 +163,14 @@ export function BubbleUserMessageComposable({
   ]
     .filter(Boolean)
     .join(' ');
+  const userFontStyle = {
+    fontFamily: resolveThemeFontFamily(theme?.bubble.user_font, 'OperitThemeUserBubbleFont')
+  };
   const showWideHeader = wideLayout && (showAvatar || userName);
 
   if (wideLayout) {
     return (
-      <article className="bubble-message-composable user is-wide">
+      <article className="bubble-message-composable user is-wide" data-theme-target="conversation.user-bubble">
         <ReplyPreview align="end" message={message} />
         <BubbleUserImageLinks
           backgroundColor={attachmentBackground}
@@ -208,17 +205,16 @@ export function BubbleUserMessageComposable({
           glassVariant={glassVariant}
           themeMode={theme?.theme_mode}
         >
-          <div className="chat-message-content user-message-plain">
+          <div className="chat-message-content user-message-plain" style={userFontStyle}>
             <div className="plain-text-block">{content}</div>
           </div>
         </BubbleImageBackgroundSurface>
-        <MessageFooterBar message={message} theme={theme} />
       </article>
     );
   }
 
   return (
-    <article className="bubble-message-composable user is-compact">
+    <article className="bubble-message-composable user is-compact" data-theme-target="conversation.user-bubble">
       <ReplyPreview align="end" message={message} />
       <BubbleUserImageLinks
         backgroundColor={attachmentBackground}
@@ -246,7 +242,7 @@ export function BubbleUserMessageComposable({
             glassVariant={glassVariant}
             themeMode={theme?.theme_mode}
           >
-            <div className="chat-message-content user-message-plain">
+            <div className="chat-message-content user-message-plain" style={userFontStyle}>
               <div className="plain-text-block">{content}</div>
             </div>
           </BubbleImageBackgroundSurface>
@@ -258,7 +254,6 @@ export function BubbleUserMessageComposable({
           />
         ) : null}
       </div>
-      <MessageFooterBar message={message} theme={theme} />
     </article>
   );
 }

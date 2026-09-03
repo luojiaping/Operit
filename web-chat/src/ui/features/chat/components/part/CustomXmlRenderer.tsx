@@ -463,7 +463,7 @@ export function CustomXmlRenderer({
   };
 
   return (
-    <div className="structured-content">
+    <div className="structured-content" data-theme-target="conversation.tools">
       {resolvedBlocks.map((block, index) =>
         renderBlock(block, `block-${index}`, {
           siblings: resolvedBlocks,

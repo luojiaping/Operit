@@ -6,7 +6,7 @@
   padding: 4px 0;
   border: 1px solid var(--chat-border);
   border-radius: 8px;
-  background: color-mix(in srgb, var(--chat-panel-bg) 95%, transparent);
+  background: color-mix(in srgb, var(--chat-menu-bg) 95%, transparent);
   box-shadow: 0 12px 28px var(--chat-shadow);
 }
 
@@ -15,7 +15,7 @@
   padding: 16px 0;
   border-top-left-radius: 16px;
   border-top-right-radius: 16px;
-  background: var(--chat-composer-bg);
+  background: var(--chat-sheet-bg);
   box-shadow: 0 -1px 2px color-mix(in srgb, var(--chat-shadow) 55%, transparent);
 }
 
@@ -143,7 +143,7 @@
   padding: 18px;
   border: 1px solid var(--chat-border);
   border-radius: 24px;
-  background: var(--chat-panel-bg);
+  background: var(--chat-dialog-bg);
   box-shadow: 0 24px 46px var(--chat-shadow);
 }
 

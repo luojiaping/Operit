@@ -2,26 +2,30 @@
   color-scheme: dark;
   --chat-primary: #7b9bff;
   --chat-secondary: #70d3c2;
-  --chat-tertiary: #efb8c8;
-  --chat-error: #f2b8b5;
-  --chat-error-container: #8c1d18;
-  --chat-on-error-container: #f9dedc;
-  --chat-secondary-container: #4a4458;
-  --chat-on-secondary-container: #e8def8;
   --chat-primary-container: #c7d3f4;
   --chat-on-primary-container: #0f1a31;
   --chat-on-primary: #08101b;
   --chat-on-secondary: #08101b;
+  --chat-secondary-container: #303542;
+  --chat-on-secondary-container: #f2f6ff;
+  --chat-tertiary: #70d3c2;
+  --chat-error: #ffb4ab;
+  --chat-error-container: #93000a;
+  --chat-danger: #ffb4ab;
+  --chat-outline-color: #8f909a;
+  --chat-outline-variant-color: #45464f;
   --chat-root-background: #0f1520;
-  --chat-background-image: none;
-  --chat-background-opacity: 0;
-  --chat-background-blur: 0px;
+  --chat-stage-background-image: none;
+  --chat-stage-background-size: cover;
+  --chat-stage-background-opacity: 0;
+  --chat-media-background-image: none;
+  --chat-media-background-opacity: 0;
+  --chat-media-background-blur: 0px;
   --chat-background-tint: transparent;
   --chat-surface-color: #1b202b;
   --chat-surface-variant-color: #303542;
   --chat-surface-container-color: #1f2532;
   --chat-surface-container-high-color: #262d3b;
-  --chat-surface-container-highest-color: #2c3342;
   --chat-surface-strong: #1b202b;
   --chat-surface-soft: rgba(34, 40, 53, 0.94);
   --chat-surface-faint: rgba(48, 53, 66, 0.2);
@@ -43,72 +47,73 @@
   --chat-assistant-text: #eef4ff;
   --chat-font-scale: 1;
   --chat-font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
-  --chat-user-font-family: var(--chat-font-family);
-  --chat-assistant-font-family: var(--chat-font-family);
   --chat-mono-font: "Cascadia Mono", "SFMono-Regular", "Consolas", monospace;
   --chat-user-radius: 20px;
   --chat-assistant-radius: 20px;
+  --chat-composer-radius: 16px;
+  --chat-input-radius: 12px;
   --chat-avatar-radius: 999px;
   --chat-user-padding-left: 12px;
   --chat-user-padding-right: 12px;
+  --chat-user-padding-top: 12px;
+  --chat-user-padding-bottom: 12px;
   --chat-assistant-padding-left: 12px;
   --chat-assistant-padding-right: 12px;
+  --chat-assistant-padding-top: 12px;
+  --chat-assistant-padding-bottom: 12px;
   --chat-header-bg: rgba(20, 24, 35, 0.14);
   --chat-header-icon-active-bg: rgba(123, 155, 255, 0.15);
   --chat-header-icon-muted: rgba(242, 246, 255, 0.7);
-  --chat-header-history-icon: var(--chat-header-icon-muted);
-  --chat-header-pip-icon: var(--chat-header-icon-muted);
+  --chat-header-history-icon: var(--chat-text-main);
+  --chat-header-pip-icon: var(--chat-text-main);
+  --chat-toolbar-bg: var(--chat-primary);
+  --chat-toolbar-fg: var(--chat-on-primary);
+  --chat-navigation-bg: var(--chat-surface-color);
+  --chat-dialog-bg: var(--chat-panel-bg);
+  --chat-sheet-bg: var(--chat-composer-bg);
+  --chat-menu-bg: var(--chat-panel-bg);
+  --chat-status-bg: var(--chat-surface-container-color);
+  --chat-status-fg: var(--chat-text-main);
   --chat-header-track: rgba(48, 53, 66, 0.3);
-  --chat-context-warn: var(--chat-tertiary);
-  --chat-context-danger: var(--chat-error);
-  --chat-progress-connecting: var(--chat-tertiary);
-  --chat-progress-tool: var(--chat-secondary);
-  --chat-progress-processing: var(--chat-primary);
-  --chat-progress-result: var(--chat-tertiary);
   --chat-button-filled-bg: #c7d3f4;
   --chat-button-filled-fg: #0f1a31;
   --chat-composer-bg: #1b202b;
   --chat-composer-bg-transparent: rgba(27, 32, 43, 0.72);
   --chat-composer-bg-strong: rgba(27, 32, 43, 0.9);
-  --chat-agent-card-bg: var(--chat-composer-bg);
-  --chat-agent-card-shadow: 0 -10px 22px var(--chat-shadow);
   --chat-queue-bg: rgba(27, 32, 43, 0.72);
   --chat-queue-item-bg: rgba(27, 32, 43, 0.9);
   --chat-field-bg: #1b202b;
   --chat-scroll-button-bg: rgba(38, 45, 59, 0.62);
   --chat-panel-bg: #1b202b;
-  --chat-code-block-bg: rgba(44, 51, 66, 0.85);
-  --chat-code-toolbar-bg: rgba(38, 45, 59, 0.95);
-  --chat-code-block-fg: rgba(242, 246, 255, 0.92);
-  --chat-diff-add-bg: var(--chat-primary-container);
-  --chat-diff-add-fg: var(--chat-on-primary-container);
-  --chat-diff-del-bg: var(--chat-error-container);
-  --chat-diff-del-fg: var(--chat-on-error-container);
-  --chat-diff-hunk-bg: var(--chat-secondary-container);
-  --chat-diff-hunk-fg: var(--chat-on-secondary-container);
+  --chat-code-block-bg: rgba(48, 53, 66, 0.42);
+  --chat-code-block-fg: #f2f6ff;
+  --chat-progress-processing: var(--chat-primary);
+  --chat-progress-connecting: var(--chat-secondary);
+  --chat-progress-tool: var(--chat-tertiary);
+  --chat-context-warn: #ffbc67;
+  --chat-context-danger: #ff7888;
+  --chat-shape-scale: 1;
+  --chat-app-bar-frame-scale: 1;
+  --chat-navigation-frame-scale: 1;
+  --chat-composer-frame-scale: 1;
   --chat-scrim: rgba(5, 8, 12, 0.38);
   --chat-dialog-scrim: rgba(5, 8, 12, 0.5);
   --chat-action-primary-bg: var(--chat-primary);
   --chat-action-primary-fg: var(--chat-on-primary);
   --chat-action-queued-bg: var(--chat-secondary);
   --chat-action-queued-fg: var(--chat-on-secondary);
-  --chat-action-danger-bg: var(--chat-error);
+  --chat-action-danger-bg: #e06e7f;
   --chat-action-danger-fg: #fef8f9;
   --chat-safe-bottom: max(8px, env(safe-area-inset-bottom));
-  /* B26：内容限宽参数化；模拟器外壳按设备宽度覆盖此值 */
-  --chat-frame-max-width: 980px;
 }
 
 * {
   box-sizing: border-box;
 }
 
-/* #preview-root 是预览站入口容器：真机 index.html 用 #root。
-   两者都必须满屏，否则壳层高度由内容撑开导致布局溢出 */
 html,
 body,
-#root,
-#preview-root {
+#root {
   width: 100%;
   height: 100%;
   min-height: 100%;
@@ -158,9 +163,9 @@ pre {
 .ai-chat-screen {
   position: relative;
   width: 100%;
-  /* 受容器约束（真机入口容器即视口，预览站壳层内为视口减顶栏）；
-     100dvh 会无视壳层顶栏导致输入栏被裁出视口 */
-  height: 100%;
+  height: 100dvh;
+  min-height: 100vh;
+  min-height: 100dvh;
   overflow: hidden;
   background: var(--chat-root-background);
   color: var(--chat-text-main);
@@ -169,8 +174,6 @@ pre {
 }
 
 .chat-glass-backdrop-source {
-  /* 背景层必须约束在聊天页内部：fixed 会铺满整个手机视口，
-     在壳层顶栏与页内头部（static 定位）之上叠加近黑底色 */
   position: absolute;
   inset: 0;
   z-index: 0;
@@ -179,33 +182,38 @@ pre {
   background: var(--chat-root-background);
 }
 
-.chat-glass-backdrop-image,
+.chat-glass-backdrop-media-image,
+.chat-glass-backdrop-stage-image,
+.chat-glass-backdrop-video,
 .chat-glass-backdrop-tint {
   position: absolute;
   inset: 0;
   pointer-events: none;
 }
 
-.chat-glass-backdrop-image {
-  background-image: var(--chat-background-image);
-  background-position: center;
-  background-repeat: no-repeat;
-  background-size: cover;
-  opacity: var(--chat-background-opacity);
-  /* A1：对齐 app Modifier.blur(backgroundBlurRadius) */
-  filter: blur(var(--chat-background-blur));
-}
-
 .chat-glass-backdrop-video {
-  position: absolute;
-  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
-  opacity: var(--chat-background-opacity);
-  /* A2/A1：视频壁纸与图片共用模糊参数 */
-  filter: blur(var(--chat-background-blur));
-  pointer-events: none;
+}
+
+.chat-glass-backdrop-media-image,
+.chat-glass-backdrop-stage-image {
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.chat-glass-backdrop-media-image {
+  background-image: var(--chat-media-background-image);
+  background-size: cover;
+  filter: blur(var(--chat-media-background-blur));
+  opacity: var(--chat-media-background-opacity);
+}
+
+.chat-glass-backdrop-stage-image {
+  background-image: var(--chat-stage-background-image);
+  background-size: var(--chat-stage-background-size);
+  opacity: var(--chat-stage-background-opacity);
 }
 
 .chat-glass-backdrop-tint {
@@ -227,6 +235,8 @@ pre {
   flex-direction: column;
   width: 100%;
   height: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
   overflow: hidden;
 }
 
@@ -235,7 +245,7 @@ pre {
   display: flex;
   flex-direction: column;
   flex: 1 1 auto;
-  width: min(100%, var(--chat-frame-max-width));
+  width: min(100%, 980px);
   height: 100%;
   min-height: 0;
   margin: 0 auto;
@@ -320,7 +330,8 @@ pre {
 .chat-message-locator-row,
 .classic-input-fullscreen,
 .history-dialog footer button,
-.fullscreen-input-dialog footer button {
+.fullscreen-input-dialog footer button,
+.configuration-screen-inline-card button {
   background: transparent;
   color: var(--chat-text-main);
 }
@@ -341,18 +352,17 @@ pre {
   color: var(--chat-header-icon-muted);
 }
 
-.chat-header-icon-button.is-active {
-  background: var(--chat-header-icon-active-bg);
-  color: var(--chat-primary);
-}
-
-/* A13：历史与 pip 图标支持独立配色，对齐 app chat_header_*_icon_color */
-.chat-header-icon-button.chat-header-history:not(.is-active) {
+.chat-header-history {
   color: var(--chat-header-history-icon);
 }
 
-.chat-header-icon-button.chat-header-pip:not(.is-active) {
+.chat-header-pip {
   color: var(--chat-header-pip-icon);
+}
+
+.chat-header-icon-button.is-active {
+  background: var(--chat-header-icon-active-bg);
+  color: var(--chat-primary);
 }
 
 .chat-header-count-button {
@@ -390,9 +400,8 @@ pre {
 .chat-header-avatar-fallback {
   width: 24px;
   height: 24px;
-  /* B20：header 头像恒圆形 + secondaryContainer 底，对齐 app ChatHeader */
-  border-radius: 999px;
-  background: var(--chat-secondary-container);
+  border-radius: var(--chat-avatar-radius);
+  background: color-mix(in srgb, var(--chat-secondary) 22%, var(--chat-surface-variant-color));
   object-fit: cover;
 }
 
@@ -411,21 +420,6 @@ pre {
   place-items: center;
   font-size: 12px;
   font-weight: 700;
-}
-
-/* B11：气泡 fallback 为矢量图标形态——无底色，tint 对齐 app：user primary / assistant secondary */
-.bubble-avatar-fallback.is-user,
-.bubble-avatar-fallback.is-assistant {
-  background: transparent;
-  font-size: 0;
-}
-
-.bubble-avatar-fallback.is-user {
-  color: var(--chat-primary);
-}
-
-.bubble-avatar-fallback.is-assistant {
-  color: var(--chat-secondary);
 }
 
 .chat-screen-header-side {
@@ -483,8 +477,6 @@ pre {
   place-items: center;
   font-size: 9px;
   font-weight: 700;
-  /* B18：环内数字颜色跟随进度色，由组件设置 --chat-usage-ring-progress */
-  color: var(--chat-usage-ring-progress, var(--chat-text-muted));
 }
 
 .chat-screen-header-stats-sheet {

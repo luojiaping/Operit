@@ -40,7 +40,7 @@ function writeU32(view: DataView, offset: number, value: number) {
   view.setUint32(offset, value, true);
 }
 
-export function createStoredZip(entries: ZipEntry[]): Blob {
+export function createStoredZip(entries: ZipEntry[], comment = ''): Blob {
   const encoder = new TextEncoder();
   const parts: BlobPart[] = [];
   const centralRecords: { name: Uint8Array; crc: number; size: number; offset: number }[] = [];
@@ -102,8 +102,11 @@ export function createStoredZip(entries: ZipEntry[]): Blob {
   writeU16(eocd, 10, centralRecords.length);
   writeU32(eocd, 12, offset - centralStart);
   writeU32(eocd, 16, centralStart);
-  writeU16(eocd, 20, 0);
+  writeU16(eocd, 20, comment.length);
   parts.push(new Uint8Array(eocdBuffer));
+  if (comment.length > 0) {
+    parts.push(asPart(encoder.encode(comment)));
+  }
 
   return new Blob(parts, { type: 'application/zip' });
 }

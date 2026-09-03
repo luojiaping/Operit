@@ -38,3 +38,7 @@
 ## 旧实现
 
 硬编码控件、旧派生、无 AUTHOR 分区、无条件显隐。
+
+## 本轮进展
+
+[IN PROGRESS] 增加了按聊天组件定位的 Inspector 目标目录；USER 参数按目标过滤，AUTHOR 的 FLOAT/INSETS/IMAGE_LAYOUT/CORNER_RADIUS 等值类型可直接编辑，componentSkins 的状态、token、frame、内距和阴影参数进入同一编辑会话。

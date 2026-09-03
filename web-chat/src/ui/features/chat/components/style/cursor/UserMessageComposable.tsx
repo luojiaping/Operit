@@ -60,7 +60,7 @@ export function UserMessageComposable({
   const cursorAttachmentText = cursorUserText ?? theme?.palette?.on_surface_color;
 
   return (
-    <article className="cursor-user-message">
+    <article className="cursor-user-message" data-theme-target="conversation.user-bubble">
       {message.reply_preview ? (
         <div className="message-reply-preview align-start">
           <span className="message-reply-preview-icon">↩</span>

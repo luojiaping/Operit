@@ -226,7 +226,7 @@ export function ChatArea({
     lastMessage?.sender === 'assistant';
 
   return (
-    <div className="chat-area-shell">
+    <div className="chat-area-shell" data-theme-target="conversation.thread">
       <div className="chat-area-scroll" ref={scrollRef}>
         <div
           className={`chat-area-thread chat-style-${chatStyle} ${theme?.bubble.wide_layout ? 'is-wide' : ''}`}

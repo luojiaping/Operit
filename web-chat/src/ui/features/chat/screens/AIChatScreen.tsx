@@ -19,10 +19,21 @@ export function AIChatScreenView({ viewModel }: { viewModel: ChatViewModel }) {
     }),
     [chatThemeStyle]
   );
-  const backdropImageStyle = useMemo(
+  const backdropMedia = viewModel.theme?.background.media;
+  const backdropVideo = backdropMedia?.type === 'video' ? backdropMedia : null;
+  const backdropMediaImageStyle = useMemo(
     () => ({
-      backgroundImage: String(chatThemeStyle['--chat-background-image'] ?? 'none'),
-      opacity: String(chatThemeStyle['--chat-background-opacity'] ?? '0')
+      backgroundImage: String(chatThemeStyle['--chat-media-background-image'] ?? 'none'),
+      filter: `blur(${String(chatThemeStyle['--chat-media-background-blur'] ?? '0px')})`,
+      opacity: String(chatThemeStyle['--chat-media-background-opacity'] ?? '0')
+    }),
+    [chatThemeStyle]
+  );
+  const backdropStageImageStyle = useMemo(
+    () => ({
+      backgroundImage: String(chatThemeStyle['--chat-stage-background-image'] ?? 'none'),
+      backgroundSize: String(chatThemeStyle['--chat-stage-background-size'] ?? 'cover'),
+      opacity: String(chatThemeStyle['--chat-stage-background-opacity'] ?? '0')
     }),
     [chatThemeStyle]
   );
@@ -32,10 +43,6 @@ export function AIChatScreenView({ viewModel }: { viewModel: ChatViewModel }) {
     }),
     [chatThemeStyle]
   );
-  // A2：视频壁纸渲染 video 元素；muted/loop 缺省对齐 app 默认值 true
-  const background = viewModel.theme?.background;
-  const isVideoBackground =
-    background?.type === 'video' && Boolean(background.asset_url);
 
   return (
     <div
@@ -44,28 +51,33 @@ export function AIChatScreenView({ viewModel }: { viewModel: ChatViewModel }) {
         viewModel.activeChatStyle === 'bubble' ? 'chat-style-bubble' : 'chat-style-cursor',
         viewModel.theme?.theme_mode === 'light' ? 'theme-light' : 'theme-dark'
       ].join(' ')}
+      data-theme-target="chat.screen"
       style={chatThemeStyle}
     >
       {fontFaceCss ? <style>{fontFaceCss}</style> : null}
       <div
         aria-hidden="true"
         className="chat-glass-backdrop-source"
+        data-theme-target="background"
         style={backdropBaseStyle}
       >
-        {isVideoBackground && background?.asset_url ? (
+        {backdropVideo && backdropVideo.asset_url ? (
           <video
             aria-hidden="true"
             autoPlay
             className="chat-glass-backdrop-video"
-            loop={background.loop ?? true}
-            muted={background.muted ?? true}
+            loop={backdropVideo.loop}
+            muted={backdropVideo.muted}
             playsInline
-            src={background.asset_url}
-            style={backdropImageStyle}
+            src={backdropVideo.asset_url}
+            style={{
+              filter: `blur(${String(chatThemeStyle['--chat-media-background-blur'] ?? '0px')})`,
+              opacity: String(chatThemeStyle['--chat-media-background-opacity'] ?? '0')
+            }}
           />
-        ) : (
-          <div className="chat-glass-backdrop-image" style={backdropImageStyle} />
-        )}
+        ) : null}
+        <div className="chat-glass-backdrop-media-image" style={backdropMediaImageStyle} />
+        <div className="chat-glass-backdrop-stage-image" style={backdropStageImageStyle} />
         <div className="chat-glass-backdrop-tint" style={backdropTintStyle} />
       </div>
 

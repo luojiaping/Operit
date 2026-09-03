@@ -41,6 +41,7 @@ export function AppDrawer({
   return (
     <div
       className={`app-drawer-root ${open ? 'is-open' : ''}`}
+      data-theme-target="chrome.drawer"
       onClick={(event) => {
         if (event.target === event.currentTarget) {
           onClose();

@@ -17,8 +17,9 @@
   gap: 4px;
   height: 64px;
   padding: 0 6px;
-  background: var(--chat-primary);
-  color: var(--chat-on-primary, #ffffff);
+  background: var(--chat-toolbar-bg, var(--chat-primary));
+  color: var(--chat-toolbar-fg, var(--chat-on-primary, #ffffff));
+  zoom: var(--chat-app-bar-frame-scale);
 }
 
 /* 对齐 app toolbarTransparent：容器透明、内容色保持 onPrimary 语义 */
@@ -149,8 +150,9 @@
   flex-direction: column;
   width: 75%;
   border-radius: 0 16px 16px 0;
-  background: var(--chat-surface-color);
+  background: var(--chat-navigation-bg, var(--chat-surface-color));
   box-shadow: 8px 0 28px rgba(0, 0, 0, 0.35);
+  zoom: var(--chat-navigation-frame-scale);
   transform: translateX(-100%);
   transition: transform 300ms ease;
 }

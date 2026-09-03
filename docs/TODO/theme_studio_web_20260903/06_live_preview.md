@@ -36,3 +36,7 @@
 ## 旧实现
 
 父页自造 snapshot（旧模型）、桥弱校验、mock 按 chat 键主题、派生不齐。
+
+## 本轮进展
+
+[IN PROGRESS] iframe 内的真实聊天 DOM 已加入稳定目标标识；点击后通过 `preview-selection` 通知父页并高亮目标，父页通过 `preview-highlight` 同步选中状态。runtime 已开始投影 componentSkins、组件 Insets、shape scale、字体资源和 App Chrome。

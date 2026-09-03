@@ -520,7 +520,7 @@
   overflow: hidden;
   border: 0;
   border-radius: 16px;
-  background: var(--chat-surface-color);
+  background: var(--chat-dialog-bg);
   box-shadow: 0 20px 44px rgba(0, 0, 0, 0.24);
 }
 
@@ -888,7 +888,7 @@
 }
 
 .markdown-block a {
-  color: #007aff;
+  color: var(--chat-primary);
   text-decoration: none;
 }
 
@@ -965,7 +965,7 @@
   overflow: hidden;
   margin: 2px 0;
   border-radius: 4px;
-  background: #1e1e1e;
+  background: var(--chat-code-block-bg);
 }
 
 .markdown-code-toolbar {
@@ -974,7 +974,7 @@
   justify-content: space-between;
   gap: 8px;
   padding: 4px 8px;
-  background: #252526;
+  background: var(--chat-surface-container-high-color);
 }
 
 .markdown-code-language {
@@ -1039,7 +1039,7 @@
 .markdown-code-text {
   min-width: 0;
   margin: 0;
-  color: rgba(238, 244, 255, 0.88);
+  color: var(--chat-code-block-fg);
   font-family: var(--chat-mono-font);
   font-size: 11px;
   line-height: 1.45;

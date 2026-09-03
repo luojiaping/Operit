@@ -35,6 +35,21 @@ const BUBBLE_TILE_IMAGE =
       '</svg>'
   );
 
+const DISABLED_IMAGE: WebThemeSnapshot['bubble']['user_image'] = {
+  enabled: false,
+  asset_url: null,
+  render_mode: 'tiled_nine_slice',
+  crop_left: 0,
+  crop_top: 0,
+  crop_right: 1,
+  crop_bottom: 1,
+  repeat_start: 0,
+  repeat_end: 1,
+  repeat_y_start: 0,
+  repeat_y_end: 1,
+  scale: 1
+};
+
 function palette(overrides: Partial<WebThemeSnapshot['palette']>): WebThemeSnapshot['palette'] {
   return {
     background_color: '#0f1520',
@@ -54,40 +69,19 @@ function palette(overrides: Partial<WebThemeSnapshot['palette']>): WebThemeSnaps
   };
 }
 
-// 默认暗色快照：携带全部 web 侧扩展字段（app 侧下发为跟进项）
+// 默认暗色快照：与 app WebChatHttpBridge 下发 DTO 同构（13 键 palette）
 export const MOCK_THEME_DARK: WebThemeSnapshot = {
   source: 'global',
   source_id: null,
   theme_mode: 'dark',
   use_system_theme: false,
   use_custom_colors: false,
-  on_color_mode: 'auto',
   palette: palette({
-    tertiary_color: '#efb8c8',
-    error_color: '#f2b8b5',
-    error_container_color: '#8c1d18',
-    secondary_container_color: '#4a4458',
-    on_primary_color: '#08101b',
-    on_secondary_color: '#08101b',
-    surface_container_highest_color: '#2c3342',
-    surface_container_low_color: '#1a1f2a',
-    surface_container_lowest_color: '#161b25'
+    primary_container_color: '#c7d3f4',
+    on_primary_container_color: '#0f1a31'
   }),
-  background: {
-    type: 'image',
-    asset_url: null,
-    opacity: 0.3,
-    use_blur: false,
-    blur_radius: 10,
-    muted: true,
-    loop: true
-  },
-  header: {
-    transparent: false,
-    overlay: false,
-    history_icon_color: null,
-    pip_icon_color: null
-  },
+  background: { stage: null, media: null },
+  header: { transparent: false, overlay: false },
   input: {
     style: 'agent',
     transparent: false,
@@ -135,10 +129,16 @@ export const MOCK_THEME_DARK: WebThemeSnapshot = {
     assistant_rounded: true,
     user_padding_left: 12,
     user_padding_right: 12,
+    user_padding_top: 12,
+    user_padding_bottom: 12,
     assistant_padding_left: 12,
     assistant_padding_right: 12,
-    user_image: { enabled: false, asset_url: null, render_mode: 'tiled_nine_slice' },
-    assistant_image: { enabled: false, asset_url: null, render_mode: 'tiled_nine_slice' }
+    assistant_padding_top: 12,
+    assistant_padding_bottom: 12,
+    user_font: { type: 'system', system_font_name: 'default', custom_font_asset_url: null, scale: 1 },
+    assistant_font: { type: 'system', system_font_name: 'default', custom_font_asset_url: null, scale: 1 },
+    user_image: DISABLED_IMAGE,
+    assistant_image: DISABLED_IMAGE
   },
   avatars: {
     shape: 'circle',
@@ -151,7 +151,6 @@ export const MOCK_THEME_DARK: WebThemeSnapshot = {
 export const MOCK_THEME_LIGHT: WebThemeSnapshot = {
   ...MOCK_THEME_DARK,
   theme_mode: 'light',
-  on_color_mode: 'auto',
   palette: palette({
     background_color: '#faf8ff',
     surface_color: '#ffffff',
@@ -162,15 +161,6 @@ export const MOCK_THEME_LIGHT: WebThemeSnapshot = {
     secondary_color: '#2e9d8f',
     primary_container_color: '#dde2fb',
     on_primary_container_color: '#131a3a',
-    tertiary_color: '#7d5260',
-    error_color: '#b3261e',
-    error_container_color: '#f9dedc',
-    secondary_container_color: '#cdeee9',
-    on_primary_color: '#ffffff',
-    on_secondary_color: '#ffffff',
-    surface_container_highest_color: '#ded8e8',
-    surface_container_low_color: '#f6f2fb',
-    surface_container_lowest_color: '#fdfbff',
     on_surface_color: '#1a1c22',
     on_surface_variant_color: '#43454e',
     outline_color: '#7a7a85',
@@ -184,20 +174,18 @@ export const MOCK_THEME_SCENIC: WebThemeSnapshot = {
   source: 'character_card',
   source_id: 'card-atmosphere',
   background: {
-    type: 'image',
-    asset_url: PLACEHOLDER_IMAGE,
-    opacity: 0.9,
-    use_blur: true,
-    blur_radius: 6,
-    muted: true,
-    loop: true
+    stage: null,
+    media: {
+      type: 'image',
+      asset_url: PLACEHOLDER_IMAGE,
+      opacity: 0.9,
+      blur_enabled: true,
+      blur_radius_dp: 6,
+      muted: true,
+      loop: true
+    }
   },
-  header: {
-    transparent: true,
-    overlay: false,
-    history_icon_color: '#ffd28a',
-    pip_icon_color: null
-  },
+  header: { transparent: true, overlay: false },
   input: {
     style: 'agent',
     transparent: true,
@@ -219,13 +207,13 @@ export const MOCK_THEME_SCENIC: WebThemeSnapshot = {
       render_mode: 'tiled_nine_slice',
       crop_left: 0.12,
       crop_top: 0.12,
-      crop_right: 0.12,
-      crop_bottom: 0.12,
+      crop_right: 0.88,
+      crop_bottom: 0.88,
       repeat_start: 0.35,
       repeat_end: 0.65,
       repeat_y_start: 0.35,
       repeat_y_end: 0.65,
-      image_scale: 1
+      scale: 1
     },
     user_font: {
       type: 'system',

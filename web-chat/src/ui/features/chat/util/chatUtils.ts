@@ -1,6 +1,5 @@
 import type { CSSProperties } from 'react';
 import type { WebChatMessage, WebMessageAttachment, WebThemeSnapshot } from './chatTypes';
-import { buildBubbleImageBorderStyle } from './chatTheme';
 
 export function formatTime(timestamp: number) {
   return new Intl.DateTimeFormat('zh-CN', {
@@ -114,13 +113,31 @@ export function bubbleImageStyle(
     return undefined;
   }
 
-  // A4/A5：九宫格走 border-image（tiled_nine_slice 平铺 / nine_patch 拉伸），
-  // 不再整图 cover 拉伸，也不叠加旧版固定暗色渐变
+  const cropWidth = Math.max(0.01, imageTheme.crop_right - imageTheme.crop_left);
+  const cropHeight = Math.max(0.01, imageTheme.crop_bottom - imageTheme.crop_top);
+  const scale = Math.max(0.1, imageTheme.scale);
+  const tiled = imageTheme.render_mode === 'tiled_nine_slice';
+  const repeatWidth = Math.max(0.01, imageTheme.repeat_end - imageTheme.repeat_start);
+  const repeatHeight = Math.max(0.01, imageTheme.repeat_y_end - imageTheme.repeat_y_start);
+
+  if (imageTheme.render_mode === 'nine_patch') {
+    return {
+      backgroundColor: 'transparent',
+      borderImageRepeat: 'stretch',
+      borderImageSlice: `${imageTheme.repeat_y_start * 100}% ${(1 - imageTheme.repeat_end) * 100}% ${(1 - imageTheme.repeat_y_end) * 100}% ${imageTheme.repeat_start * 100}% fill`,
+      borderImageSource: `url(${imageTheme.asset_url})`,
+      borderImageWidth: '12px',
+      borderStyle: 'solid',
+      borderWidth: '12px'
+    };
+  }
+
   return {
-    ...buildBubbleImageBorderStyle(imageTheme),
-    borderStyle: 'solid',
-    // border-image 的边区宽度由 borderWidth 承载；
-    // 取 12px 与默认气泡内边距一致，保证角和边可见
-    borderWidth: '12px'
+    backgroundImage: `linear-gradient(180deg, rgba(10, 12, 20, 0.06), rgba(10, 12, 20, 0.12)), url(${imageTheme.asset_url})`,
+    backgroundSize: tiled
+      ? `${(scale * 100) / repeatWidth}% ${(scale * 100) / repeatHeight}%`
+      : `${(scale * 100) / cropWidth}% ${(scale * 100) / cropHeight}%`,
+    backgroundRepeat: tiled ? 'repeat' : 'no-repeat',
+    backgroundPosition: `${imageTheme.crop_left * 100}% ${imageTheme.crop_top * 100}%`
   };
 }

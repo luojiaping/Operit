@@ -27,7 +27,10 @@ export function AppTopBar({
   onMenu: () => void;
 }) {
   return (
-    <header className={`app-top-bar ${isTransparent ? 'is-transparent' : ''}`}>
+    <header
+      className={`app-top-bar ${isTransparent ? 'is-transparent' : ''}`}
+      data-theme-target="chrome.toolbar"
+    >
       <button
         aria-label={canGoBack ? '返回' : '菜单'}
         className="app-top-bar-nav"

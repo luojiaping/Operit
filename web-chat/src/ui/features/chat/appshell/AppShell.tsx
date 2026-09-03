@@ -50,6 +50,7 @@ export function AppShell({
   const chatThemeStyle = useMemo(() => buildChatThemeStyle(theme), [theme]);
   const fontFaceCss = buildChatFontFaceCss(theme);
   const canGoBack = screen.name !== 'chat';
+  const toolbarTransparent = theme?.chrome?.toolbar_transparent ?? theme?.header.transparent ?? false;
 
   // body 在 .app-shell 之外，body { background: var(--chat-root-background) }
   // 只能解析到 :root 的固定暗色默认；把变量同步到 documentElement，
@@ -78,13 +79,13 @@ export function AppShell({
   );
 
   return (
-    <div className="app-shell" style={chatThemeStyle as CSSProperties}>
+    <div className="app-shell" data-theme-target="app.shell" style={chatThemeStyle as CSSProperties}>
       {fontFaceCss ? <style>{fontFaceCss}</style> : null}
       <AppTopBar
         canGoBack={canGoBack}
         chatTitle={chatTitle}
         isChat={screen.name === 'chat'}
-        isTransparent={Boolean(theme?.header.transparent)}
+        isTransparent={toolbarTransparent}
         onBack={() => onScreenChange({ name: 'chat' })}
         onMenu={() => setDrawerOpen(true)}
         title={screenTitleOf(screen, settingsTitles)}

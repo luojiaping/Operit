@@ -1,5 +1,6 @@
 import type { WebThemeSnapshot } from '../util/chatTypes';
 import type { ComposeChildren, ComposeNode } from './composeDslTypes';
+import { resolveM3SemanticScheme } from '../../../../shared/theme/baseScheme';
 
 // Compose DSL 的浏览器执行环境：对齐 app OperitComposeDslBridge 暴露给
 // screen 脚本的 ctx 契约（UI 注册表 + MaterialTheme + 状态钩子）。
@@ -53,15 +54,17 @@ function buildColorScheme(theme: WebThemeSnapshot | null) {
   if (!palette) {
     return {};
   }
+  const m3 = resolveM3SemanticScheme(palette, theme?.theme_mode === 'light');
   return {
     primary: palette.primary_color,
-    onPrimary: palette.on_primary_color ?? theme?.palette.primary_color,
+    onPrimary: m3.on_primary_color,
     secondary: palette.secondary_color,
-    onSecondary: palette.on_secondary_color ?? palette.secondary_color,
-    tertiary: palette.tertiary_color ?? null,
-    error: palette.error_color ?? null,
-    errorContainer: palette.error_container_color ?? null,
-    secondaryContainer: palette.secondary_container_color ?? null,
+    onSecondary: m3.on_secondary_color,
+    tertiary: m3.tertiary_color,
+    error: m3.error_color,
+    errorContainer: m3.error_container_color,
+    onErrorContainer: m3.on_error_container_color,
+    secondaryContainer: m3.secondary_container_color,
     primaryContainer: palette.primary_container_color,
     onPrimaryContainer: palette.on_primary_container_color,
     background: palette.background_color,

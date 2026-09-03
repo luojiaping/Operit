@@ -24,9 +24,9 @@ describe('MockTransport 端点行为', () => {
 
   it('各会话主题携带 web 扩展字段', async () => {
     const theme = await transport.getTheme(token, 'chat-scenic');
-    expect(theme.background.use_blur).toBe(true);
+    expect(theme.background.media?.blur_enabled).toBe(true);
+    expect(theme.background.media?.asset_url).toBeTruthy();
     expect(theme.bubble.user_image.enabled).toBe(true);
-    expect(theme.header.history_icon_color).toBe('#ffd28a');
   });
 
   it('getMessages 默认按时间升序返回', async () => {

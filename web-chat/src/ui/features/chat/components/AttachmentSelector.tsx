@@ -104,7 +104,7 @@ export function AttachmentSelector({
 
   if (mode === 'classic') {
     return (
-      <div className="attachment-selector-sheet">
+      <div className="attachment-selector-sheet" data-theme-target="overlay.dialog">
         <div className="attachment-selector-handle" />
         <div className="attachment-selector-grid">
           {selectorItems.map((item) => (

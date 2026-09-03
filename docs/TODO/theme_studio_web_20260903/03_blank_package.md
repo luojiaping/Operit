@@ -20,11 +20,11 @@
 
 ## 最小功能单元
 
-[TODO] 1. 内置模板资产：default/cyber `3.0.0` 随 vite 静态资产分发 + 元信息索引（避免重复打包哈希计算）。
+[DONE] 1. 内置模板资产：default/cyber `3.0.0` 随 vite `public/templates/` 分发 + `bundledTemplates.ts` 元数据索引（SHA 与发布坐标核对一致）。
 
-[TODO] 2. 新建向导表单与校验（命名规则、必填项、重复 packageId 仅提示）。
+[DONE] 2. 新建向导 `ThemeStudioEntry` 空白表单 + packageId/version/displayName 校验（`blankPackage.validateBlankPackageForm`）。
 
-[TODO] 3. 派生实现：basis 锁定 + parameters 全量复制 + `StudioPackage` 生成；测试校验产物过 `validation.ts`。
+[DONE] 3. 派生实现 `blankPackage.createBlankPackageManifest`：basis 锁定（基础包坐标+archiveSha256）+ parameters 全量复制 + `StudioPackage` 生成；测试覆盖派生包过 `validation.ts`。
 
 ## 旧实现
 

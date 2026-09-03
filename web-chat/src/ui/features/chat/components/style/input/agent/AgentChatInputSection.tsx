@@ -828,7 +828,7 @@ export function AgentChatInputSection({
   }
 
   return (
-    <div className="agent-chat-input-section">
+    <div className="agent-chat-input-section" data-theme-target="composer.agent">
       <InputSlotHost layout="above-input-agent" slot="above_input" theme={theme} />
       <PendingMessageQueuePanel
         expanded={isPendingQueueExpanded}

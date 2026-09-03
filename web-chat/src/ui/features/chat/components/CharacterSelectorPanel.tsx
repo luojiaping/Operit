@@ -182,7 +182,11 @@ export function CharacterSelectorPanel({
         className={`character-selector-panel ${open ? 'is-open' : ''}`}
         role="dialog"
       >
-        <div className="character-selector-panel-shell" onClick={(event) => event.stopPropagation()}>
+        <div
+          className="character-selector-panel-shell"
+          data-theme-target="overlay.character"
+          onClick={(event) => event.stopPropagation()}
+        >
           <header className="character-selector-panel-header">
             <span className="character-selector-panel-title">
               <strong>选择角色</strong>

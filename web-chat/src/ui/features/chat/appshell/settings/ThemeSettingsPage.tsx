@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { WebThemeSnapshot } from '../../util/chatTypes';
-import { deriveCustomPalette } from '../../util/chatTheme';
+import { deriveCustomPalette } from '../../../../../shared/theme/previewPalette';
 import {
   InfoBanner,
   OptionCards,
@@ -34,6 +34,48 @@ export function ThemeSettingsPage({
 
   function patchBackground(patch: Partial<WebThemeSnapshot['background']>) {
     onPatchTheme({ background: { ...snapshot.background, ...patch } });
+  }
+
+  function changeBackgroundMediaType(type: 'image' | 'video') {
+    const media = snapshot.background.media;
+    const stage = snapshot.background.stage;
+    if (media == null) {
+      return;
+    }
+    patchBackground({
+      stage,
+      media: { ...media, type }
+    });
+  }
+
+  function changeBackgroundOpacity(opacity: number) {
+    const media = snapshot.background.media;
+    if (media == null) {
+      return;
+    }
+    patchBackground({ stage: snapshot.background.stage, media: { ...media, opacity } });
+  }
+
+  function changeBackgroundBlur(blurEnabled: boolean) {
+    const media = snapshot.background.media;
+    if (media == null) {
+      return;
+    }
+    patchBackground({
+      stage: snapshot.background.stage,
+      media: { ...media, blur_enabled: blurEnabled }
+    });
+  }
+
+  function changeBackgroundBlurRadius(blurRadiusDp: number) {
+    const media = snapshot.background.media;
+    if (media == null) {
+      return;
+    }
+    patchBackground({
+      stage: snapshot.background.stage,
+      media: { ...media, blur_radius_dp: blurRadiusDp }
+    });
   }
 
   function patchBubble(patch: Partial<WebThemeSnapshot['bubble']>) {
@@ -172,38 +214,38 @@ export function ThemeSettingsPage({
               <SectionTitle title="聊天背景" />
               <SettingsCard>
                 <OptionCards
-                  onChange={(type) => patchBackground({ type })}
+                  onChange={changeBackgroundMediaType}
                   options={[
                     { id: 'image', label: '图片' },
                     { id: 'video', label: '视频' }
                   ]}
-                  value={snapshot.background.type === 'video' ? 'video' : 'image'}
+                  value={snapshot.background.media?.type === 'video' ? 'video' : 'image'}
                 />
-                {snapshot.background.asset_url ? (
+                {snapshot.background.media ? (
                   <>
                     <SliderRow
                       label="背景不透明度"
                       max={1}
                       min={0.05}
-                      onChange={(opacity) => patchBackground({ opacity })}
+                      onChange={changeBackgroundOpacity}
                       step={0.05}
-                      value={snapshot.background.opacity}
-                      valueLabel={`${Math.round(snapshot.background.opacity * 100)}%`}
+                      value={snapshot.background.media.opacity}
+                      valueLabel={`${Math.round(snapshot.background.media.opacity * 100)}%`}
                     />
                     <SwitchRow
-                      checked={snapshot.background.use_blur ?? false}
-                      onChange={(useBlur) => patchBackground({ use_blur: useBlur })}
+                      checked={snapshot.background.media.blur_enabled}
+                      onChange={changeBackgroundBlur}
                       title="背景模糊"
                     />
-                    {snapshot.background.use_blur ? (
+                    {snapshot.background.media.blur_enabled ? (
                       <SliderRow
                         label="模糊半径"
                         max={30}
                         min={0}
-                        onChange={(radius) => patchBackground({ blur_radius: radius })}
+                        onChange={changeBackgroundBlurRadius}
                         step={1}
-                        value={snapshot.background.blur_radius ?? 10}
-                        valueLabel={`${snapshot.background.blur_radius ?? 10} dp`}
+                        value={snapshot.background.media.blur_radius_dp}
+                        valueLabel={`${snapshot.background.media.blur_radius_dp} dp`}
                       />
                     ) : null}
                   </>

@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import type { WebThemeSnapshot } from '../ui/features/chat/util/chatTypes';
-import { deriveCustomPalette } from '../ui/features/chat/util/chatTheme';
+import type { WebBubbleImageTheme, WebThemeSnapshot } from '../ui/features/chat/util/chatTypes';
+import { deriveCustomPalette } from '../shared/theme/previewPalette';
+import { ThemeTargetNavigator } from './ThemeTargetNavigator';
+import { themeTargetDefinition, type ThemeTargetId } from './themeTargets';
 
 // 主题工作室：左侧调参，右侧手机壳实时渲染。
 // 基线 palette 只保留必填字段，用户改色后派生项（容器色、对比文本、
@@ -30,6 +32,28 @@ interface ThemeDraft {
   inputLiquidGlass: boolean;
 }
 
+const DEFAULT_FONT = {
+  type: 'system',
+  system_font_name: 'default',
+  custom_font_asset_url: null,
+  scale: 1
+} as const;
+
+const NO_IMAGE: WebBubbleImageTheme = {
+  enabled: false,
+  asset_url: null,
+  render_mode: 'tiled_nine_slice',
+  crop_left: 0,
+  crop_top: 0,
+  crop_right: 1,
+  crop_bottom: 1,
+  repeat_start: 0,
+  repeat_end: 1,
+  repeat_y_start: 0,
+  repeat_y_end: 1,
+  scale: 1
+};
+
 const CLEAN_BASE: Record<ThemeMode, WebThemeSnapshot> = {
   dark: {
     source: 'global',
@@ -48,12 +72,14 @@ const CLEAN_BASE: Record<ThemeMode, WebThemeSnapshot> = {
       on_surface_color: '#f2f6ff',
       on_surface_variant_color: '#9ca8bb',
       outline_color: '#8f909a',
-      outline_variant_color: '#45464f'
+      outline_variant_color: '#45464f',
+      primary_container_color: '#c7d3f4',
+      on_primary_container_color: '#0f1a31'
     },
-    background: { type: 'image', asset_url: null, opacity: 0.3, use_blur: false, blur_radius: 10 },
+    background: { stage: null, media: null },
     header: { transparent: false, overlay: false },
     input: { style: 'agent', transparent: false, floating: false, liquid_glass: false, water_glass: false },
-    font: { type: 'system', system_font_name: 'default', custom_font_asset_url: null, scale: 1 },
+    font: { ...DEFAULT_FONT },
     chat_style: 'bubble',
     show_thinking_process: true,
     show_status_tags: true,
@@ -88,10 +114,16 @@ const CLEAN_BASE: Record<ThemeMode, WebThemeSnapshot> = {
       assistant_rounded: true,
       user_padding_left: 12,
       user_padding_right: 12,
+      user_padding_top: 12,
+      user_padding_bottom: 12,
       assistant_padding_left: 12,
       assistant_padding_right: 12,
-      user_image: { enabled: false, asset_url: null, render_mode: 'tiled_nine_slice' },
-      assistant_image: { enabled: false, asset_url: null, render_mode: 'tiled_nine_slice' }
+      assistant_padding_top: 12,
+      assistant_padding_bottom: 12,
+      user_font: { ...DEFAULT_FONT },
+      assistant_font: { ...DEFAULT_FONT },
+      user_image: { ...NO_IMAGE },
+      assistant_image: { ...NO_IMAGE }
     },
     avatars: { shape: 'circle', corner_radius: 8, user_avatar_url: null, assistant_avatar_url: null }
   },
@@ -112,12 +144,14 @@ const CLEAN_BASE: Record<ThemeMode, WebThemeSnapshot> = {
       on_surface_color: '#1a1c22',
       on_surface_variant_color: '#43454e',
       outline_color: '#7a7a85',
-      outline_variant_color: '#c8c4cf'
+      outline_variant_color: '#c8c4cf',
+      primary_container_color: '#dde2fb',
+      on_primary_container_color: '#131a3a'
     },
-    background: { type: 'image', asset_url: null, opacity: 0.3, use_blur: false, blur_radius: 10 },
+    background: { stage: null, media: null },
     header: { transparent: false, overlay: false },
     input: { style: 'agent', transparent: false, floating: false, liquid_glass: false, water_glass: false },
-    font: { type: 'system', system_font_name: 'default', custom_font_asset_url: null, scale: 1 },
+    font: { ...DEFAULT_FONT },
     chat_style: 'bubble',
     show_thinking_process: true,
     show_status_tags: true,
@@ -152,10 +186,16 @@ const CLEAN_BASE: Record<ThemeMode, WebThemeSnapshot> = {
       assistant_rounded: true,
       user_padding_left: 12,
       user_padding_right: 12,
+      user_padding_top: 12,
+      user_padding_bottom: 12,
       assistant_padding_left: 12,
       assistant_padding_right: 12,
-      user_image: { enabled: false, asset_url: null, render_mode: 'tiled_nine_slice' },
-      assistant_image: { enabled: false, asset_url: null, render_mode: 'tiled_nine_slice' }
+      assistant_padding_top: 12,
+      assistant_padding_bottom: 12,
+      user_font: { ...DEFAULT_FONT },
+      assistant_font: { ...DEFAULT_FONT },
+      user_image: { ...NO_IMAGE },
+      assistant_image: { ...NO_IMAGE }
     },
     avatars: { shape: 'circle', corner_radius: 8, user_avatar_url: null, assistant_avatar_url: null }
   }
@@ -200,21 +240,26 @@ function buildTheme(draft: ThemeDraft): WebThemeSnapshot {
     ...base,
     theme_mode: draft.mode,
     palette,
-    background: {
-      type: 'image',
-      asset_url: draft.backgroundKind === 'image' ? draft.backgroundImageUrl : null,
-      opacity:
-        draft.backgroundKind === 'image' ? draft.backgroundOpacity : 0,
-      use_blur: draft.backgroundKind === 'image' && draft.useBlur,
-      blur_radius: draft.blurRadius,
-      muted: true,
-      loop: true
-    },
+    background:
+      draft.backgroundKind === 'image'
+        ? {
+            stage: null,
+            media: draft.backgroundImageUrl
+              ? {
+                  type: 'image',
+                  asset_url: draft.backgroundImageUrl,
+                  opacity: draft.backgroundOpacity,
+                  blur_enabled: draft.useBlur,
+                  blur_radius_dp: draft.blurRadius,
+                  muted: true,
+                  loop: true
+                }
+              : null
+          }
+        : { stage: null, media: null },
     header: {
       transparent: draft.headerTransparent,
-      overlay: false,
-      history_icon_color: null,
-      pip_icon_color: null
+      overlay: false
     },
     input: {
       style: draft.inputStyle,
@@ -234,6 +279,10 @@ function buildTheme(draft: ThemeDraft): WebThemeSnapshot {
       assistant_bubble_color: draft.assistantBubbleColor
     }
   };
+}
+
+function showTarget(selectedTarget: ThemeTargetId, ...targets: ThemeTargetId[]): boolean {
+  return selectedTarget === 'all' || targets.includes(selectedTarget);
 }
 
 function ColorField({
@@ -314,12 +363,30 @@ function SliderField({
 }
 
 export function ThemeStudioPanel({
-  onApplyTheme
+  onApplyTheme,
+  selectedTarget,
+  onSelectTarget
 }: {
   onApplyTheme: (theme: WebThemeSnapshot) => void;
+  selectedTarget: ThemeTargetId;
+  onSelectTarget: (target: ThemeTargetId) => void;
 }) {
   const [draft, setDraft] = useState<ThemeDraft>(DEFAULT_DRAFT);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const selectedTargetDefinition = themeTargetDefinition(selectedTarget);
+  const hasLegacyControls = showTarget(
+    selectedTarget,
+    'app.shell',
+    'chat.screen',
+    'background',
+    'typography',
+    'conversation.thread',
+    'conversation.user-bubble',
+    'conversation.assistant-bubble',
+    'chrome.toolbar',
+    'composer.agent',
+    'composer.classic'
+  );
   // 面板合成完整快照后交给手机视口（iframe）应用，
   // 派生在 iframe 内的 chatTheme 管线完成，mock 本地即时无需节流
   useEffect(() => {
@@ -343,7 +410,21 @@ export function ThemeStudioPanel({
 
   return (
     <div className="studio-panel">
-      <div className="studio-group">
+      <ThemeTargetNavigator onSelectTarget={onSelectTarget} selectedTarget={selectedTarget} />
+      <div className="studio-inspector-heading">
+        <div>
+          <span className="studio-eyebrow">Selected surface</span>
+          <strong>{selectedTargetDefinition.label}</strong>
+        </div>
+        <span>{selectedTargetDefinition.description}</span>
+      </div>
+      {!hasLegacyControls ? (
+        <div className="studio-target-empty">
+          <strong>请先导入或新建 schema 4 主题包</strong>
+          <span>这个区域的完整参数来自主题插件 manifest，导入主题包后会在这里展开。</span>
+        </div>
+      ) : null}
+      {showTarget(selectedTarget, 'app.shell', 'chat.screen') ? <div className="studio-group">
         <h4>基础</h4>
         <div className="studio-segment">
           {(['dark', 'light'] as const).map((mode) => (
@@ -375,9 +456,9 @@ export function ThemeStudioPanel({
           onChange={(secondary) => updateDraft({ secondary })}
           value={draft.secondary}
         />
-      </div>
+      </div> : null}
 
-      <div className="studio-group">
+      {showTarget(selectedTarget, 'app.shell', 'chat.screen', 'background') ? <div className="studio-group">
         <h4>背景</h4>
         <div className="studio-segment">
           {(
@@ -459,9 +540,15 @@ export function ThemeStudioPanel({
             ) : null}
           </>
         )}
-      </div>
+      </div> : null}
 
-      <div className="studio-group">
+      {showTarget(
+        selectedTarget,
+        'chat.screen',
+        'conversation.thread',
+        'conversation.user-bubble',
+        'conversation.assistant-bubble'
+      ) ? <div className="studio-group">
         <h4>气泡</h4>
         <ToggleField
           label="圆角气泡"
@@ -480,9 +567,15 @@ export function ThemeStudioPanel({
           }
           value={draft.userBubbleColor === null}
         />
-      </div>
+      </div> : null}
 
-      <div className="studio-group">
+      {showTarget(
+        selectedTarget,
+        'chat.screen',
+        'chrome.toolbar',
+        'composer.agent',
+        'composer.classic'
+      ) ? <div className="studio-group">
         <h4>界面风格</h4>
         <div className="studio-segment">
           {(
@@ -535,9 +628,9 @@ export function ThemeStudioPanel({
             value={draft.inputLiquidGlass}
           />
         ) : null}
-      </div>
+      </div> : null}
 
-      <div className="studio-group">
+      {showTarget(selectedTarget, 'app.shell', 'chat.screen', 'typography') ? <div className="studio-group">
         <h4>字体</h4>
         <SliderField
           label="字号缩放"
@@ -547,19 +640,19 @@ export function ThemeStudioPanel({
           step={0.05}
           value={draft.fontScale}
         />
-      </div>
+      </div> : null}
 
-      <button
+      {showTarget(selectedTarget, 'all', 'app.shell', 'chat.screen', 'background', 'typography', 'conversation.thread', 'conversation.user-bubble', 'conversation.assistant-bubble', 'chrome.toolbar', 'composer.agent', 'composer.classic') ? <button
         className="studio-reset"
         onClick={() => setDraft(DEFAULT_DRAFT)}
         type="button"
       >
         重置为主题默认
-      </button>
-      <p className="studio-note">
+      </button> : null}
+      {showTarget(selectedTarget, 'all', 'app.shell', 'chat.screen', 'background', 'typography', 'conversation.thread', 'conversation.user-bubble', 'conversation.assistant-bubble', 'chrome.toolbar', 'composer.agent', 'composer.classic') ? <p className="studio-note">
         颜色派生（容器色、对比文本、语义色）与 app 的
         ThemeColorSchemeResolver 同一套规则，预览即所得。
-      </p>
+      </p> : null}
     </div>
   );
 }

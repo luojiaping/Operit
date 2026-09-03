@@ -26,3 +26,9 @@
 ## 旧实现
 
 见盘点编号；本文件修复目标即盘点清单。
+
+## 进展
+
+[DONE] 聊天背景层从 `position: fixed` 改为受 `.ai-chat-screen` 约束的 `position: absolute`，避免覆盖 iframe 内 AppShell 顶栏；已通过本地 headless 截图确认顶栏、聊天 header、消息区和 composer 正常绘制。
+
+[IN PROGRESS] 预览壳增加聊天目标选择高亮，右侧 Inspector 可按目标切换参数；仍需完成窄屏单滚动容器和最终移动端截图验收。

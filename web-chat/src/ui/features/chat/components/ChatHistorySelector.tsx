@@ -1106,7 +1106,10 @@ export function ChatHistorySelector({
         className={`chat-history-selector-scrim ${open ? 'is-visible' : ''}`}
         onClick={onClose}
       />
-      <aside className={`chat-history-selector ${open ? 'is-open' : ''}`}>
+      <aside
+        className={`chat-history-selector ${open ? 'is-open' : ''}`}
+        data-theme-target="overlay.history"
+      >
         <div className="chat-history-selector-top">
           <header className="chat-history-selector-title-row">
             <strong>对话历史</strong>

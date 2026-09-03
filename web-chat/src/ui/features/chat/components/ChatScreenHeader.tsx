@@ -87,7 +87,7 @@ export function ChatScreenHeader({
     contextPercent > 90 ? 'danger' : contextPercent > 75 ? 'warn' : 'normal';
 
   return (
-    <header className="chat-screen-header">
+    <header className="chat-screen-header" data-theme-target="chat.header">
       <ChatHeader
         activeCharacterAvatarUrl={activeCharacterAvatarUrl}
         activeCharacterName={activeCharacterName}

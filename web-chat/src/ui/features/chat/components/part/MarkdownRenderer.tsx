@@ -23,7 +23,7 @@ function MarkdownCodeBlock({
   const languageLabel = language || 'text';
 
   return (
-    <section className="markdown-code-block">
+    <section className="markdown-code-block" data-theme-target="conversation.code">
       <header className="markdown-code-toolbar">
         <span className="markdown-code-language">{languageLabel}</span>
         <div className="markdown-code-actions">
@@ -136,7 +136,7 @@ export function MarkdownRenderer({
   }
 
   return (
-    <div className={className ?? 'markdown-block'}>
+    <div className={className ?? 'markdown-block'} data-theme-target="conversation.markdown">
       <ReactMarkdown components={markdownComponents} remarkPlugins={[remarkGfm]}>
         {content}
       </ReactMarkdown>

@@ -118,7 +118,7 @@ export function ClassicChatInputSection({
   }
 
   return (
-    <div className="classic-chat-input-section">
+    <div className="classic-chat-input-section" data-theme-target="composer.classic">
       <InputSlotHost layout="above-input-classic" slot="above_input" theme={theme} />
       <PendingMessageQueuePanel
         expanded={isPendingQueueExpanded}

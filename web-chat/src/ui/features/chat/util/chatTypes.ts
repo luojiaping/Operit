@@ -119,14 +119,60 @@ export interface WebChatMessageLocatorPreview {
 export type HistoryDisplayMode = 'BY_CHARACTER_CARD' | 'BY_FOLDER' | 'CURRENT_CHARACTER_ONLY';
 
 export interface WebThemeBackground {
-  type: string;
-  asset_url?: string | null;
+  stage?: WebThemeStageBackground | null;
+  media?: WebThemeMediaBackground | null;
+}
+
+export interface WebThemeStageBackground {
+  asset_url: string;
+  fit: string;
   opacity: number;
-  // app 侧跟进下发：背景模糊与视频行为，缺省值对齐 ThemePreferenceSnapshot.defaultVisual
-  use_blur?: boolean;
-  blur_radius?: number;
-  muted?: boolean;
-  loop?: boolean;
+}
+
+export interface WebThemeMediaBackground {
+  type: string;
+  asset_url: string;
+  opacity: number;
+  blur_enabled: boolean;
+  blur_radius_dp: number;
+  muted: boolean;
+  loop: boolean;
+}
+
+export interface WebThemeInsets {
+  start_dp: number;
+  top_dp: number;
+  end_dp: number;
+  bottom_dp: number;
+}
+
+export interface WebThemeGeometry {
+  shape_scale?: number;
+  component_frame_scale?: Record<string, number>;
+  component_content_insets?: Record<string, WebThemeInsets>;
+}
+
+export interface WebThemeChrome {
+  status_bar_hidden: boolean;
+  status_bar_transparent: boolean;
+  status_bar_color?: string | null;
+  toolbar_transparent: boolean;
+  toolbar_color?: string | null;
+  navigation_water_glass: boolean;
+  navigation_button_liquid_glass: boolean;
+  navigation_background_color?: string | null;
+  navigation_accent_color?: string | null;
+  app_bar_content_color_mode: string;
+  chat_header_history_icon_color?: string | null;
+  chat_header_pip_icon_color?: string | null;
+}
+
+export interface WebThemeComponentSkin {
+  container_color: string;
+  content_color: string;
+  corner_radius_dp: number;
+  elevation_dp: number;
+  content_padding: WebThemeInsets;
 }
 
 export interface WebThemePalette {
@@ -137,32 +183,25 @@ export interface WebThemePalette {
   surface_container_high_color: string;
   primary_color: string;
   secondary_color: string;
-  // 真机快照恒下发；主题工作室合成快照时可省略，
-  // 由前端按 app 同款规则从主色派生（见 chatTheme.ts）
-  primary_container_color?: string;
-  on_primary_container_color?: string;
+  primary_container_color: string;
+  on_primary_container_color: string;
   on_surface_color: string;
   on_surface_variant_color: string;
   outline_color: string;
   outline_variant_color: string;
-  // app 侧跟进下发：语义色与对比文本，缺失时按 ThemeColorSchemeResolver 派生
-  tertiary_color?: string;
-  error_color?: string;
-  error_container_color?: string;
-  secondary_container_color?: string;
-  on_primary_color?: string;
-  on_secondary_color?: string;
-  surface_container_highest_color?: string;
-  surface_container_low_color?: string;
-  surface_container_lowest_color?: string;
+  // app 侧未下发的键仅由语义基线/派生补充；真机 palette 恒为上述 13 键
+  on_primary_color?: string | null;
+  on_secondary_color?: string | null;
+  tertiary_color?: string | null;
+  error_color?: string | null;
+  error_container_color?: string | null;
+  on_error_container_color?: string | null;
+  secondary_container_color?: string | null;
 }
 
 export interface WebHeaderTheme {
   transparent: boolean;
   overlay: boolean;
-  // app 侧跟进下发：chat_header_history_icon_color / chat_header_pip_icon_color
-  history_icon_color?: string | null;
-  pip_icon_color?: string | null;
 }
 
 export interface WebInputTheme {
@@ -180,20 +219,19 @@ export interface WebFontTheme {
   scale: number;
 }
 
-// 气泡九宫格参数，语义对齐 app BubbleImageStyleConfig；缺省值对齐 defaultVisual
 export interface WebBubbleImageTheme {
   enabled: boolean;
   asset_url?: string | null;
-  render_mode?: 'tiled_nine_slice' | 'nine_patch' | null;
-  crop_left?: number;
-  crop_top?: number;
-  crop_right?: number;
-  crop_bottom?: number;
-  repeat_start?: number;
-  repeat_end?: number;
-  repeat_y_start?: number;
-  repeat_y_end?: number;
-  image_scale?: number;
+  render_mode?: string | null;
+  crop_left: number;
+  crop_top: number;
+  crop_right: number;
+  crop_bottom: number;
+  repeat_start: number;
+  repeat_end: number;
+  repeat_y_start: number;
+  repeat_y_end: number;
+  scale: number;
 }
 
 export interface WebBubbleTheme {
@@ -215,13 +253,16 @@ export interface WebBubbleTheme {
   assistant_rounded: boolean;
   user_padding_left: number;
   user_padding_right: number;
+  user_padding_top: number;
+  user_padding_bottom: number;
   assistant_padding_left: number;
   assistant_padding_right: number;
+  assistant_padding_top: number;
+  assistant_padding_bottom: number;
+  user_font: WebFontTheme;
+  assistant_font: WebFontTheme;
   user_image: WebBubbleImageTheme;
   assistant_image: WebBubbleImageTheme;
-  // app 侧跟进下发：气泡级独立字体，缺省跟随全局 font
-  user_font?: WebFontTheme;
-  assistant_font?: WebFontTheme;
 }
 
 export interface WebAvatarTheme {
@@ -249,8 +290,6 @@ export interface WebThemeSnapshot {
   theme_mode: string;
   use_system_theme: boolean;
   use_custom_colors: boolean;
-  // app 侧跟进下发：on_color_mode 决定对比文本计算，缺省 auto
-  on_color_mode?: 'auto' | 'light' | 'dark';
   primary_color?: string | null;
   secondary_color?: string | null;
   palette: WebThemePalette;
@@ -258,6 +297,9 @@ export interface WebThemeSnapshot {
   header: WebHeaderTheme;
   input: WebInputTheme;
   font: WebFontTheme;
+  geometry?: WebThemeGeometry;
+  chrome?: WebThemeChrome;
+  component_skins?: Record<string, WebThemeComponentSkin>;
   chat_style: string;
   show_thinking_process: boolean;
   show_status_tags: boolean;

@@ -8,9 +8,17 @@ import { PreviewSlotProvider } from '../ui/features/chat/composedsl/InputSlotHos
 import type { InputSlotContentMap } from '../ui/features/chat/composedsl/composeDslTypes';
 import type { WebThemeSnapshot } from '../ui/features/chat/util/chatTypes';
 import { ThemeStudioPanel } from './ThemeStudioPanel';
+import { ThemeStudioEntry } from './ThemeStudioEntry';
+import { ThemeWorkbench } from './ThemeWorkbench';
+import type { StudioPackage } from '../shared/theme/packageLoader';
+import type { StudioEditorState } from '../shared/theme/editorState';
+import { resolveEditorRuntimeTheme } from '../shared/theme/runtime';
+import { createBrowserAssetLibrary } from '../shared/theme/assets/library';
 import { CodePreviewPanel } from './CodePreviewPanel';
 import { isPreviewBridgeMessage } from './previewBridge';
 import type { PreviewBridgeMessage } from './previewBridge';
+import { isThemeTargetId } from './themeTargets';
+import type { ThemeTargetId } from './themeTargets';
 import { AppShell } from '../ui/features/chat/appshell/AppShell';
 import type { ShellScreen } from '../ui/features/chat/appshell/AppShell';
 import { SettingsHome } from '../ui/features/chat/appshell/settings/SettingsHome';
@@ -90,6 +98,53 @@ function EmbeddedPreviewApp() {
   const viewModel = useChatViewModel();
   const [slotContents, setSlotContents] = useState<InputSlotContentMap>({});
   const [screen, setScreen] = useState<ShellScreen>({ name: 'chat' });
+  const [selectedTarget, setSelectedTarget] = useState<ThemeTargetId | null>(null);
+
+  useEffect(() => {
+    const shell = document.querySelector<HTMLElement>('.app-shell');
+    if (!shell) {
+      return;
+    }
+
+    function handlePreviewClick(event: MouseEvent) {
+      const element = event.target;
+      if (!(element instanceof Element)) {
+        return;
+      }
+      const selectable = element.closest<HTMLElement>('[data-theme-target]');
+      if (selectable == null || !shell.contains(selectable)) {
+        return;
+      }
+      const target = selectable.dataset.themeTarget;
+      if (target == null) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      if (!isThemeTargetId(target)) {
+        return;
+      }
+      setSelectedTarget(target);
+      window.parent.postMessage({ type: 'preview-selection', target }, '*');
+    }
+
+    shell.addEventListener('click', handlePreviewClick, true);
+    return () => shell.removeEventListener('click', handlePreviewClick, true);
+  }, []);
+
+  useEffect(() => {
+    const shell = document.querySelector<HTMLElement>('.app-shell');
+    if (!shell) {
+      return;
+    }
+    shell.querySelectorAll<HTMLElement>('[data-theme-target]').forEach((element) => {
+      if (element.dataset.themeTarget === selectedTarget) {
+        element.dataset.themeSelected = 'true';
+      } else {
+        delete element.dataset.themeSelected;
+      }
+    });
+  }, [screen, selectedTarget]);
 
   // 主题设置页的即时补丁：patch 后重载会话刷新界面
   function patchThemeLive(patch: Partial<WebThemeSnapshot>) {
@@ -113,6 +168,10 @@ function EmbeddedPreviewApp() {
       }
       if (data.type === 'preview-slots') {
         setSlotContents(data.contents);
+        return;
+      }
+      if (data.type === 'preview-highlight') {
+        setSelectedTarget(data.target);
       }
     }
     window.addEventListener('message', handleMessage);
@@ -214,7 +273,7 @@ function DeviceMockup({
                 className="device-viewport"
                 onLoad={onReady}
                 ref={iframeRef}
-                src="/preview.html?mock=1&embed=1"
+                src="/preview.html?mock=1&embed=1&studio=theme-studio-v2"
                 title="Operit 手机预览"
               />
             </div>
@@ -232,8 +291,18 @@ function DeviceMockup({
 
 function PreviewApp() {
   const [studioMode, setStudioMode] = useState<StudioMode>('theme');
+  const [selectedTarget, setSelectedTarget] = useState<ThemeTargetId>('chat.screen');
+  const [editorPackage, setEditorPackage] = useState<StudioPackage | null>(null);
+  const [editorState, setEditorState] = useState<StudioEditorState | null>(null);
+  // 素材库单例：IndexedDB 持久化 + blob URL 注册表
+  const assetLibraryRef = useRef<ReturnType<typeof createBrowserAssetLibrary> | null>(null);
+  if (assetLibraryRef.current == null) {
+    assetLibraryRef.current = createBrowserAssetLibrary();
+  }
+  const assetLibrary = assetLibraryRef.current;
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const iframeReadyRef = useRef(false);
+  const pendingSelectionRef = useRef<ThemeTargetId | null>('chat.screen');
   // ready 握手前缓存最新一次主题/插槽，握手成功后立即补发
   const pendingThemeRef = useRef<WebThemeSnapshot | null>(null);
   const pendingSlotsRef = useRef<InputSlotContentMap | null>(null);
@@ -257,10 +326,14 @@ function PreviewApp() {
     if (pendingSlotsRef.current) {
       postToIframe({ type: 'preview-slots', contents: pendingSlotsRef.current });
     }
+    postToIframe({ type: 'preview-highlight', target: pendingSelectionRef.current });
   }, [postToIframe]);
 
   useEffect(() => {
     function handleMessage(event: MessageEvent) {
+      if (event.source !== iframeRef.current?.contentWindow) {
+        return;
+      }
       const data: unknown = event.data;
       if (!isPreviewBridgeMessage(data)) {
         return;
@@ -276,11 +349,27 @@ function PreviewApp() {
           isProcessing: data.isProcessing,
           inputText: data.inputText
         });
+        return;
+      }
+      if (data.type === 'preview-selection') {
+        setSelectedTarget(data.target);
+        pendingSelectionRef.current = data.target;
       }
     }
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
   }, [handleIframeReady]);
+
+  const selectTarget = useCallback(
+    (target: ThemeTargetId) => {
+      setSelectedTarget(target);
+      pendingSelectionRef.current = target;
+      if (iframeReadyRef.current) {
+        postToIframe({ type: 'preview-highlight', target });
+      }
+    },
+    [postToIframe]
+  );
 
   // 面板回调：发送（未就绪时缓存，握手后补发）
   const applyTheme = useCallback(
@@ -298,6 +387,24 @@ function PreviewApp() {
       postToIframe({ type: 'preview-slots', contents });
     },
     [postToIframe]
+  );
+
+  // 工作台投影：按 schema 4 runtime 完整派生（asset:// 解析为 blob URL 后过桥）
+  const applyEditorProjection = useCallback(
+    async (nextState: StudioEditorState) => {
+      if (editorPackage == null) {
+        return;
+      }
+      const theme = await resolveEditorRuntimeTheme(
+        editorPackage.manifest,
+        nextState.values,
+        'dark',
+        assetLibrary,
+        nextState.componentSkins
+      );
+      applyTheme(theme);
+    },
+    [applyTheme, assetLibrary, editorPackage]
   );
 
   // 模式切换时同步插槽可见性：主题模式展示纯净界面，插件模式挂载当前插槽内容
@@ -333,7 +440,33 @@ function PreviewApp() {
         <DeviceMockup iframeRef={iframeRef} onReady={handleIframeReady} />
         <aside className="studio-side">
           {studioMode === 'theme' ? (
-            <ThemeStudioPanel onApplyTheme={applyTheme} />
+            <>
+              <ThemeStudioEntry
+                onPackageLoaded={(studioPackage) => {
+                  setEditorPackage(studioPackage);
+                  setEditorState(null);
+                }}
+              />
+              {editorPackage != null ? (
+                <ThemeWorkbench
+                  assetLibrary={assetLibrary}
+                  onPreview={(nextState) => {
+                    setEditorState(nextState);
+                    void applyEditorProjection(nextState);
+                  }}
+                  onSelectTarget={selectTarget}
+                  selectedTarget={selectedTarget}
+                  studioPackage={editorPackage}
+                  key={editorPackage.archiveSha256}
+                />
+              ) : (
+                <ThemeStudioPanel
+                  onApplyTheme={applyTheme}
+                  onSelectTarget={selectTarget}
+                  selectedTarget={selectedTarget}
+                />
+              )}
+            </>
           ) : (
             <CodePreviewPanel
               onContentsChange={applySlots}

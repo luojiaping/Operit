@@ -11,6 +11,7 @@
   flex-direction: column;
   gap: 8px;
   padding-bottom: var(--chat-safe-bottom);
+  zoom: var(--chat-composer-frame-scale);
 }
 
 .chat-composer-host.is-floating {
@@ -84,10 +85,9 @@
 }
 
 .chat-composer-host.is-transparent .classic-chat-input-section {
-  /* A8：对齐 app 的真透明 surface alpha 0，不做半透明毛玻璃 */
-  background: transparent;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
+  background: var(--chat-composer-bg-transparent);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
 }
 
 .chat-composer-host.is-water-glass .classic-chat-input-section {
@@ -188,6 +188,7 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
+  color: var(--chat-status-fg);
 }
 
 .input-processing-status.is-classic {
@@ -240,7 +241,7 @@
 .classic-input-field {
   min-height: 44px;
   padding: 7px 8px 7px 14px;
-  border-radius: 14px;
+  border-radius: var(--chat-input-radius);
 }
 
 .composer-attachment-strip.is-classic {
@@ -259,10 +260,9 @@
   margin-top: 4px;
   padding: 8px 12px 8px;
   border: 0;
-  border-radius: 20px 20px 0 0;
-  /* B5/B6：底色与顶部质感公式由 chatTheme 按 app 侧规则生成 */
-  background: var(--chat-agent-card-bg);
-  box-shadow: var(--chat-agent-card-shadow);
+  border-radius: var(--chat-composer-radius) var(--chat-composer-radius) 0 0;
+  background: var(--chat-composer-bg);
+  box-shadow: 0 -10px 22px var(--chat-shadow);
 }
 
 .agent-input-field {
@@ -275,16 +275,14 @@
 
 .chat-composer-host.is-floating .agent-input-card {
   margin: 2px 0 0;
-  border-radius: 22px;
+  border-radius: var(--chat-composer-radius);
   box-shadow: 0 16px 32px var(--chat-shadow);
 }
 
 .chat-composer-host.is-transparent .agent-input-card {
-  /* A8：对齐 app 的真透明 surface alpha 0，不做半透明毛玻璃 */
-  background: transparent;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-  box-shadow: none;
+  background: var(--chat-composer-bg-transparent);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
 }
 
 .chat-composer-host.is-water-glass .agent-input-card {
@@ -1829,12 +1827,12 @@
 }
 
 .glass-surface-local-image {
-  background-image: var(--chat-background-image);
+  background-image: var(--chat-stage-background-image);
   background-position: center;
   background-repeat: no-repeat;
-  background-size: cover;
+  background-size: var(--chat-stage-background-size);
   background-attachment: fixed;
-  opacity: var(--chat-background-opacity);
+  opacity: var(--chat-stage-background-opacity);
 }
 
 .glass-surface-local-tint {

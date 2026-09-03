@@ -16,7 +16,7 @@ export function AiMessageComposable({
   const attachmentText = theme?.bubble.assistant_text_color ?? theme?.palette?.on_surface_color;
 
   return (
-    <article className="cursor-ai-message">
+    <article className="cursor-ai-message" data-theme-target="conversation.assistant-bubble">
       <div className="cursor-message-header">
         <strong className="cursor-message-label">Response</strong>
         {detailText ? (

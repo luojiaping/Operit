@@ -1,6 +1,4 @@
 import { MessageAttachmentTag } from '../../attachments';
-import { MessageFooterBar } from '../../MessageFooterBar';
-import { AssistantIcon } from '../../../util/chatIcons';
 import { CustomXmlRenderer } from '../../part/CustomXmlRenderer';
 import { BubbleImageBackgroundSurface } from './BubbleImageBackgroundSurface';
 import {
@@ -9,6 +7,7 @@ import {
   assistantHeaderName,
   bubbleImageStyle
 } from '../../../util/chatUtils';
+import { resolveThemeFontFamily } from '../../../util/chatTheme';
 import type { WebChatMessage, WebThemeSnapshot } from '../../../util/chatTypes';
 
 function BubbleAvatar({
@@ -24,16 +23,7 @@ function BubbleAvatar({
     return <img alt={name} className={className} src={url} />;
   }
 
-  return (
-    <div
-      aria-label={name || 'Assistant'}
-      className={`${className} bubble-avatar-fallback is-assistant`}
-      role="img"
-    >
-      {/* B11：对齐 app 的矢量图标 fallback，tint secondary，不再用首字母 */}
-      <AssistantIcon size={22} />
-    </div>
-  );
+  return <div className={`${className} bubble-avatar-fallback`}>{name.slice(0, 1) || 'A'}</div>;
 }
 
 export function BubbleAiMessageComposable({
@@ -73,10 +63,13 @@ export function BubbleAiMessageComposable({
   const showWideHeader = wideLayout && (showAvatar || headerName || headerMeta);
   const attachmentBackground = theme?.bubble.assistant_bubble_color ?? theme?.palette?.surface_color;
   const attachmentText = theme?.bubble.assistant_text_color ?? theme?.palette?.on_surface_color;
+  const assistantFontStyle = {
+    fontFamily: resolveThemeFontFamily(theme?.bubble.assistant_font, 'OperitThemeAssistantBubbleFont')
+  };
 
   if (wideLayout) {
     return (
-      <article className="bubble-message-composable ai is-wide">
+      <article className="bubble-message-composable ai is-wide" data-theme-target="conversation.assistant-bubble">
         {showWideHeader ? (
           <div className="bubble-message-header">
             {showAvatar ? (
@@ -104,7 +97,7 @@ export function BubbleAiMessageComposable({
           glassVariant={glassVariant}
           themeMode={theme?.theme_mode}
         >
-          <div className="chat-message-content">
+          <div className="chat-message-content" style={assistantFontStyle}>
             <CustomXmlRenderer
               blocks={message.content_blocks}
               content={message.content_raw}
@@ -128,13 +121,15 @@ export function BubbleAiMessageComposable({
             ))}
           </div>
         ) : null}
-        <MessageFooterBar message={message} theme={theme} />
       </article>
     );
   }
 
   return (
-    <article className={`bubble-message-composable ai is-compact ${showAvatar ? 'has-avatar' : 'no-avatar'}`}>
+    <article
+      className={`bubble-message-composable ai is-compact ${showAvatar ? 'has-avatar' : 'no-avatar'}`}
+      data-theme-target="conversation.assistant-bubble"
+    >
       <div className="bubble-inline-row ai">
         {showAvatar ? (
           <BubbleAvatar
@@ -157,7 +152,7 @@ export function BubbleAiMessageComposable({
             glassVariant={glassVariant}
             themeMode={theme?.theme_mode}
           >
-            <div className="chat-message-content">
+          <div className="chat-message-content" style={assistantFontStyle}>
               <CustomXmlRenderer
                 blocks={message.content_blocks}
                 content={message.content_raw}
@@ -183,7 +178,6 @@ export function BubbleAiMessageComposable({
           ))}
         </div>
       ) : null}
-      <MessageFooterBar message={message} theme={theme} />
     </article>
   );
 }

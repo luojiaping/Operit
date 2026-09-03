@@ -11,7 +11,7 @@ export function FullscreenInputDialog({
 }) {
   return (
     <div className="dialog-scrim" role="presentation">
-      <div className="fullscreen-input-dialog" role="dialog">
+      <div className="fullscreen-input-dialog" data-theme-target="overlay.dialog" role="dialog">
         <header>
           <span>输入扩展</span>
           <h3>全屏输入</h3>

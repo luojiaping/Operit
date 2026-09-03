@@ -22,13 +22,13 @@
 
 ## 最小功能单元
 
-[TODO] 1. 从 `feat/plugin-interface` 迁移 schema 4 版 `chatTheme.ts`/`chatTypes.ts`（含 fit 校验、font-face 三族、stage/media 透明链）替代旧模型，确保本分支 web-chat 先编译通过。
+[DONE] 1. 从 `feat/plugin-interface` 迁移 schema 4 版 `chatTheme.ts`/`chatTypes.ts`（含 fit 校验、font-face 三族、stage/media 透明链）替代旧模型：9 个共享文件整体接入，studio 侧消费点（ThemeStudioPanel/ThemeSettingsPage/mock fixtures/composeDslRuntime/预览入口）同步迁移；`previewPalette`/`baseScheme` 作为共享派生模块；`npm run typecheck` 通过。
 
-[TODO] 2. 实现 `shared/theme/manifest.ts` 模型镜像（值/控件/效果/behavior/assets/scene/material），全部字段类型精确，无 `any`。
+[DONE] 2. 实现 `shared/theme/manifest.ts` 模型镜像（值/控件/效果/behavior/assets/scene/material 类型镜像），strict 解码逐字段校验（未知键/类型/值域/ARGB/content:///crop/insets/behavior 精确字段集），无 `any`。
 
-[TODO] 3. 实现 `shared/theme/typing.ts` strict 解码 + `validation.ts` 全约束校验，错误信息带字段路径。
+[DONE] 3. 实现 `shared/theme/validation.ts` 全约束校验（control/type、effect/type、USER 默认+section、AUTHOR 必须 author_value、choice 默认∈选项、option⊆target 域、condition 依赖类型、SCENE surface 场景引用、assets 预算/SHA/路径、archive 预算与 comment/根条目），错误带字段路径。
 
-[TODO] 4. 写对齐 test：default/cyber `3.0.0` 真 archive 解析通过；畸形样例（未知键/错类型/错 effect 组合/超预算/坏 comment/非根 manifest）逐项拒绝。
+[DONE] 4. 对齐 test：`themeManifest.test.ts` 17 项 strict 解码/语义/预算正反样例；全部 43 项 vitest 通过。
 
 ## 旧实现
 
