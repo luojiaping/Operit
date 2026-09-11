@@ -115,9 +115,9 @@ open class OpenAIProvider(
     private var isManuallyCancelled = false
 
     /**
-     * 由客户端错误（如4xx状态码）触发的API异常，是否重试由统一策略决定
+     * 带 HTTP 状态码的 API 异常，供统一重试日志和最终错误展示使用。
      */
-    class NonRetriableException(
+    class HttpStatusException(
         message: String,
         override val statusCode: Int,
         cause: Throwable? = null
@@ -211,6 +211,25 @@ open class OpenAIProvider(
         messagesArray: JSONArray,
         toolsJson: String?
     ) {
+    }
+
+    protected open fun convertChatRequestToResponsesRequest(requestObject: JSONObject): JSONObject {
+        return OpenAIResponsesPayloadAdapter.toResponsesRequest(requestObject)
+    }
+
+    protected open fun createResponsesReasoningMetadataTag(item: JSONObject): String? {
+        return OpenAIResponsesPayloadAdapter.createReasoningMetadataTag(item)
+    }
+
+    protected open fun createResponsesMessageMetadataTag(
+        item: JSONObject,
+        bufferedText: String
+    ): String? = null
+
+    protected open fun parseResponsesNonStreamingResponse(
+        jsonResponse: JSONObject
+    ): OpenAIResponsesPayloadAdapter.ParsedResponseOutput {
+        return OpenAIResponsesPayloadAdapter.parseNonStreamingResponse(jsonResponse)
     }
 
     protected open fun applyAuthenticationHeaders(
@@ -676,7 +695,7 @@ open class OpenAIProvider(
 
         val finalRequestObject =
             if (useResponsesApi) {
-                OpenAIResponsesPayloadAdapter.toResponsesRequest(jsonObject)
+                convertChatRequestToResponsesRequest(jsonObject)
             } else {
                 jsonObject
             }
@@ -1011,8 +1030,8 @@ open class OpenAIProvider(
 
         var queuedAssistantToolText: String? = null
         var queuedToolCalls = JSONArray()
-        val queuedToolCallIds = mutableListOf<String>()
-        val openToolCallIds = mutableListOf<String>()
+        val queuedOpenToolCalls = mutableListOf<StructuredToolCallBridge.OpenToolCall>()
+        val openToolCalls = mutableListOf<StructuredToolCallBridge.OpenToolCall>()
         var nextToolCallOrdinal = 0
 
         fun appendQueuedAssistantToolText(text: String) {
@@ -1033,7 +1052,12 @@ open class OpenAIProvider(
                 val callId = generatedToolCallId(nextToolCallOrdinal++)
                 toolCall.put("id", callId)
                 queuedToolCalls.put(toolCall)
-                queuedToolCallIds.add(callId)
+                queuedOpenToolCalls.add(
+                    StructuredToolCallBridge.OpenToolCall(
+                        callId,
+                        StructuredToolCallBridge.toolCallName(toolCall)
+                    )
+                )
             }
         }
 
@@ -1048,36 +1072,40 @@ open class OpenAIProvider(
             }
             if (effectiveContent != null) {
                 historyMessage.put("content", buildContentField(context, effectiveContent, role = "assistant"))
-            } else {
-                historyMessage.put("content", null)
             }
             historyMessage.put("tool_calls", queuedToolCalls)
             messagesArray.put(historyMessage)
 
-            openToolCallIds.addAll(queuedToolCallIds)
+            openToolCalls.addAll(queuedOpenToolCalls)
             queuedAssistantToolText = null
             queuedToolCalls = JSONArray()
-            queuedToolCallIds.clear()
+            queuedOpenToolCalls.clear()
         }
 
-        fun flushOpenToolCallsAsCancelled(reason: String) {
+        fun flushOpenToolCallsAsUnmatched(reason: String) {
             emitQueuedToolCallsIfNeeded()
-            if (openToolCallIds.isEmpty()) return
+            if (openToolCalls.isEmpty()) return
 
             AppLogger.w(
                 "AIService",
-                "发现未完成的tool_calls，按取消处理: count=${openToolCallIds.size}, reason=$reason"
+                "发现未匹配的tool_calls，按工具结果未匹配处理: count=${openToolCalls.size}, reason=$reason"
             )
-            for (toolCallId in openToolCallIds) {
+            for (openToolCall in openToolCalls) {
                 messagesArray.put(
                     JSONObject().apply {
                         put("role", "tool")
-                        put("tool_call_id", toolCallId)
-                        put("content", "User cancelled")
+                        put("tool_call_id", openToolCall.id)
+                        put(
+                            "content",
+                            StructuredToolCallBridge.unmatchedToolResultContent(
+                                reason,
+                                openToolCall.matchingName
+                            )
+                        )
                     }
                 )
             }
-            openToolCallIds.clear()
+            openToolCalls.clear()
         }
 
         // 添加聊天历史
@@ -1088,7 +1116,7 @@ open class OpenAIProvider(
                 if (useToolCall) {
                     when (turn.kind) {
                         PromptTurnKind.SYSTEM -> {
-                            flushOpenToolCallsAsCancelled("system_boundary")
+                            flushOpenToolCallsAsUnmatched("system_boundary")
                             messagesArray.put(
                                 JSONObject().apply {
                                     put("role", "system")
@@ -1099,7 +1127,7 @@ open class OpenAIProvider(
 
                         PromptTurnKind.USER,
                         PromptTurnKind.SUMMARY -> {
-                            flushOpenToolCallsAsCancelled("user_boundary")
+                            flushOpenToolCallsAsUnmatched("user_boundary")
                             messagesArray.put(
                                 JSONObject().apply {
                                     put("role", "user")
@@ -1118,12 +1146,12 @@ open class OpenAIProvider(
                                 }
 
                             if (toolCalls != null && toolCalls.length() > 0) {
-                                if (openToolCallIds.isNotEmpty()) {
-                                    flushOpenToolCallsAsCancelled("assistant_tool_call_before_result")
+                                if (openToolCalls.isNotEmpty()) {
+                                    flushOpenToolCallsAsUnmatched("assistant_tool_call_before_result")
                                 }
                                 queueToolCalls(textContent, toolCalls)
                             } else {
-                                flushOpenToolCallsAsCancelled("assistant_boundary")
+                                flushOpenToolCallsAsUnmatched("assistant_boundary")
                                 val effectiveContent = if (content.isBlank()) {
                                     AppLogger.d("AIService", "发现空的assistant消息，填充为[空消息]")
                                     "[Empty]"
@@ -1154,12 +1182,12 @@ open class OpenAIProvider(
                                 }
 
                             if (toolCalls != null && toolCalls.length() > 0) {
-                                if (openToolCallIds.isNotEmpty()) {
-                                    flushOpenToolCallsAsCancelled("typed_tool_call_before_result")
+                                if (openToolCalls.isNotEmpty()) {
+                                    flushOpenToolCallsAsUnmatched("typed_tool_call_before_result")
                                 }
                                 queueToolCalls(textContent, toolCalls)
                             } else {
-                                flushOpenToolCallsAsCancelled("typed_tool_call_without_payload")
+                                flushOpenToolCallsAsUnmatched("typed_tool_call_without_payload")
                                 val effectiveContent = if (content.isBlank()) "[Empty]" else content
                                 messagesArray.put(
                                     JSONObject().apply {
@@ -1180,30 +1208,33 @@ open class OpenAIProvider(
                             val (textContent, toolResults) = parseXmlToolResults(content)
                             val resultsList = toolResults ?: emptyList()
 
-                            if (resultsList.isNotEmpty() && openToolCallIds.isNotEmpty()) {
-                                val validCount = minOf(resultsList.size, openToolCallIds.size)
+                            if (resultsList.isNotEmpty() && openToolCalls.isNotEmpty()) {
                                 val readableImageSources = mutableListOf<String>()
-                                repeat(validCount) { index ->
-                                    val (_, resultContent) = resultsList[index]
+                                val matchedCalls =
+                                    StructuredToolCallBridge.consumeMatchingToolCalls(
+                                        openToolCalls,
+                                        resultsList.map { it.first }
+                                    )
+                                matchedCalls.forEach { matchedCall ->
+                                    val resultContent = resultsList[matchedCall.resultIndex].second
                                     readableImageSources.add(resultContent)
                                     messagesArray.put(
                                         JSONObject().apply {
                                             put("role", "tool")
-                                            put("tool_call_id", openToolCallIds[index])
+                                            put("tool_call_id", matchedCall.call.id)
                                             put("content", buildContentField(context, resultContent, role = "tool"))
                                         }
                                     )
                                 }
-                                repeat(validCount) {
-                                    openToolCallIds.removeAt(0)
-                                }
 
-                                if (resultsList.size > validCount) {
+                                if (matchedCalls.size < resultsList.size) {
                                     AppLogger.w(
                                         "AIService",
-                                        "发现多余的tool_result: ${resultsList.size} results vs ${validCount} pending tool_calls"
+                                        "发现未匹配的tool_result: ${resultsList.size - matchedCalls.size}"
                                     )
                                 }
+
+                                flushOpenToolCallsAsUnmatched("tool_result_partial_batch")
 
                                 if (!useResponsesApi) {
                                     appendReadableImageMessageIfNeeded(
@@ -1222,24 +1253,20 @@ open class OpenAIProvider(
                                     )
                                 }
                             } else {
-                                flushOpenToolCallsAsCancelled("tool_result_without_structured_match")
-                                val fallbackContent =
-                                    when {
-                                        textContent.isNotEmpty() -> textContent
-                                        content.isNotBlank() -> content
-                                        else -> "[Empty]"
-                                    }
-                                messagesArray.put(
-                                    JSONObject().apply {
-                                        put("role", "user")
-                                        put("content", buildContentField(context, fallbackContent))
-                                    }
-                                )
+                                flushOpenToolCallsAsUnmatched("tool_result_without_structured_match")
+                                if (textContent.isNotEmpty()) {
+                                    messagesArray.put(
+                                        JSONObject().apply {
+                                            put("role", "user")
+                                            put("content", buildContentField(context, textContent))
+                                        }
+                                    )
+                                }
                             }
                         }
                     }
                 } else {
-                    flushOpenToolCallsAsCancelled("tool_call_api_disabled")
+                    flushOpenToolCallsAsUnmatched("tool_call_api_disabled")
                     val role = providerRoleForTurn(turn)
                     // 不启用Tool Call API时，保持原样
                     val historyMessage = JSONObject()
@@ -1265,7 +1292,7 @@ open class OpenAIProvider(
             }
         }
 
-        flushOpenToolCallsAsCancelled("history_end")
+        flushOpenToolCallsAsUnmatched("history_end")
 
         return Pair(messagesArray, tokenCount)
     }
@@ -1534,6 +1561,16 @@ open class OpenAIProvider(
             receivedContent.append(tag)
         }
 
+        /**
+         * Provider protocol metadata must occupy its own line so the XML splitter does not
+         * interpret it as ordinary response text when it follows content or tool arguments.
+         */
+        suspend fun emitMetadataTag(tag: String) {
+            emitTag("\n")
+            emitTag(tag)
+            emitTag("\n")
+        }
+
         suspend fun emitSavepoint(id: String) {
             savepointLengths[id] = receivedContent.length
             eventChannel.emit(TextStreamEvent(TextStreamEventType.SAVEPOINT, id))
@@ -1738,7 +1775,7 @@ open class OpenAIProvider(
 
     /**
      * 解析XML格式的tool_result，转换为OpenAI Tool消息格式
-     * @return List<Pair<tool_call_id, result_content>>
+     * @return List<Pair<tool_name, result_content>>，tool_name 用于把结果配回发起它的 tool_call
      */
     fun parseXmlToolResults(content: String): Pair<String, List<Pair<String, String>>?> {
         // 匹配带属性的tool_result标签，例如: <tool_result name="..." status="...">...</tool_result>
@@ -1750,7 +1787,6 @@ open class OpenAIProvider(
 
         val results = mutableListOf<Pair<String, String>>()
         var textContent = content
-        var resultIndex = 0
 
         matches.forEach { match ->
             // 提取<content>标签内的内容，如果有的话
@@ -1762,12 +1798,14 @@ open class OpenAIProvider(
                 fullContent
             }
 
-            // 生成一个tool_call_id（这里需要与之前的call对应，但因为历史记录可能不完整，我们使用索引）
-            results.add(Pair("call_result_${resultIndex}", resultContent))
+            // 保留 name 属性，让结果能配回同名的 tool_call 而不是只按位置对齐
+            val openingTag = match.value.substringBefore('>')
+            val resultName =
+                ChatMarkupRegex.nameAttr.find(openingTag)?.groupValues?.getOrNull(1).orEmpty()
+            results.add(Pair(resultName, resultContent))
 
             // 从文本内容中移除tool_result标签（包括前后的空白符）
             textContent = textContent.replace(match.value, "").trim()
-            resultIndex++
         }
 
         // trim 确保移除所有空白字符
@@ -1834,7 +1872,9 @@ open class OpenAIProvider(
         val responsesWebSearchItems: MutableMap<Int, JSONObject> = linkedMapOf(),
         val emittedResponsesWebSearchKeys: MutableSet<String> = mutableSetOf(),
         val emittedResponsesOutputItemMetadataKeys: MutableSet<String> = mutableSetOf(),
-        val responsesOutputTextBuffers: MutableMap<Int, StringBuilder> = linkedMapOf()
+        val responsesOutputTextBuffers: MutableMap<Int, StringBuilder> = linkedMapOf(),
+        val responsesMessageItems: MutableMap<Int, JSONObject> = linkedMapOf(),
+        val responsesLiveEmittedOutputIndexes: MutableSet<Int> = mutableSetOf()
     )
 
     /**
@@ -2354,7 +2394,7 @@ open class OpenAIProvider(
             return
         }
         closeReasoningModeIfOpen(state, emitter)
-        emitter.emitTag(metadataTag)
+        emitter.emitMetadataTag(metadataTag)
     }
 
     private suspend fun emitResponsesOutputItemMetadataFromResponse(
@@ -2564,8 +2604,11 @@ open class OpenAIProvider(
                 if (delta.isNotEmpty()) {
                     val outputIndex = jsonResponse.optInt("output_index", -1)
                     if (bufferResponsesOutputTextUntilItemDone && outputIndex >= 0) {
+                        // Keep a buffer for commentary metadata. Visible final text is emitted
+                        // live once output_item.added has shown this item is not commentary.
                         state.responsesOutputTextBuffers.getOrPut(outputIndex) { StringBuilder() }
                             .append(delta)
+                        emitLiveResponsesOutputText(outputIndex, delta, state, emitter)
                     } else {
                         processResponsesRegularContentDelta(delta, state, emitter)
                     }
@@ -2620,8 +2663,45 @@ open class OpenAIProvider(
                         // Responses output item 的顺序是 reasoning -> web search -> message。
                         // 消息边界只负责把已完成的搜索来源放到正文之前。
                         emitResponsesWebSearchDisplayFromResponse(context, null, state, emitter)
-                    } else if (eventType == "response.output_item.done" && bufferResponsesOutputTextUntilItemDone) {
-                        emitBufferedResponsesMessageItemContent(item, outputIndex, state, emitter)
+                        if (bufferResponsesOutputTextUntilItemDone && outputIndex >= 0) {
+                            state.responsesMessageItems[outputIndex] = JSONObject(item.toString())
+                            val pendingText =
+                                state.responsesOutputTextBuffers[outputIndex]?.toString().orEmpty()
+                            if (pendingText.isNotEmpty() &&
+                                outputIndex !in state.responsesLiveEmittedOutputIndexes
+                            ) {
+                                emitLiveResponsesOutputText(
+                                    outputIndex,
+                                    pendingText,
+                                    state,
+                                    emitter
+                                )
+                            }
+                        }
+                    } else if (eventType == "response.output_item.done") {
+                        val bufferedText =
+                            if (outputIndex >= 0) {
+                                state.responsesOutputTextBuffers[outputIndex]?.toString().orEmpty()
+                            } else {
+                                ""
+                            }
+                        if (bufferResponsesOutputTextUntilItemDone) {
+                            if (outputIndex in state.responsesLiveEmittedOutputIndexes) {
+                                state.responsesOutputTextBuffers.remove(outputIndex)
+                            } else {
+                                emitBufferedResponsesMessageItemContent(
+                                    item,
+                                    outputIndex,
+                                    state,
+                                    emitter
+                                )
+                            }
+                        }
+                        // Some Responses providers attach opaque continuation state to a completed
+                        // message item. The provider-specific hook owns both the encoding and replay.
+                        createResponsesMessageMetadataTag(item, bufferedText)?.let { metadataTag ->
+                            emitter.emitMetadataTag(metadataTag)
+                        }
                     }
                     return
                 }
@@ -2641,8 +2721,8 @@ open class OpenAIProvider(
                             emitter
                         )
                         closeReasoningModeIfOpen(state, emitter)
-                        OpenAIResponsesPayloadAdapter.createReasoningMetadataTag(item)?.let { metadataTag ->
-                            emitter.emitTag(metadataTag)
+                        createResponsesReasoningMetadataTag(item)?.let { metadataTag ->
+                            emitter.emitMetadataTag(metadataTag)
                         }
                     }
                     return
@@ -2907,6 +2987,23 @@ open class OpenAIProvider(
         processContentDelta("", regularContent, state, emitter)
     }
 
+    private suspend fun emitLiveResponsesOutputText(
+        outputIndex: Int,
+        text: String,
+        state: StreamingState,
+        emitter: StreamEmitter
+    ) {
+        if (text.isEmpty() || outputIndex < 0) {
+            return
+        }
+        val item = state.responsesMessageItems[outputIndex] ?: return
+        if (isResponsesCommentaryMessage(item)) {
+            return
+        }
+        processResponsesRegularContentDelta(text, state, emitter)
+        state.responsesLiveEmittedOutputIndexes.add(outputIndex)
+    }
+
     private suspend fun emitBufferedResponsesMessageItemContent(
         item: JSONObject,
         outputIndex: Int,
@@ -2924,9 +3021,9 @@ open class OpenAIProvider(
         }
 
         if (isResponsesCommentaryMessage(item)) {
+            // DeepSeek commentary is persisted as hidden metadata on output_item.done.
+            // Emitting it as think would show a second thinking block next to the reasoning item.
             state.reasoningObserved = true
-            processContentDelta(bufferedText, "", state, emitter)
-            closeReasoningModeIfOpen(state, emitter)
         } else {
             processResponsesRegularContentDelta(bufferedText, state, emitter)
         }
@@ -3218,14 +3315,13 @@ open class OpenAIProvider(
                                 "AIService",
                                 "【发送消息】API请求失败，状态码: ${response.code}，错误信息: $errorBody"
                             )
-                            // 4xx错误仍保留单独的异常类型，具体是否重试由统一策略决定
+                            // 状态码错误保留状态码信息，随后进入统一重试循环。
                             if (response.code in 400..499) {
-                                throw NonRetriableException(
+                                throw HttpStatusException(
                                     context.getString(R.string.openai_error_api_request_failed_with_status, response.code, errorBody),
                                     statusCode = response.code
                                 )
                             }
-                            // 对于5xx等服务端错误，允许重试
                             throw IOException(context.getString(R.string.openai_error_api_request_failed_with_status, response.code, errorBody))
                         }
 
@@ -3260,7 +3356,7 @@ open class OpenAIProvider(
                                 val handledImages = tryHandleOpenAiImageResponse(jsonResponse, emitter, null)
 
                                 if (useResponsesApi) {
-                                    val parsed = OpenAIResponsesPayloadAdapter.parseNonStreamingResponse(jsonResponse)
+                                    val parsed = parseResponsesNonStreamingResponse(jsonResponse)
                                     val responseDisplayState = StreamingState()
 
                                     parsed.reasoningChunks.forEach { reasoningChunk ->
@@ -3269,10 +3365,10 @@ open class OpenAIProvider(
                                         }
                                     }
                                     parsed.reasoningMetadataTags.forEach { metadataTag ->
-                                        emitter.emitTag(metadataTag)
+                                        emitter.emitMetadataTag(metadataTag)
                                     }
                                     parsed.outputItemMetadataTags.forEach { metadataTag ->
-                                        emitter.emitTag(metadataTag)
+                                        emitter.emitMetadataTag(metadataTag)
                                     }
                                     emitResponsesWebSearchDisplayFromResponse(
                                         context,
